@@ -33,9 +33,19 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# porterra-lite offline failsafe (pending-op queue + last-good snapshot)
+/.porterra/
+
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# IDE
+/.idea/
+
+# Claude Code local settings + temp (credentials/data must stay out of git)
+/.claude/settings.local.json
+/.claude/tmp/
