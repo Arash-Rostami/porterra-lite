@@ -5,9 +5,11 @@ const port = (() => {
   return Number.isFinite(p) && p > 0 ? p : 3306;
 })();
 
+const ssl = process.env.MYSQL_SSL ? (process.env.MYSQL_SSL === 'accept' ? {} : { rejectUnauthorized: true }) : undefined;
 const cfg = {
   host: process.env.MYSQL_HOST || 'localhost',
   port,
+  ssl,
   user: process.env.MYSQL_USER || 'root',
   password: process.env.MYSQL_PASSWORD || '',
   database: process.env.MYSQL_DATABASE || 'porterra-lite',
