@@ -22,6 +22,24 @@ export function rowToContact(row) {
     result: row.result,
     priority: row.priority,
     notes: row.notes,
+    deactivateReason: row.deactivate_reason,
+    quotePrice: row.quote_price,
+    quotePriceType: row.quote_price_type,
+    quoteTerms: row.quote_terms,
+    quotePriceDate: row.quote_price_date,
+    quoteResult: row.quote_result,
+    quoteResultDate: row.quote_result_date,
+    quoteFailReason: row.quote_fail_reason,
+  };
+}
+
+export function rowToProduct(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    isCustom: Boolean(row.is_custom),
+    createdAt: Number(row.created_at),
   };
 }
 
@@ -78,6 +96,24 @@ export function contactToRow(c) {
     result: n(c.result),
     priority: n(c.priority),
     notes: n(c.notes),
+    deactivate_reason: n(c.deactivateReason),
+    quote_price: n(c.quotePrice),
+    quote_price_type: n(c.quotePriceType),
+    quote_terms: n(c.quoteTerms),
+    quote_price_date: normDate(n(c.quotePriceDate)),
+    quote_result: n(c.quoteResult),
+    quote_result_date: normDate(n(c.quoteResultDate)),
+    quote_fail_reason: n(c.quoteFailReason),
+  };
+}
+
+export function productToRow(p) {
+  return {
+    id: p.id,
+    name: p.name,
+    category: p.category,
+    is_custom: p.isCustom ? 1 : 0,
+    created_at: p.createdAt,
   };
 }
 
@@ -120,8 +156,12 @@ export function rowToUser(row) {
   };
 }
 
-export const CONTACT_COLS = ['id', 'converted', 'company', 'coordinator', 'name', 'phone', 'product', 'category', 'source', 'date', 'price', 'result', 'priority', 'notes'];
+export const CONTACT_COLS = [
+  'id', 'converted', 'company', 'coordinator', 'name', 'phone', 'product', 'category', 'source', 'date', 'price', 'result', 'priority', 'notes',
+  'deactivate_reason', 'quote_price', 'quote_price_type', 'quote_terms', 'quote_price_date', 'quote_result', 'quote_result_date', 'quote_fail_reason',
+];
 export const REMINDER_COLS = ['id', 'cust_key', 'company', 'due_date', 'due_time', 'for_agent', 'text', 'created_at', 'done'];
 export const ACTIVITY_COLS = ['id', 'company_key', 'type', 'ts', 'author', 'text'];
 export const USER_COLS = ['id', 'username', 'email', 'display_name', 'agent_code', 'password_cipher', 'role', 'active', 'last_login', 'created_at'];
 export const USER_SAFE_COLS = ['id', 'username', 'email', 'display_name', 'agent_code', 'role', 'active', 'last_login', 'created_at'];
+export const PRODUCT_COLS = ['id', 'name', 'category', 'is_custom', 'created_at'];

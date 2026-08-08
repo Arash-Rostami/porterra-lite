@@ -3,10 +3,9 @@ import { useMemo } from 'react';
 import Dropdown from '../ui/Dropdown.jsx';
 import CompanySuggest from '../ui/CompanySuggest.jsx';
 import { TrashIcon } from '../ui/Icon.jsx';
-import { filterOptionsFrom } from '../../lib/filters.js';
+import { filterOptionsFrom, STATUS_OPTS } from '../../lib/filters.js';
 
-const STATUS_OPTS = ['موفق', 'ناموفق', 'در حال پیگیری', 'بی‌پاسخ', 'بدون وضعیت'];
-const emptyFilters = { q: '', coordinator: '', category: '', source: '', status: '', dateFrom: '', dateTo: '' };
+const emptyFilters = { q: '', coordinator: '', category: '', source: '', status: '', dateFrom: '', dateTo: '', showDeactivated: false };
 
 export default function ContactFilters({ records, filters, onChange, chartFilter, onClearChartFilter }) {
   const opts = useMemo(() => filterOptionsFrom(records), [records]);
@@ -38,6 +37,10 @@ export default function ContactFilters({ records, filters, onChange, chartFilter
         </div>
         <button type="button" className="crm-suggest-clear-mini" title="پاک کردن" aria-label="پاک کردن" onClick={() => onChange(emptyFilters)}><TrashIcon /></button>
       </div>
+      <label className="crm-toggle-label">
+        <input type="checkbox" checked={!!filters.showDeactivated} onChange={(e) => onChange({ ...filters, showDeactivated: e.target.checked })} />
+        <span>نمایش غیرفعال‌ها</span>
+      </label>
       {chartFilter && (
         <div className="crm-active-chart-filter -show" id="crmChartFilterPill">
           <span>{chartFilter.label}</span>

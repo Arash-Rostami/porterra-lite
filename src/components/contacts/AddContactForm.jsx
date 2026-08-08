@@ -2,17 +2,14 @@
 import { useState, useMemo, useEffect } from 'react';
 import Modal from '../ui/Modal.jsx';
 import Dropdown from '../ui/Dropdown.jsx';
+import ProductField from './ProductField.jsx';
 import Utils from '../../lib/utils.js';
 import { findDuplicateCompany, findDuplicatePhone } from '../../lib/duplicates.js';
+import { coordOptions, CATEGORY_OPTS, RESULT_OPTS, PRIORITY_OPTS } from '../../lib/filters.js';
 import { toast } from '../ui/Toast.jsx';
 import { CheckIcon, XCircleIcon } from '../ui/Icon.jsx';
 
-const COORD_OPTS = [{ value: 'FARNAZ', label: 'فرناز' }, { value: 'PARDIS', label: 'پردیس' }, { value: 'ZOHREH', label: 'زهره' }];
-const CATEGORY_OPTS = ['Solar', 'Polymer', 'Petrochemical', 'Chemical', 'Chemical/Polymer', 'Wood', 'Glass Fiber'];
-const RESULT_OPTS = ['در حال پیگیری', 'موفق', 'ناموفق', 'بی‌پاسخ'];
-const PRIORITY_OPTS = ['بالا', 'متوسط', 'پایین'];
-
-const empty = { coordinator: '', company: '', name: '', phone: '', product: '', category: '', source: '', date: '', price: '', result: '', priority: '', notes: '' };
+const empty = { coordinator: '', company: '', name: '', phone: '', product: '', category: '', source: '', date: '', price: '', result: '', priority: '', notes: '', deactivateReason: '' };
 
 // create and edit share the same <Modal> chrome for UI consistency
 export default function AddContactForm({ open, records, defaultCoordinator, onSubmit, onCancel }) {
@@ -31,7 +28,7 @@ export default function AddContactForm({ open, records, defaultCoordinator, onSu
 
   function submit() {
     if (!f.coordinator || !f.company.trim()) { toast('کارشناس و نام شرکت الزامی است'); return; }
-    const today = new Date();
+    if (f.result === 'غیرفعال' && !f.deactivateReason.trim()) { toast('برای غیرفعال کردن، دلیل الزامی است'); return; }
     const rec = {
       id: 'NEW-' + Date.now() + '-' + Math.floor(Math.random() * 10000),
       converted: false,
@@ -42,11 +39,12 @@ export default function AddContactForm({ open, records, defaultCoordinator, onSu
       product: f.product.trim() || null,
       category: f.category || null,
       source: f.source.trim() || null,
-      date: (f.date ? Utils.fromISODate(f.date) : '') || (String(today.getDate()).padStart(2, '0') + '.' + String(today.getMonth() + 1).padStart(2, '0') + '.' + today.getFullYear()),
+      date: (f.date ? Utils.fromISODate(f.date) : '') || Utils.todayDdMmYyyy(),
       price: f.price.trim() || null,
       result: f.result || null,
       priority: f.priority || null,
       notes: f.notes.trim() || null,
+      deactivateReason: f.result === 'غیرفعال' ? f.deactivateReason.trim() : null,
     };
     onSubmit(rec);
     reset();
@@ -74,7 +72,7 @@ export default function AddContactForm({ open, records, defaultCoordinator, onSu
       <div className="crm-form-grid">
         <div className="crm-field">
           <label>کارشناس *</label>
-          <Dropdown value={f.coordinator} onChange={set('coordinator')} options={COORD_OPTS} placeholder="انتخاب کنید" />
+          <Dropdown value={f.coordinator} onChange={set('coordinator')} options={coordOptions()} placeholder="انتخاب کنید" />
         </div>
         <div className="crm-field -span2">
           <label>نام شرکت *</label>
@@ -92,7 +90,7 @@ export default function AddContactForm({ open, records, defaultCoordinator, onSu
         </div>
         <div className="crm-field">
           <label>محصول</label>
-          <input className="crm-input" value={f.product} onChange={setInput('product')} placeholder="مثلاً: PET / پنل خورشیدی" />
+          <ProductField value={f.product} onChange={set('product')} onCategorySelect={(cat) => setF((s) => (s.category ? s : { ...s, category: cat }))} />
         </div>
         <div className="crm-field">
           <label>دسته محصول</label>
@@ -122,6 +120,12 @@ export default function AddContactForm({ open, records, defaultCoordinator, onSu
           <label>یادداشت</label>
           <textarea className="crm-textarea" rows={3} value={f.notes} onChange={setInput('notes')} placeholder="خلاصه مکالمه، پیگیری بعدی و ..." />
         </div>
+        {f.result === 'غیرفعال' && (
+          <div className="crm-field -span3">
+            <label>دلیل غیرفعال شدن *</label>
+            <textarea className="crm-textarea" rows={2} value={f.deactivateReason} onChange={setInput('deactivateReason')} placeholder="چرا این سرنخ کنار گذاشته شد؟" />
+          </div>
+        )}
       </div>
       <div className="crm-required-note">فیلدهای ستاره‌دار الزامی هستند.</div>
     </Modal>

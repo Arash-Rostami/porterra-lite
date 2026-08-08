@@ -2,13 +2,12 @@
 import { computeKpis } from '../../lib/analytics.js';
 import useCountUp from '../../lib/useCountUp.js';
 
-function KpiCard({ label, value, sub, cls }) {
+function KpiCard({ label, value, cls }) {
   const display = useCountUp(value);
   return (
     <div className={`crm-kpi${cls ? ' ' + cls : ''}`}>
       <div className="crm-kpi-label">{label}</div>
       <div className="crm-kpi-value">{display}</div>
-      <div className="crm-kpi-sub">{sub}</div>
     </div>
   );
 }

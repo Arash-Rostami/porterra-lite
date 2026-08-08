@@ -45,6 +45,23 @@ export function exportToExcel(records) {
   return { ok: true, count: records.length };
 }
 
+export function exportProductsToExcel(products) {
+  if (!products.length) return { ok: false, reason: 'empty' };
+  const rows = products.map((p) => ({
+    'نام محصول': p.name || '',
+    'دسته‌بندی': p.category || '',
+    'تاریخ ثبت': p.createdAt ? Utils.formatTs(p.createdAt, 'gregorian') : '',
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{ wch: 26 }, { wch: 18 }, { wch: 20 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'محصولات');
+  const today = new Date();
+  const fname = 'محصولات-' + today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0') + '.xlsx';
+  XLSX.writeFile(wb, fname);
+  return { ok: true, count: products.length };
+}
+
 export function downloadImportTemplate() {
   const headers = ['کارشناس', 'شرکت', 'مخاطب', 'تلفن', 'محصول', 'دسته محصول', 'منبع سرنخ', 'تاریخ تماس', 'آخرین قیمت اعلامی', 'نتیجه', 'اولویت', 'تبدیل به مشتری', 'یادداشت'];
   const sample = [{

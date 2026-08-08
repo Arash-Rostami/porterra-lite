@@ -92,7 +92,7 @@ export async function loadBootData() {
     data = await loadAllFromDb();
   } catch {
     const snap = await readSnapshot();
-    return { data: snap || { records: [], customerMeta: {}, reminders: [] }, offline: true, queueCount: await getQueueCount() };
+    return { data: snap || { records: [], customerMeta: {}, reminders: [], products: [], agents: [] }, offline: true, queueCount: await getQueueCount() };
   }
   await writeSnapshot(data).catch(() => {});
   return { data, offline: false, queueCount: await getQueueCount() };

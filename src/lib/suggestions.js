@@ -8,7 +8,6 @@ export function computeSuggestions(records) {
   const now = new Date();
   now.setHours(0, 0, 0, 0);
 
-  // a fresh call supersedes any older, still-pending record for the same company
   const latestByCustomer = {};
   for (const r of records) {
     const key = custKey(r.company);
@@ -26,15 +25,15 @@ export function computeSuggestions(records) {
   for (const key in latestByCustomer) {
     const r = latestByCustomer[key];
     if (r.converted) continue;
+    if (r.result === 'غیرفعال' || r.result === 'در حال استعلام') continue;
     const effRes = effectiveResult(r);
-    if (effRes === 'موفق') continue;
     const dt = Utils.parseDate(r.date);
     if (!dt) continue;
     const days = Math.round((now - dt) / 86400000);
     if (days <= 0) continue;
     const noStatus = !effRes;
     const pr = noStatus ? 3 : PRIORITY_RANK[r.priority] || 0;
-    const isNoAnswer = effRes === 'ناموفق';
+    const isNoAnswer = effRes === 'بی‌پاسخ';
     if (!isNoAnswer && !noStatus && days < 3 && pr < 3) continue;
     const agent = Utils.normSpace(r.coordinator);
     if (!agent) continue;

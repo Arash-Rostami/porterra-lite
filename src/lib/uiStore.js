@@ -25,7 +25,7 @@ let ui = {
   agentProfile: null,
   addFormOpen: false,
   chartFilter: null,
-  filters: { q: '', coordinator: '', category: '', source: '', status: '', dateFrom: '', dateTo: '' },
+  filters: { q: '', coordinator: '', category: '', source: '', status: '', dateFrom: '', dateTo: '', showDeactivated: false },
   calendar: 'gregorian',
   fontScale: FONT_SCALE_DEFAULT,
   scope: 'mine',

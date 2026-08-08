@@ -2,7 +2,7 @@
 import { computeFunnelStages } from '../../lib/analytics.js';
 
 export default function FunnelChart({ records }) {
-  const stages = computeFunnelStages(records);
+  const { stages, leadToCustomerRate, quoteToSaleRate } = computeFunnelStages(records);
   return (
     <div className="crm-section" id="crmFunnel">
       <div className="crm-section-title">قیف فروش</div>
@@ -17,6 +17,10 @@ export default function FunnelChart({ records }) {
           <div className="crm-funnel-pct">{s.pct}%</div>
         </div>
       ))}
+      <div className="crm-funnel-rates">
+        <span>نرخ تبدیل سرنخ به مشتری: {leadToCustomerRate}٪</span>
+        <span>نرخ تبدیل استعلام به فروش: {quoteToSaleRate}٪</span>
+      </div>
     </div>
   );
 }

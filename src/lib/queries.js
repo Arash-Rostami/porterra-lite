@@ -4,11 +4,14 @@ import {
     activityToRow,
     CONTACT_COLS,
     contactToRow,
+    PRODUCT_COLS,
+    productToRow,
     REMINDER_COLS,
     reminderToRow,
     rowsToCustomerMeta,
     rowToActivity,
     rowToContact,
+    rowToProduct,
     rowToReminder,
     rowToUser,
     USER_COLS,
@@ -21,7 +24,29 @@ const selectCols = (cols) => cols.map((c) => `\`${c}\``).join(',');
 
 const CONTACT_SET = CONTACT_COLS.filter((c) => c !== 'id');
 const REMINDER_SET = REMINDER_COLS.filter((c) => c !== 'id');
-const UPDATEABLE = ['converted', 'company', 'coordinator', 'name', 'phone', 'product', 'category', 'source', 'date', 'price', 'result', 'priority', 'notes'];
+const CONTACT_UPDATE = [
+    {k: 'converted', col: 'converted'},
+    {k: 'company', col: 'company'},
+    {k: 'coordinator', col: 'coordinator'},
+    {k: 'name', col: 'name'},
+    {k: 'phone', col: 'phone'},
+    {k: 'product', col: 'product'},
+    {k: 'category', col: 'category'},
+    {k: 'source', col: 'source'},
+    {k: 'date', col: 'date'},
+    {k: 'price', col: 'price'},
+    {k: 'result', col: 'result'},
+    {k: 'priority', col: 'priority'},
+    {k: 'notes', col: 'notes'},
+    {k: 'deactivateReason', col: 'deactivate_reason'},
+    {k: 'quotePrice', col: 'quote_price'},
+    {k: 'quotePriceType', col: 'quote_price_type'},
+    {k: 'quoteTerms', col: 'quote_terms'},
+    {k: 'quotePriceDate', col: 'quote_price_date'},
+    {k: 'quoteResult', col: 'quote_result'},
+    {k: 'quoteResultDate', col: 'quote_result_date'},
+    {k: 'quoteFailReason', col: 'quote_fail_reason'},
+];
 const USER_SET = USER_COLS.filter((c) => c !== 'id' && c !== 'username' && c !== 'created_at');
 
 const USER_SELECT = selectCols(USER_COLS);
@@ -29,6 +54,7 @@ const USER_SAFE_SELECT = selectCols(USER_SAFE_COLS);
 const CONTACT_SELECT = selectCols(CONTACT_COLS);
 const ACTIVITY_SELECT = selectCols(ACTIVITY_COLS);
 const REMINDER_SELECT = selectCols(REMINDER_COLS);
+const PRODUCT_SELECT = selectCols(PRODUCT_COLS);
 
 export async function listContacts(conn) {
     const rows = await exec(conn, `SELECT ${CONTACT_SELECT} FROM \`contacts\``);
@@ -57,9 +83,9 @@ async function upsertContacts(records, conn) {
 export async function updateContact(id, patch, conn) {
     const sets = [];
     const params = [];
-    for (const k of UPDATEABLE) {
+    for (const {k, col} of CONTACT_UPDATE) {
         if (patch[k] === undefined) continue;
-        sets.push(`\`${k}\`=?`);
+        sets.push(`\`${col}\`=?`);
         params.push(k === 'converted' ? (patch[k] ? 1 : 0) : (patch[k] === '' ? null : patch[k]));
     }
     if (!sets.length) return;
@@ -153,16 +179,58 @@ export async function deleteReminder(id, conn) {
 }
 
 export async function loadAllFromDb() {
-    const [contactsRows, activityRows, reminderRows] = await Promise.all([
+    const [contactsRows, activityRows, reminderRows, productRows, agents] = await Promise.all([
         query(`SELECT ${CONTACT_SELECT} FROM \`contacts\``),
         query(`SELECT ${ACTIVITY_SELECT} FROM \`customer_activity\``),
         query(`SELECT ${REMINDER_SELECT} FROM \`reminders\``),
+        query(`SELECT ${PRODUCT_SELECT} FROM \`products\``),
+        listActiveAgents(),
     ]);
     return {
         records: contactsRows.map(rowToContact),
         customerMeta: rowsToCustomerMeta(activityRows),
         reminders: reminderRows.map(rowToReminder),
+        products: productRows.map(rowToProduct),
+        agents,
     };
+}
+
+export async function listActiveAgents(conn) {
+    const rows = await exec(conn, 'SELECT `agent_code`,`display_name` FROM `users` WHERE `agent_code` IS NOT NULL AND `active`=1 ORDER BY `display_name`');
+    return (rows || []).map((r) => ({agentCode: r.agent_code, displayName: r.display_name}));
+}
+
+export async function listProducts(conn) {
+    const rows = await exec(conn, `SELECT ${PRODUCT_SELECT} FROM \`products\``);
+    return (rows || []).map(rowToProduct);
+}
+export async function getProductById(id, conn) {
+    const rows = await exec(conn, `SELECT ${PRODUCT_SELECT} FROM \`products\` WHERE \`id\`=? LIMIT 1`, [id]);
+    return rows && rows[0] ? rowToProduct(rows[0]) : null;
+}
+export async function createProduct(p, conn) {
+    const row = productToRow(p);
+    const sql = `INSERT INTO \`products\` (\`${PRODUCT_COLS.join('`,`')}\`) VALUES (${ph(PRODUCT_COLS.length)})`;
+    await exec(conn, sql, PRODUCT_COLS.map((c) => row[c]));
+}
+const PRODUCT_UPDATE = [
+    {k: 'name', col: 'name'},
+    {k: 'category', col: 'category'},
+];
+export async function updateProduct(id, patch, conn) {
+    const sets = [];
+    const params = [];
+    for (const {k, col} of PRODUCT_UPDATE) {
+        if (patch[k] === undefined) continue;
+        sets.push(`\`${col}\`=?`);
+        params.push(patch[k]);
+    }
+    if (!sets.length) return;
+    params.push(id);
+    await exec(conn, `UPDATE \`products\` SET ${sets.join(',')} WHERE \`id\`=?`, params);
+}
+export async function deleteProduct(id, conn) {
+    await exec(conn, 'DELETE FROM `products` WHERE `id`=?', [id]);
 }
 
 export async function reseedContacts(seedRecords) {
@@ -262,6 +330,12 @@ export async function applyOp(op, payload, conn) {
             return updateReminder(payload.id, payload.patch, conn);
         case 'deleteReminder':
             return deleteReminder(payload.id, conn);
+        case 'createProduct':
+            return createProduct(payload.product, conn);
+        case 'updateProduct':
+            return updateProduct(payload.id, payload.patch, conn);
+        case 'deleteProduct':
+            return deleteProduct(payload.id, conn);
         case 'deleteContact': {
             const run = async (c) => {
                 await deleteContact(payload.id, c);

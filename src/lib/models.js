@@ -20,6 +20,14 @@ const timeField = z.preprocess(emptyToNull, z.string().regex(/^\d{2}:\d{2}$/, 'd
 // Accept boolean or 0/1 (DB TINYINT); reject truthy strings like "false" being coerced to true.
 const boolField = z.preprocess((v) => v === true || v === 1 || v === '1' || v === 'true', z.boolean());
 
+const quoteResultField = z.preprocess(emptyToNull, z.enum(['موفق', 'ناموفق']).nullable());
+
+const requireDeactivateReason = (data, ctx) => {
+    if (data.result === 'غیرفعال' && !data.deactivateReason) {
+        ctx.addIssue({code: z.ZodIssueCode.custom, message: 'deactivateReason is required when result is غیرفعال', path: ['deactivateReason']});
+    }
+};
+
 export const ContactCreate = z.object({
     id: reqStr(40),
     converted: boolField.default(false),
@@ -35,7 +43,15 @@ export const ContactCreate = z.object({
     result: optStr(64),
     priority: optStr(32),
     notes: optStr(10000),
-});
+    deactivateReason: optStr(500),
+    quotePrice: optStr(100),
+    quotePriceType: optStr(50),
+    quoteTerms: optStr(5000),
+    quotePriceDate: dateField.optional(),
+    quoteResult: quoteResultField.optional(),
+    quoteResultDate: dateField.optional(),
+    quoteFailReason: optStr(500),
+}).superRefine(requireDeactivateReason);
 
 // partial UPDATE patch (id passed separately): absent keys stay undefined so SQL skips them; present '' becomes NULL
 export const ContactUpdate = z.object({
@@ -52,6 +68,46 @@ export const ContactUpdate = z.object({
     result: optStr(64).optional(),
     priority: optStr(32).optional(),
     notes: optStr(10000).optional(),
+    deactivateReason: optStr(500).optional(),
+    quotePrice: optStr(100).optional(),
+    quotePriceType: optStr(50).optional(),
+    quoteTerms: optStr(5000).optional(),
+    quotePriceDate: dateField.optional(),
+    quoteResult: quoteResultField.optional(),
+    quoteResultDate: dateField.optional(),
+    quoteFailReason: optStr(500).optional(),
+}).superRefine((data, ctx) => {
+    if (data.result === undefined) return;
+    requireDeactivateReason(data, ctx);
+});
+
+export const ProductCategory = z.enum(['Chemical/Polymer', 'Solar']);
+
+export const ProductCreate = z.object({
+    id: reqStr(40),
+    name: reqStr(150),
+    category: ProductCategory,
+    isCustom: boolField.default(true),
+    createdAt: z.number().int().nonnegative(),
+});
+
+export const ProductUpdate = z.object({
+    name: reqStr(150).optional(),
+    category: ProductCategory.optional(),
+});
+
+export const QuoteAnnouncePrice = z.object({
+    price: reqStr(100),
+    priceType: optStr(50),
+    terms: optStr(5000),
+});
+
+export const QuoteResolve = z.object({
+    result: z.enum(['موفق', 'ناموفق']),
+    failReason: optStr(500),
+}).refine((v) => v.result !== 'ناموفق' || !!v.failReason, {
+    message: 'failReason is required when result is ناموفق',
+    path: ['failReason'],
 });
 
 export const Activity = z.object({

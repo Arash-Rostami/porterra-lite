@@ -1,10 +1,29 @@
 import Utils from './utils.js';
 
 export const COORD_LABELS = { FARNAZ: 'فرناز', PARDIS: 'پردیس', ZOHREH: 'زهره' };
+export const COORD_OPTS = [{ value: 'FARNAZ', label: 'فرناز' }, { value: 'PARDIS', label: 'پردیس' }, { value: 'ZOHREH', label: 'زهره' }];
+export const COMMENT_AUTHORS = ['فرناز', 'پردیس', 'زهره'];
+export const CATEGORY_OPTS = ['Chemical/Polymer', 'Solar'];
+export const RESULT_OPTS = ['در حال پیگیری', 'در حال استعلام', 'بی‌پاسخ', 'غیرفعال'];
+export const STATUS_OPTS = ['در حال پیگیری', 'در حال استعلام', 'بی‌پاسخ', 'غیرفعال', 'بدون وضعیت'];
+export const PRIORITY_OPTS = ['بالا', 'متوسط', 'پایین'];
+export const PRICE_TYPE_OPTS = ['نقدی', 'اعتباری', 'پیش‌پرداخت'];
 const FAIL_NOTE_PATTERNS = ['یادم نمیاد', 'جواب نداد', 'پاسخ نداد', 'جواب نمی', 'پاسخ نمی'];
 
+let AGENT_DIRECTORY = {};
+export function setAgentDirectory(agents) {
+  AGENT_DIRECTORY = {};
+  for (const a of agents) AGENT_DIRECTORY[a.agentCode] = a.displayName;
+}
+
 export function coordLabel(v) {
-  return COORD_LABELS[v] || v;
+  return AGENT_DIRECTORY[v] || COORD_LABELS[v] || v;
+}
+
+export function coordOptions() {
+  const codes = Object.keys(AGENT_DIRECTORY);
+  if (!codes.length) return COORD_OPTS;
+  return codes.sort((a, b) => AGENT_DIRECTORY[a].localeCompare(AGENT_DIRECTORY[b])).map((value) => ({ value, label: AGENT_DIRECTORY[value] }));
 }
 
 export function coordClass(co) {
@@ -32,17 +51,21 @@ export function noteIndicatesNoAnswer(notes) {
 
 export function effectiveResult(r) {
   if (r.result) return r.result;
-  if (noteIndicatesNoAnswer(r.notes)) return 'ناموفق';
+  if (noteIndicatesNoAnswer(r.notes)) return 'بی‌پاسخ';
   return null;
 }
 
+export function isQuoteOpen(r) {
+  return r.result === 'در حال استعلام' && !r.quoteResult;
+}
+
 export function statusBadgeInfo(r) {
+  if (r.converted || r.quoteResult === 'موفق') return { text: 'موفق', className: '-success' };
+  if (r.quoteResult === 'ناموفق') return { text: 'ناموفق', className: '-fail' };
   const effRes = effectiveResult(r);
   if (!effRes) return { text: '-', className: '-none' };
-  let cls = '-progress';
-  if (effRes === 'موفق') cls = '-success';
-  else if (effRes === 'ناموفق') cls = '-fail';
-  return { text: effRes, className: cls };
+  if (effRes === 'غیرفعال') return { text: effRes, className: '-fail' };
+  return { text: effRes, className: '-progress' };
 }
 
 export function smartSearch(records, query) {
@@ -68,8 +91,9 @@ export function smartSearch(records, query) {
 
 export function getFiltered(records, filters, chartFilter, sort) {
   let base = records;
-  const { coordinator, category, source, status, dateFrom, dateTo } = filters;
+  const { coordinator, category, source, status, dateFrom, dateTo, showDeactivated } = filters;
   base = base.filter((r) => {
+    if (!showDeactivated && status !== 'غیرفعال' && r.result === 'غیرفعال') return false;
     if (coordinator && r.coordinator !== coordinator) return false;
     if (category && r.category !== category) return false;
     if (source && Utils.normSpace(r.source) !== source) return false;

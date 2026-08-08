@@ -22,11 +22,39 @@ login/comment timestamps stay stable across server/viewer TZs),
 harmless to leave, safe to delete if you're cleaning up).
 
 ### `filters.js`
+- Also holds the app's shared enum constants (`COORD_OPTS`, `COMMENT_AUTHORS`, `CATEGORY_OPTS`,
+  `RESULT_OPTS`, `STATUS_OPTS`, `PRIORITY_OPTS`, `PRICE_TYPE_OPTS`) — these used to be duplicated
+  per-component; this file already owned `COORD_LABELS` so the rest of the label/option vocabulary
+  lives beside it instead of a separate constants module.
+- `COORD_LABELS`/`COORD_OPTS` are now a **fallback only**, not the source of truth — the real
+  coordinator/agent list comes from active `users` rows (`agentCode`/`displayName`), loaded once
+  at boot into a module-level registry via `setAgentDirectory(agents)` (called from `store.js`'s
+  `loadAll`/`syncNow`/`logout`). `coordLabel(v)` checks that registry first, falls back to
+  `COORD_LABELS[v]`, then the raw code. `coordOptions()` builds the dropdown list from the
+  registry, falling back to the hardcoded `COORD_OPTS` only when the registry is empty (before
+  boot load completes, or genuinely offline with no cached snapshot yet — `products`/`agents` are
+  both part of the cached `snapshot.json`, so a normal offline session still has real data).
+  `coordClass(co)` still special-cases exactly `FARNAZ`/`PARDIS`/`ZOHREH` for their brand colors
+  and falls back to `-other` for any other agent — same treatment as `agentColor()` in
+  `analytics.js`, intentionally not extended to a per-agent color table.
+- `result` is now a 4-state enum, never `'موفق'`/`'ناموفق'` directly: `'در حال پیگیری'` (follow-up),
+  `'در حال استعلام'` (an inquiry/quote is open — see the `quote*` fields below), `'بی‌پاسخ'`
+  (no answer), `'غیرفعال'` (deactivated, requires `deactivateReason`). `'موفق'`/`'ناموفق'` only
+  exist as `quoteResult` values, set exclusively by resolving a quote (`resolveQuote` in `store.js`).
 - `effectiveResult(r)` — **the** status-resolution function. If `r.result` is set, use it;
   otherwise scan `r.notes` for `FAIL_NOTE_PATTERNS` ('یادم نمیاد', 'جواب نداد', 'پاسخ نداد',
-  'جواب نمی', 'پاسخ نمی') and infer `'ناموفق'`; otherwise `null` ("بدون وضعیت" / no status).
-  Every stat (funnel, KPIs, agent report, suggestions) reads status through this function,
-  never `r.result` directly. If you add a new stat, do the same.
+  'جواب نمی', 'پاسخ نمی') and infer `'بی‌پاسخ'` (**not** `'ناموفق'` — that value doesn't exist on
+  `result` anymore); otherwise `null` ("بدون وضعیت" / no status). Every stat (funnel, KPIs, agent
+  report, suggestions) reads status through this function, never `r.result` directly. If you add a
+  new stat, do the same — and never compare `effectiveResult(r) === 'موفق'`/`'ناموفق'`, since that's
+  the exact stale-enum bug the quote-model migration fixed upstream (check `r.quoteResult` instead).
+- `isQuoteOpen(r)` — `r.result === 'در حال استعلام' && !r.quoteResult`.
+- `statusBadgeInfo(r)` — `r.converted || r.quoteResult === 'موفق'` → success badge;
+  `r.quoteResult === 'ناموفق'` → fail badge; `'غیرفعال'` → fail-styled; else falls through to
+  `effectiveResult(r)`.
+- `getFiltered` hides `result === 'غیرفعال'` rows by default — pass `filters.showDeactivated: true`
+  or `filters.status === 'غیرفعال'` to include them (mirrors the prototype's "نمایش غیرفعال‌ها"
+  checkbox).
 - `smartSearch(records, query)` — multi-token, scored, OR-across-fields search (company,
   name, phone, notes, product, category, source, coordinator-label). Not a filter — returns
   every record with `score >= 1` sorted by score. This is intentionally permissive (feels
@@ -44,10 +72,12 @@ harmless to leave, safe to delete if you're cleaning up).
 (exact order, don't reorder):
 1. Reduce to **one record per customer** — the most recent by date. Older records for the
    same company are ignored entirely, even if they were never actioned.
-2. Skip if `converted` or `effectiveResult === 'موفق'` (already won).
+2. Skip if `converted`, `result === 'غیرفعال'`, or `result === 'در حال استعلام'` (deactivated leads
+   and open quotes are handled by their own surfaces — the deactivated list and the Inquiry Panel —
+   not by call suggestions).
 3. Skip if the latest contact date is today or in the future (`days <= 0`).
 4. `noStatus = !effectiveResult` → priority rank 3 (highest), overriding `record.priority`.
-5. `isNoAnswer = effectiveResult === 'ناموفق'` → always surfaced regardless of days elapsed.
+5. `isNoAnswer = effectiveResult === 'بی‌پاسخ'` → always surfaced regardless of days elapsed.
 6. Everything else (e.g. "در حال پیگیری") only surfaces once `days >= 3` OR priority rank 3.
 `filterAgentSuggestions` applies the optional per-agent category/product/search UI filters
 on top of the computed pool, and caps the visible list (6 normally, 20 while searching) —
@@ -62,19 +92,25 @@ behavior change, not a bug fix.
 
 ### `analytics.js`
 Pure "compute metrics from records" — folded `kpis.js` + `chartData.js` + `agentStats.js`
-into one file. `computeKpis` — 4 fixed cards: total records, distinct companies;
-Solar-category count; Polymer+Petrochemical+Chemical combined count (category string match
-uses `.indexOf('Polymer') > -1`, so `'Chemical/Polymer'` counts toward Polymer, not
-Chemical — deliberate, matches the original); calls in the last 7 days (inclusive of today).
+into one file. `computeKpis` — 6 fixed cards matching the quote-model status set: total
+records, `converted` count, open-quote count (`isQuoteOpen`), `'غیرفعال'` count, `'در حال
+پیگیری'` count, `effectiveResult === 'بی‌پاسخ'` count. `tally()` (private) buckets every
+record into exactly one of `noAnswer`/`deactivated`/`followUp`/`quoteOpen`/`quoteWon`/
+`quoteLost` via `effectiveResult`, then branches into the quote sub-states by `r.quoteResult`
+when `effectiveResult === 'در حال استعلام'` — **never** compares `effectiveResult` against
+`'موفق'`/`'ناموفق'` directly, since `result` can't hold those values (see `filters.js`).
 `computeAgentReport` — per-agent totals across all records; `computeAgentStats` — same tally
 for one agent with an optional date range (agent profile modal). `agentColor` — 3 hardcoded
 brand colors for FARNAZ/PARDIS/ZOHREH, falls back to a deterministic HSL hash for any other
-coordinator. `computeFunnelStages`/`computeTrendData`/`computeDailyAgentData`/
-`computeCategoryData`/`computeSourceData` — pure data-prep for the dashboard charts (no
-Chart.js objects here — components own the `Chart` instance). `computeDailyAgentData`'s
-outlier cap (`cap = max(15, min(40, p75*3))`) exists so one bulk-import day doesn't flatten
-the monthly bar chart — the *real* number still appears in the tooltip via `rawData`, only
-the bar height is clamped. Don't "simplify" this away; it's there on purpose.
+coordinator. `computeFunnelStages` returns `{stages, leadToCustomerRate, quoteToSaleRate}` —
+3 stages (total leads → open+resolved quotes → `converted` count) plus the two conversion
+rates the quote-model spec calls for, replacing the old 4-stage "price-field-truthy" funnel.
+`computeTrendData`/`computeDailyAgentData`/`computeCategoryData`/`computeSourceData` — pure
+data-prep for the dashboard charts (no Chart.js objects here — components own the `Chart`
+instance). `computeDailyAgentData`'s outlier cap (`cap = max(15, min(40, p75*3))`) exists so
+one bulk-import day doesn't flatten the monthly bar chart — the *real* number still appears
+in the tooltip via `rawData`, only the bar height is clamped. Don't "simplify" this away;
+it's there on purpose.
 
 ### `excel.js`
 `parseImportFile` reads any `.xlsx`/`.xls`, matches columns via `IMPORT_ALIASES` (Persian
@@ -92,6 +128,13 @@ Chart month-bucket grouping stays Gregorian on purpose — re-bucketing by Jalal
 change what's grouped together, not just the label.
 
 ### `store.js`
+Also holds `products` (loaded once at boot alongside `records`) and three quote/product actions
+that follow the same optimistic-`persist()` pattern as everything else: `addProduct`,
+`announceQuotePrice(id, price, priceType, terms)`, `resolveQuote(id, result, failReason)`. Both
+quote actions stamp `Utils.todayDdMmYyyy()` client-side for the optimistic update; the server
+route recomputes the same value authoritatively, so the two only diverge if the client's clock is
+wrong, and a `loadAll`/`syncNow` refresh corrects it.
+
 Client singleton holding `records`/`customerMeta`/`reminders`/`currentUser`, backed by
 **MySQL via the REST API in `src/app/api/*` (client `apiClient.js` → server `serverOps.js`)** —
 the prototype's `window.storage` is gone, and the former `src/app/actions.js` Server Actions
@@ -183,10 +226,39 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
 `updateX`, `deleteX` — every function takes an optional pooled `conn` (used when called inside
 `applyOp`'s transaction; otherwise runs on the pool). Coverage:
 - **`contacts`**: `listContacts`, `getContactById`, `createContact` (upsert), `updateContact`, `deleteContact`.
+  Holds the 8 quote/deactivation columns (`deactivate_reason`, `quote_price`, `quote_price_type`,
+  `quote_terms`, `quote_price_date`, `quote_result`, `quote_result_date`, `quote_fail_reason`) added
+  for the inquiry workflow — `quote_price_date`/`quote_result_date` are `dd.mm.yyyy` VARCHAR like
+  `date`, not SQL `DATE`, to match the rest of this app's date convention (`normDate` in
+  `mappers.js` covers all three). `updateContact` maps camelCase patch keys to snake_case columns
+  via the `CONTACT_UPDATE` `{k, col}` array (the multi-word quote fields don't collapse to their
+  column name the way the single-word legacy fields did).
 - **`customer_activity`**: `listActivity`, `getActivityById`, `createActivity` (upsert), `updateActivity`, `deleteActivity`.
 - **`reminders`**: `listReminders`, `getReminderById`, `createReminder` (upsert), `updateReminder`, `deleteReminder`.
 - **`users`**: `listUsers`/`listUsersRaw`, `getUserById`, `createUser`, `updateUser`, `deleteUser`, plus finders
   (`findUserByUsername`, `findUserByEmail`) and partial setters (`updateUserLastLogin`, `setUserActive`, `upsertUser`).
+- **`products`**: `listProducts`, `getProductById`, `createProduct` (plain insert — `name` is
+  `UNIQUE`, a duplicate throws `ER_DUP_ENTRY`, translated to a 400 by both `POST /api/products`
+  and `PATCH /api/products/[id]`), `updateProduct`, `deleteProduct`. Diverges from the prototype
+  here — `state.customProducts` was append-only, but the `/products` admin tab needs real
+  edit/delete, so `updateProduct`/`deleteProduct` were added (`update*`/`delete*` gated to
+  `requireElevated`; `create*` stays open to any authenticated user, since `ProductField.jsx`'s
+  inline "add on the fly" widget relies on that). Loaded once at boot via
+  `loadAllFromDb`/`loadBootData` alongside contacts/activity/reminders; the `/products` page
+  reads/writes this same `store.js` `products` state (via `addProduct`/`updateProduct`/
+  `deleteProduct`) rather than fetching independently like `/users` does.
+
+Quote lifecycle (`PATCH /api/quotes/[id]`, one route handling both stage transitions via an
+`action` body field) reuses the existing `updateContact`/`applyOp('updateContact', ...)` path
+rather than adding new `applyOp` cases — it's still just a contact patch, with the server
+computing `quotePriceDate`/`quoteResultDate` (`Utils.todayDdMmYyyy()`) and enforcing stage order
+(`announce-price` requires `result === 'در حال استعلام'`; `resolve` requires `quotePrice` already
+set **and `quoteResult` not already set** — `result` never transitions away from `'در حال
+استعلام'` once opened, so without that second check a resolved quote could be resolved again,
+flipping `quoteResult`/`converted` with no audit trail) before calling it. `QuoteResolve`'s Zod schema requires `failReason` when `result ===
+'ناموفق'` via `.refine`; `ContactCreate`/`ContactUpdate` similarly require `deactivateReason` when
+`result === 'غیرفعال'` via `.superRefine` — both are the server-side enforcement the prototype's
+handoff spec calls out as missing (client-only validation there).
 
 `create*` are idempotent upserts (`INSERT ... ON DUPLICATE KEY UPDATE`) keyed on the VARCHAR PK —
 this matches the last-write-wins + offline-queue model. `update*` take a partial patch and `SET`

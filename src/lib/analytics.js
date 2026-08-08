@@ -12,16 +12,20 @@ export function agentColor(name) {
 }
 
 function tally(recs) {
-    let success = 0, fail = 0, pending = 0, quoted = 0, customers = 0;
+    let noAnswer = 0, deactivated = 0, followUp = 0, quoteOpen = 0, quoteWon = 0, quoteLost = 0, customers = 0;
     for (const r of recs) {
         const eff = effectiveResult(r);
-        if (eff === 'موفق') success++;
-        else if (eff === 'ناموفق') fail++;
-        else pending++;
-        if (r.price && String(r.price).trim()) quoted++;
-        if (r.converted || eff === 'موفق') customers++;
+        if (eff === 'بی‌پاسخ') noAnswer++;
+        else if (eff === 'غیرفعال') deactivated++;
+        else if (eff === 'در حال پیگیری') followUp++;
+        else if (eff === 'در حال استعلام') {
+            if (r.quoteResult === 'موفق') quoteWon++;
+            else if (r.quoteResult === 'ناموفق') quoteLost++;
+            else quoteOpen++;
+        }
+        if (r.converted) customers++;
     }
-    return {success, fail, pending, quoted, customers};
+    return {noAnswer, deactivated, followUp, quoteOpen, quoteWon, quoteLost, customers};
 }
 
 export function computeAgentReport(records) {
@@ -66,11 +70,12 @@ export async function exportAgentReportToExcel(data) {
     if (!data.length) return false;
     const XLSX = await import('xlsx');
     const rows = data.map((d) => ({
-        'کارشناس': coordLabel(d.agent), 'کل تماس‌ها': d.total, 'موفق': d.success, 'ناموفق': d.fail,
-        'در جریان': d.pending, 'استعلام‌ها': d.quoted, 'مشتری‌شده': d.customers, 'نرخ تبدیل (٪)': d.conversionRate,
+        'کارشناس': coordLabel(d.agent), 'کل تماس‌ها': d.total, 'در حال پیگیری': d.followUp, 'بی‌پاسخ': d.noAnswer,
+        'غیرفعال': d.deactivated, 'استعلام باز': d.quoteOpen, 'استعلام موفق': d.quoteWon, 'استعلام ناموفق': d.quoteLost,
+        'مشتری‌شده': d.customers, 'نرخ تبدیل (٪)': d.conversionRate,
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = [{wch: 14}, {wch: 12}, {wch: 10}, {wch: 10}, {wch: 10}, {wch: 12}, {wch: 12}, {wch: 14}];
+    ws['!cols'] = [{wch: 14}, {wch: 12}, {wch: 12}, {wch: 10}, {wch: 10}, {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12}, {wch: 14}];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'گزارش کارشناس');
     const today = new Date();
@@ -79,48 +84,44 @@ export async function exportAgentReportToExcel(data) {
 }
 
 export function computeKpis(records) {
-  const companies = new Set();
-  let solar = 0, poly = 0, petro = 0, chem = 0, last7 = 0;
-  const now = new Date(); now.setHours(0, 0, 0, 0);
-  const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
+  let customers = 0, openQuotes = 0, deactivated = 0, followUp = 0, noAnswer = 0;
   for (const r of records) {
-    if (r.company) companies.add(Utils.normSpace(r.company));
-    const cat = r.category || '';
-    if (cat === 'Solar') solar++;
-    else if (cat.indexOf('Polymer') > -1) poly++;
-    else if (cat === 'Petrochemical') petro++;
-    else if (cat === 'Chemical') chem++;
-    const dt = Utils.parseDate(r.date);
-    if (dt && dt >= weekAgo && dt <= now) last7++;
+    if (r.converted) customers++;
+    if (r.result === 'در حال استعلام' && !r.quoteResult) openQuotes++;
+    if (r.result === 'غیرفعال') deactivated++;
+    if (r.result === 'در حال پیگیری') followUp++;
+    if (effectiveResult(r) === 'بی‌پاسخ') noAnswer++;
   }
   return [
-    { label: 'کل مخاطبین ثبت‌شده', value: records.length, sub: companies.size + ' شرکت متمایز', cls: '' },
-    { label: 'سرنخ‌های خورشیدی', value: solar, sub: 'Solar', cls: '-amber' },
-    { label: 'پلیمر / پتروشیمی / شیمیایی', value: poly + petro + chem, sub: 'Polymer + Petrochemical + Chemical', cls: '-teal' },
-    { label: 'تماس ۷ روز اخیر', value: last7, sub: 'نسبت به امروز', cls: '' },
+    { label: 'تعداد کل سرنخ‌ها', value: records.length, cls: '' },
+    { label: 'مشتری شده', value: customers, cls: '-teal' },
+    { label: 'استعلام‌های در جریان', value: openQuotes, cls: '-amber' },
+    { label: 'غیرفعال شده', value: deactivated, cls: '' },
+    { label: 'در حال پیگیری', value: followUp, cls: '' },
+    { label: 'بی‌پاسخ', value: noAnswer, cls: '' },
   ];
 }
 
 export function computeFunnelStages(records) {
   const total = records.length;
-  let followedUp = 0, quoted = 0, customer = 0;
-  for (const r of records) {
-    const eff = effectiveResult(r);
-    const isCustomer = r.converted || eff === 'موفق';
-    if (eff) followedUp++;
-    if (r.price && String(r.price).trim()) quoted++;
-    if (isCustomer) customer++;
-  }
+  const quotes = records.filter((r) => r.result === 'در حال استعلام');
+  const quotedCount = quotes.length;
+  const salesCount = quotes.filter((q) => q.quoteResult === 'موفق').length;
+  const customersCount = records.filter((r) => r.converted).length;
   const raw = [
     { label: 'کل سرنخ‌ها', value: total, color: '#64748b' },
-    { label: 'پیگیری شده', value: followedUp, color: '#2b7fff' },
-    { label: 'قیمت داده شده', value: quoted, color: '#ff6900' },
-    { label: 'مشتری شده', value: customer, color: '#00bc7d' },
+    { label: 'در حال استعلام', value: quotedCount, color: '#ff6900' },
+    { label: 'فروش شده', value: customersCount, color: '#00bc7d' },
   ];
-  return raw.map((s) => {
+  const stages = raw.map((s) => {
     const pct = total ? Math.round((s.value / total) * 100) : 0;
     return { ...s, pct, widthPct: Math.max(pct, s.value > 0 ? 4 : 0) };
   });
+  return {
+    stages,
+    leadToCustomerRate: total ? Math.round((customersCount / total) * 100) : 0,
+    quoteToSaleRate: quotedCount ? Math.round((salesCount / quotedCount) * 100) : 0,
+  };
 }
 
 export function computeTrendData(records) {

@@ -4,21 +4,27 @@ import Utils from './utils.js';
 import {SEED_DATA} from '../data/seed.js';
 import {toast} from '../components/ui/Toast.jsx';
 import {initScopeForUser, useUiStore} from './uiStore.js';
+import {setAgentDirectory} from './filters.js';
 import {initContactPrefsForUser, resetContactPrefs} from './contactPrefs.js';
 import {
     addChangeLog as addChangeLogAction,
     addComment as addCommentAction,
     addReminder as addReminderAction,
+    announceQuotePrice as announceQuotePriceAction,
+    createProduct as createProductAction,
     deleteActivity as deleteActivityAction,
     deleteContact as deleteContactAction,
+    deleteProductAction,
     deleteReminder as deleteReminderAction,
     importRecords as importRecordsAction,
     loadAllData as loadAllDataAction,
     markReminderDone as markReminderDoneAction,
     resetToSeed as resetToSeedAction,
+    resolveQuote as resolveQuoteAction,
     syncNow as syncNowAction,
     updateActivity as updateActivityAction,
     updateContact as updateContactAction,
+    updateProductAction,
     updateReminder as updateReminderAction,
     logout as logoutAction,
 } from './apiClient.js';
@@ -27,6 +33,8 @@ let state = {
     records: [],
     customerMeta: {},
     reminders: [],
+    products: [],
+    agents: [],
     currentUser: null,
     loaded: false,
     loading: false,
@@ -82,6 +90,9 @@ export async function loadAll() {
         state.records = (res.data && res.data.records) || [];
         state.customerMeta = (res.data && res.data.customerMeta) || {};
         state.reminders = (res.data && res.data.reminders) || [];
+        state.products = (res.data && res.data.products) || [];
+        state.agents = (res.data && res.data.agents) || [];
+        setAgentDirectory(state.agents);
         state.currentUser = res.currentUser || null;
         state.offline = !!res.offline;
         state.queueCount = res.queueCount || 0;
@@ -114,6 +125,9 @@ export async function logout() {
     state.records = [];
     state.customerMeta = {};
     state.reminders = [];
+    state.products = [];
+    state.agents = [];
+    setAgentDirectory([]);
     state.currentUser = null;
     state.loaded = false;
     state.offline = false;
@@ -135,6 +149,9 @@ export async function syncNow() {
             state.records = (res.data && res.data.records) || [];
             state.customerMeta = (res.data && res.data.customerMeta) || {};
             state.reminders = (res.data && res.data.reminders) || [];
+            state.products = (res.data && res.data.products) || [];
+            state.agents = (res.data && res.data.agents) || [];
+            setAgentDirectory(state.agents);
             state.offline = false;
             state.queueCount = 0;
             emit();
@@ -208,6 +225,57 @@ export function deleteRecordWithLog(record) {
             changeLogEntry: {id, companyKey: k, type: 'change', ts, author: null, text}
         }),
     );
+}
+
+export function addProduct(product) {
+    const prev = state.products;
+    state.products = prev.concat([product]);
+    emit();
+    persist(() => {
+        state.products = prev;
+    }, () => createProductAction(product));
+}
+
+export function updateProduct(id, patch) {
+    const prev = state.products;
+    state.products = prev.map((p) => (p.id === id ? {...p, ...patch} : p));
+    emit();
+    persist(() => {
+        state.products = prev;
+    }, () => updateProductAction(id, patch));
+}
+
+export function deleteProduct(id) {
+    const prev = state.products;
+    state.products = prev.filter((p) => p.id !== id);
+    emit();
+    persist(() => {
+        state.products = prev;
+    }, () => deleteProductAction(id));
+}
+
+export function announceQuotePrice(id, price, priceType, terms) {
+    const prev = state.records;
+    const quotePriceDate = Utils.todayDdMmYyyy();
+    state.records = prev.map((r) => (r.id === id ? {...r, quotePrice: price, quotePriceType: priceType, quoteTerms: terms, quotePriceDate} : r));
+    emit();
+    persist(() => {
+        state.records = prev;
+    }, () => announceQuotePriceAction(id, price, priceType, terms));
+}
+
+export function resolveQuote(id, result, failReason) {
+    const prev = state.records;
+    const quoteResultDate = Utils.todayDdMmYyyy();
+    state.records = prev.map((r) => (r.id === id ? {
+        ...r, quoteResult: result, quoteResultDate,
+        quoteFailReason: result === 'ناموفق' ? (failReason || null) : null,
+        converted: result === 'موفق' ? true : r.converted,
+    } : r));
+    emit();
+    persist(() => {
+        state.records = prev;
+    }, () => resolveQuoteAction(id, result, failReason));
 }
 
 const EMPTY_META = Object.freeze({comments: [], changeLog: []});

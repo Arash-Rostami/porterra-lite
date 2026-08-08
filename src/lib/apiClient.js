@@ -46,6 +46,12 @@ export const markReminderDone = (id) => req('POST', `/api/reminders/${enc(id)}/d
 export const updateReminder = (id, patch) => req('PATCH', `/api/reminders/${enc(id)}`, { patch });
 export const deleteReminder = (id) => req('DELETE', `/api/reminders/${enc(id)}`);
 
+export const createProduct = (product) => req('POST', '/api/products', { product });
+export const updateProductAction = (id, patch) => req('PATCH', `/api/products/${enc(id)}`, { patch });
+export const deleteProductAction = (id) => req('DELETE', `/api/products/${enc(id)}`);
+export const announceQuotePrice = (id, price, priceType, terms) => req('PATCH', `/api/quotes/${enc(id)}`, { action: 'announce-price', price, priceType, terms });
+export const resolveQuote = (id, result, failReason) => req('PATCH', `/api/quotes/${enc(id)}`, { action: 'resolve', result, failReason });
+
 export const importRecords = (records) => req('POST', '/api/contacts/import', { records });
 export const syncNow = () => req('POST', '/api/sync');
 export const resetToSeed = () => req('POST', '/api/admin/reset');

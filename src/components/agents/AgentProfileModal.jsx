@@ -102,7 +102,7 @@ export default function AgentProfileModal({ agent, records, onClose, onOpenRecor
           </div>
 
           <div className="crm-agent-profile-stats" id="apStats">
-            {[['کل تماس‌ها', s.total], ['موفق', s.success], ['ناموفق', s.fail], ['در حال پیگیری', s.pending], ['استعلام', s.quoted]].map(([label, val]) => (
+            {[['کل تماس‌ها', s.total], ['در حال پیگیری', s.followUp], ['بی‌پاسخ', s.noAnswer], ['غیرفعال', s.deactivated], ['استعلام باز', s.quoteOpen], ['استعلام موفق', s.quoteWon], ['استعلام ناموفق', s.quoteLost]].map(([label, val]) => (
               <div className="crm-agent-profile-stat" key={label}>
                 <StatValue target={val} />
                 <div className="crm-agent-profile-stat-label">{label}</div>

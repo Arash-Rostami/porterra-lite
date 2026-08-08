@@ -19,10 +19,12 @@ function AgentReportCard({ d }) {
         <span className="crm-agent-report-total">{d.total.toLocaleString('en-US')} تماس</span>
         <RingChart percent={d.conversionRate} size={40} stroke={5} />
       </div>
-      <div className="crm-agent-report-row"><span>موفق</span><Bar val={d.success} total={d.total} color="#3E7A4F" /><b>{d.success.toLocaleString('en-US')}</b></div>
-      <div className="crm-agent-report-row"><span>ناموفق</span><Bar val={d.fail} total={d.total} color="#B4532A" /><b>{d.fail.toLocaleString('en-US')}</b></div>
-      <div className="crm-agent-report-row"><span>در جریان</span><Bar val={d.pending} total={d.total} color="#E3A23C" /><b>{d.pending.toLocaleString('en-US')}</b></div>
-      <div className="crm-agent-report-row"><span>استعلام</span><Bar val={d.quoted} total={d.total} color="#1F6F72" /><b>{d.quoted.toLocaleString('en-US')}</b></div>
+      <div className="crm-agent-report-row"><span>در حال پیگیری</span><Bar val={d.followUp} total={d.total} color="#E3A23C" /><b>{d.followUp.toLocaleString('en-US')}</b></div>
+      <div className="crm-agent-report-row"><span>بی‌پاسخ</span><Bar val={d.noAnswer} total={d.total} color="#6B7280" /><b>{d.noAnswer.toLocaleString('en-US')}</b></div>
+      <div className="crm-agent-report-row"><span>غیرفعال</span><Bar val={d.deactivated} total={d.total} color="#7C2D12" /><b>{d.deactivated.toLocaleString('en-US')}</b></div>
+      <div className="crm-agent-report-row"><span>استعلام باز</span><Bar val={d.quoteOpen} total={d.total} color="#1F6F72" /><b>{d.quoteOpen.toLocaleString('en-US')}</b></div>
+      <div className="crm-agent-report-row"><span>استعلام موفق</span><Bar val={d.quoteWon} total={d.total} color="#3E7A4F" /><b>{d.quoteWon.toLocaleString('en-US')}</b></div>
+      <div className="crm-agent-report-row"><span>استعلام ناموفق</span><Bar val={d.quoteLost} total={d.total} color="#B4532A" /><b>{d.quoteLost.toLocaleString('en-US')}</b></div>
       <div className="crm-agent-report-conversion"><span>نرخ تبدیل به مشتری</span><span>{d.conversionRate}٪ ({d.customers.toLocaleString('en-US')} نفر)</span></div>
     </div>
   );

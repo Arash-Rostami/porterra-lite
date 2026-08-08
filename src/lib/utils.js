@@ -37,6 +37,11 @@ export default class Utils {
         return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
     }
 
+    static todayDdMmYyyy() {
+        const d = new Date();
+        return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + d.getFullYear();
+    }
+
     static fromISODate(iso) {
         if (!iso) return '';
         const parts = iso.split('-');
