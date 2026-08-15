@@ -9,7 +9,7 @@ export default function Footer() {
   async function handleReset() {
     const ok = await confirm({
       title: 'بازگشت به داده اولیه',
-      message: `همه مخاطبین تازه‌ای که اضافه شده حذف می‌شود و پنل به داده اولیه (${SEED_DATA.length.toLocaleString('en-US')} رکورد) برمی‌گردد. ادامه می‌دهید؟`,
+      message: `همه سرنخ‌های تازه‌ای که اضافه شده حذف می‌شود و پنل به داده اولیه (${SEED_DATA.length.toLocaleString('en-US')} رکورد) برمی‌گردد. ادامه می‌دهید؟`,
       confirmText: 'بازگشت به داده اولیه',
       cancelText: 'انصراف',
     });

@@ -13,7 +13,7 @@ function lastBuildDate() {
 
 export function generateMetadata() {
   return {
-    title: 'Porterra Lite — پنل مشتریان',
+    title: 'Porterra Lite — پنل سرنخ‌ها',
     applicationName: 'PorterrA-lite',
     authors: [{ name: 'Arash R.' }],
     icons: {

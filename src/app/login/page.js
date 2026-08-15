@@ -40,7 +40,7 @@ export default function LoginPage() {
       </div>
       <div className="crm-auth-card">
         <img src={dark ? '/img/logos/logo-dark.png' : '/img/logos/logo-light.png'} alt="PorterrA-lite" className="crm-auth-logo" />
-        <h1 className="crm-auth-title">پنل مشتریان</h1>
+        <h1 className="crm-auth-title">پنل سرنخ‌ها</h1>
         <p className="crm-auth-sub">برای ادامه وارد شوید</p>
         <form onSubmit={onSubmit}>
           <div className="crm-auth-field">

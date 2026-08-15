@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import Utils from './utils.js';
-import { coordLabel, effectiveResult } from './filters.js';
+import { coordLabel, coordCodeFromLabel, effectiveResult } from './filters.js';
 
 const IMPORT_ALIASES = {
   coordinator: ['coordinator', 'کارشناس', 'هماهنگ کننده', 'هماهنگ\u200cکننده'],
@@ -15,7 +15,7 @@ const IMPORT_ALIASES = {
   result: ['result', 'نتیجه', 'وضعیت'],
   priority: ['priority', 'اولویت'],
   notes: ['notes', 'یادداشت'],
-  converted: ['تبدیل به مشتری', 'converted'],
+  converted: ['سرنخ تبدیل‌شده', 'converted'],
 };
 
 export function exportToExcel(records) {
@@ -32,15 +32,15 @@ export function exportToExcel(records) {
     'آخرین قیمت اعلامی': r.price || '',
     'وضعیت': effectiveResult(r) || '',
     'اولویت': r.priority || '',
-    'تبدیل به مشتری': r.converted ? 'بله' : 'خیر',
+    'سرنخ تبدیل‌شده': r.converted ? 'بله' : 'خیر',
     'یادداشت': r.notes || '',
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
   ws['!cols'] = [{ wch: 10 }, { wch: 26 }, { wch: 20 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 20 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 40 }];
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'مشتریان');
+  XLSX.utils.book_append_sheet(wb, ws, 'سرنخ‌ها');
   const today = new Date();
-  const fname = 'مشتریان-' + today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0') + '.xlsx';
+  const fname = 'سرنخ‌ها-' + today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0') + '.xlsx';
   XLSX.writeFile(wb, fname);
   return { ok: true, count: records.length };
 }
@@ -63,18 +63,18 @@ export function exportProductsToExcel(products) {
 }
 
 export function downloadImportTemplate() {
-  const headers = ['کارشناس', 'شرکت', 'مخاطب', 'تلفن', 'محصول', 'دسته محصول', 'منبع سرنخ', 'تاریخ تماس', 'آخرین قیمت اعلامی', 'نتیجه', 'اولویت', 'تبدیل به مشتری', 'یادداشت'];
+  const headers = ['کارشناس', 'شرکت', 'مخاطب', 'تلفن', 'محصول', 'دسته محصول', 'منبع سرنخ', 'تاریخ تماس', 'آخرین قیمت اعلامی', 'نتیجه', 'اولویت', 'سرنخ تبدیل‌شده', 'یادداشت'];
   const sample = [{
     'کارشناس': 'فرناز', 'شرکت': 'شرکت نمونه صنعت', 'مخاطب': 'آقای محمدی', 'تلفن': '09121234567',
     'محصول': 'PVC', 'دسته محصول': 'Polymer', 'منبع سرنخ': 'نمایشگاه', 'تاریخ تماس': '14.07.2026',
-    'آخرین قیمت اعلامی': '', 'نتیجه': 'در حال پیگیری', 'اولویت': 'متوسط', 'تبدیل به مشتری': 'خیر',
+    'آخرین قیمت اعلامی': '', 'نتیجه': 'در حال پیگیری', 'اولویت': 'متوسط', 'سرنخ تبدیل‌شده': 'خیر',
     'یادداشت': 'این یک ردیف نمونه‌ست — پاکش کن و ردیف‌های خودت رو جایگزین کن',
   }];
   const ws = XLSX.utils.json_to_sheet(sample, { header: headers });
   ws['!cols'] = headers.map(() => ({ wch: 18 }));
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'مشتریان جدید');
-  XLSX.writeFile(wb, 'قالب-ورود-مشتری.xlsx');
+  XLSX.utils.book_append_sheet(wb, ws, 'سرنخ‌های جدید');
+  XLSX.writeFile(wb, 'قالب-ورود-سرنخ.xlsx');
 }
 
 function findImportField(rowObj, aliases) {
@@ -89,6 +89,8 @@ function findImportField(rowObj, aliases) {
 function normalizeImportCoordinator(v) {
   if (v == null) return null;
   const s = String(v).trim();
+  const fromLabel = coordCodeFromLabel(s);
+  if (fromLabel) return fromLabel;
   if (s === 'فرناز') return 'FARNAZ';
   if (s === 'پردیس') return 'PARDIS';
   if (s === 'زهره') return 'ZOHREH';

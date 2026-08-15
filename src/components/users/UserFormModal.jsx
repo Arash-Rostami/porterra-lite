@@ -6,12 +6,11 @@ import { toast } from '../ui/Toast.jsx';
 import { CheckIcon, PlusIcon, XCircleIcon } from '../ui/Icon.jsx';
 import { coordLabel } from '../../lib/filters.js';
 
-const AGENT_OPTS = [{ value: 'FARNAZ', label: 'فرناز' }, { value: 'PARDIS', label: 'پردیس' }, { value: 'ZOHREH', label: 'زهره' }];
 const ROLE_OPTS = [{ value: 'admin', label: 'مدیر' }, { value: 'developer', label: 'توسعه‌دهنده' }, { value: 'agent', label: 'کارشناس' }];
 
 const empty = { username: '', displayName: '', email: '', agentCode: '', role: 'agent', password: '', active: true };
 
-// create and edit share the same <Modal> chrome for UI consistency (same pattern as AddContactForm)
+// create and edit share the same <Modal> chrome for UI consistency (same pattern as AddLeadForm)
 export default function UserFormModal({ open, user, currentUserId, isElevated, onSubmit, onCancel }) {
   const [f, setF] = useState(empty);
   const isEdit = !!user;
@@ -46,7 +45,7 @@ export default function UserFormModal({ open, user, currentUserId, isElevated, o
         : {
           displayName: f.displayName.trim(),
           email: f.email.trim(),
-          agentCode: f.agentCode,
+          agentCode: f.agentCode.trim().toUpperCase(),
           ...(isSelf ? {} : { role: f.role, active: f.active }),
         };
       if (f.password) patch.password = f.password;
@@ -57,7 +56,7 @@ export default function UserFormModal({ open, user, currentUserId, isElevated, o
         username: f.username.trim(),
         email: f.email.trim(),
         displayName: f.displayName.trim(),
-        agentCode: f.agentCode,
+        agentCode: f.agentCode.trim().toUpperCase(),
         role: f.role,
         password: f.password,
         active: f.active,
@@ -97,7 +96,7 @@ export default function UserFormModal({ open, user, currentUserId, isElevated, o
           {fieldsLocked ? (
             <input className="crm-input" value={f.agentCode ? coordLabel(f.agentCode) : 'بدون کارشناس'} disabled title="این فیلد قابل تغییر نیست" />
           ) : (
-            <Dropdown value={f.agentCode} onChange={set('agentCode')} options={AGENT_OPTS} placeholder="بدون کارشناس" />
+            <input className="crm-input" value={f.agentCode} onChange={setInput('agentCode')} placeholder="مثلاً ALI" />
           )}
         </div>
         <div className="crm-field">

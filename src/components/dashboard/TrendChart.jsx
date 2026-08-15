@@ -3,11 +3,13 @@ import { useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import { computeTrendData } from '../../lib/analytics.js';
 import { chartGridColor, chartTextColor } from '../../lib/theme.js';
+import { useUiStore } from '../../lib/uiStore.js';
 
 export default function TrendChart({ records, dark, onSelectMonth }) {
+  const calendar = useUiStore((u) => u.calendar);
   const canvasRef = useRef(null);
   const chartRef = useRef(null);
-  const { keys, labels, data } = computeTrendData(records);
+  const { keys, labels, data, ranges } = computeTrendData(records, calendar);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -29,12 +31,11 @@ export default function TrendChart({ records, dark, onSelectMonth }) {
       const points = chartRef.current.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
       if (!points.length) return;
       const idx = points[0].index;
-      const [ky, km] = keys[idx].split('-').map(Number);
-      onSelectMonth(ky, km, labels[idx]);
+      onSelectMonth(ranges[idx].from, ranges[idx].to, labels[idx]);
     };
     return () => chartRef.current?.destroy();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [records, dark]);
+  }, [records, dark, calendar]);
 
   return (
     <div className="crm-section">
@@ -42,7 +43,7 @@ export default function TrendChart({ records, dark, onSelectMonth }) {
       <div className="crm-chart-canvas-wrap"><canvas ref={canvasRef} id="crmTrendChart"></canvas></div>
       <div className="crm-chart-chips" id="crmTrendChips">
         {keys.map((k, idx) => (
-          <button key={k} type="button" className="crm-chart-chip" onClick={() => { const [ky, km] = k.split('-').map(Number); onSelectMonth(ky, km, labels[idx]); }}>
+          <button key={k} type="button" className="crm-chart-chip" onClick={() => onSelectMonth(ranges[idx].from, ranges[idx].to, labels[idx])}>
             {labels[idx]} ({data[idx].toLocaleString('en-US')})
           </button>
         ))}

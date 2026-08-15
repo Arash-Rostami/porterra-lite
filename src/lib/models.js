@@ -28,7 +28,7 @@ const requireDeactivateReason = (data, ctx) => {
     }
 };
 
-export const ContactCreate = z.object({
+export const LeadCreate = z.object({
     id: reqStr(40),
     converted: boolField.default(false),
     company: reqStr(255),
@@ -36,7 +36,7 @@ export const ContactCreate = z.object({
     name: optStr(255),
     phone: optStr(128),
     product: optStr(5000),
-    category: optStr(64),
+    categoryId: optStr(40),
     source: optStr(64),
     date: dateField.optional(),
     price: optStr(64),
@@ -54,14 +54,14 @@ export const ContactCreate = z.object({
 }).superRefine(requireDeactivateReason);
 
 // partial UPDATE patch (id passed separately): absent keys stay undefined so SQL skips them; present '' becomes NULL
-export const ContactUpdate = z.object({
+export const LeadUpdate = z.object({
     converted: boolField.optional(),
     company: reqStr(255).optional(),
     coordinator: optStr(32).optional(),
     name: optStr(255).optional(),
     phone: optStr(128).optional(),
     product: optStr(5000).optional(),
-    category: optStr(64).optional(),
+    categoryId: optStr(40).optional(),
     source: optStr(64).optional(),
     date: dateField.optional(),
     price: optStr(64).optional(),
@@ -81,19 +81,29 @@ export const ContactUpdate = z.object({
     requireDeactivateReason(data, ctx);
 });
 
-export const ProductCategory = z.enum(['Chemical/Polymer', 'Solar']);
+export const CategoryCreate = z.object({
+    id: reqStr(40),
+    name: reqStr(150),
+    isCustom: boolField.default(true),
+    createdAt: z.number().int().nonnegative(),
+});
+
+export const CategoryUpdate = z.object({
+    name: reqStr(150).optional(),
+    isCustom: boolField.optional(),
+});
 
 export const ProductCreate = z.object({
     id: reqStr(40),
     name: reqStr(150),
-    category: ProductCategory,
+    categoryId: optStr(40),
     isCustom: boolField.default(true),
     createdAt: z.number().int().nonnegative(),
 });
 
 export const ProductUpdate = z.object({
     name: reqStr(150).optional(),
-    category: ProductCategory.optional(),
+    categoryId: optStr(40).optional(),
 });
 
 export const QuoteAnnouncePrice = z.object({
@@ -131,7 +141,6 @@ export const Reminder = z.object({
     done: boolField.optional(),
 });
 
-// partial UPDATE patches (id passed separately): absent keys stay undefined so SQL skips them; present '' becomes NULL
 export const ActivityUpdate = z.object({
     companyKey: reqStr(255).optional(),
     type: z.enum(['comment', 'change']).optional(),
@@ -176,7 +185,6 @@ export const UserCreate = z.object({
     active: boolField.default(true),
 });
 
-// username absent (identity, not editable); blank password (-> null) means "leave unchanged"
 export const UserUpdate = z.object({
     displayName: optStr(255).optional(),
     email: optStr(255).optional(),
@@ -191,7 +199,6 @@ export const LoginInput = z.object({
     password: reqStr(256),
 });
 
-// Throws a VALIDATION-tagged error the caller maps to a 400 / client rollback.
 export function parseOrThrow(schema, input) {
     const r = schema.safeParse(input);
     if (!r.success) {

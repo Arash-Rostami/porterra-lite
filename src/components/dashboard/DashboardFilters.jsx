@@ -1,6 +1,7 @@
 'use client';
 import { useMemo } from 'react';
 import Dropdown from '../ui/Dropdown.jsx';
+import DateField from '../ui/DateField.jsx';
 import { TrashIcon } from '../ui/Icon.jsx';
 import { filterOptionsFrom } from '../../lib/filters.js';
 
@@ -17,9 +18,9 @@ export default function DashboardFilters({ filters, onChange, records }) {
       <div className="crm-toolbar">
         <Dropdown value={filters.coordinator} onChange={set('coordinator')} options={opts.coordinators} placeholder="همه کارشناسان" />
         <div className="crm-date-range">
-          <input type="date" className="crm-input crm-mono" value={filters.dateFrom} onChange={setInput('dateFrom')} />
+          <DateField className="crm-input crm-mono" value={filters.dateFrom} onChange={set('dateFrom')} />
           <span>تا</span>
-          <input type="date" className="crm-input crm-mono" value={filters.dateTo} onChange={setInput('dateTo')} />
+          <DateField className="crm-input crm-mono" value={filters.dateTo} onChange={set('dateTo')} />
         </div>
         {active && (
           <button type="button" className="crm-suggest-clear-mini" title="پاک کردن" aria-label="پاک کردن" onClick={() => onChange(emptyDashboardFilters)}>

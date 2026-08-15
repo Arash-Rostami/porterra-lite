@@ -17,7 +17,7 @@ export default function Header({ recordCount, dark, onToggleTheme }) {
     <div className="crm-header">
       <div className="crm-header-top">
         <div>
-          <div className="crm-title">پنل مشتریان</div>
+          <div className="crm-title">پنل سرنخ‌ها</div>
           <div className="crm-subtitle">
             {currentUser && <span className="crm-header-greeting">سلام، {currentUser.displayName} 👋</span>}
             <span className="crm-header-chip">{recordCount.toLocaleString('en-US')} رکورد</span>

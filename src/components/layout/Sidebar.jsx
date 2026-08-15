@@ -13,9 +13,9 @@ const LINK_GROUPS = [
     ],
   },
   {
-    label: 'مشتریان و فروش',
+    label: 'سرنخ‌ها و فروش',
     links: [
-      { href: '/contacts', label: 'مخاطبین', icon: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18M8 4v16" /></> },
+      { href: '/leads', label: 'سرنخ‌ها', icon: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18M8 4v16" /></> },
       { href: '/inquiries', label: 'استعلام‌ها', icon: <><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" /><circle cx="7.5" cy="7.5" r="0.75" fill="currentColor" /></> },
       { href: '/suggestions', label: 'پیگیری‌ها', icon: <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></> },
     ],
@@ -32,6 +32,7 @@ const LINK_GROUPS = [
     label: 'مدیریت',
     links: [
       { href: '/products', label: 'محصولات', icon: <><path d="m7.5 4.27 9 5.15" /><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5M12 22V12" /></> },
+      { href: '/categories', label: 'دسته‌بندی‌ها', icon: <><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><circle cx="7" cy="7" r="1.5" /></> },
       { href: '/users', label: 'کاربران', icon: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></> },
     ],
   },
@@ -53,9 +54,9 @@ export default function Sidebar({ dark }) {
 
   const groups = LINK_GROUPS;
 
-  function newContactShortcut() {
+  function newLeadShortcut() {
     setAddFormOpen(true);
-    router.push('/contacts');
+    router.push('/leads');
   }
 
   function toggleCollapsed() {
@@ -103,7 +104,7 @@ export default function Sidebar({ dark }) {
       </aside>
       {collapsed && collapseBtn}
       <div className="crm-side-shortcuts">
-        <button type="button" className="crm-theme-toggle" title="ثبت تماس جدید" onClick={newContactShortcut}><PlusIcon /></button>
+        <button type="button" className="crm-theme-toggle" title="ثبت تماس جدید" onClick={newLeadShortcut}><PlusIcon /></button>
         <Link href="/report-builder" className="crm-theme-toggle" title="گزارش‌ساز"><SearchIcon /></Link>
       </div>
     </>

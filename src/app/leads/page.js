@@ -1,21 +1,22 @@
 'use client';
-import AddContactForm from '../../components/contacts/AddContactForm.jsx';
-import ContactFilters from '../../components/contacts/ContactFilters.jsx';
-import ContactTable from '../../components/contacts/ContactTable.jsx';
+import AddLeadForm from '../../components/leads/AddLeadForm.jsx';
+import LeadFilters from '../../components/leads/LeadFilters.jsx';
+import LeadTable from '../../components/leads/LeadTable.jsx';
 import { addRecords, deleteRecordWithLog, useScopedData } from '../../lib/store.js';
 import { useUiStore, setFilters, setAddFormOpen, clearChartFilter, openProfile } from '../../lib/uiStore.js';
 import { exportToExcel } from '../../lib/excel.js';
+import { getFiltered } from '../../lib/filters.js';
 import { confirm } from '../../lib/confirm.js';
 import { toast } from '../../components/ui/Toast.jsx';
 
-export default function ContactsPage() {
+export default function LeadsPage() {
     const { records, currentUser } = useScopedData();
     const filters = useUiStore((u) => u.filters);
     const chartFilter = useUiStore((u) => u.chartFilter);
     const addFormOpen = useUiStore((u) => u.addFormOpen);
 
     function handleExport() {
-        const res = exportToExcel(records);
+        const res = exportToExcel(getFiltered(records, filters, chartFilter));
         toast(res.ok ? `${res.count.toLocaleString('en-US')} رکورد در فایل اکسل ذخیره شد` : 'رکوردی برای خروجی گرفتن نیست');
     }
 
@@ -39,10 +40,10 @@ export default function ContactsPage() {
     }
 
     return (
-        <div className="crm-tab-panel" id="crmPanelContacts">
-            <AddContactForm open={addFormOpen} records={records} defaultCoordinator={currentUser?.agentCode || ''} onSubmit={handleAddSubmit} onCancel={() => setAddFormOpen(false)} />
-            <ContactFilters records={records} filters={filters} onChange={setFilters} chartFilter={chartFilter} onClearChartFilter={clearChartFilter} />
-            <ContactTable
+        <div className="crm-tab-panel" id="crmPanelLeads">
+            <AddLeadForm open={addFormOpen} records={records} defaultCoordinator={currentUser?.agentCode || ''} onSubmit={handleAddSubmit} onCancel={() => setAddFormOpen(false)} />
+            <LeadFilters records={records} filters={filters} onChange={setFilters} chartFilter={chartFilter} onClearChartFilter={clearChartFilter} />
+            <LeadTable
                 records={records}
                 filters={filters}
                 chartFilter={chartFilter}

@@ -5,7 +5,7 @@ import Utils from '../../lib/utils.js';
 import Dropdown from '../ui/Dropdown.jsx';
 import { PencilIcon, TrashIcon, DownloadIcon, PlusIcon, FlagIcon, ArrowsUpDownIcon } from '../ui/Icon.jsx';
 import { useUiStore } from '../../lib/uiStore.js';
-import { useContactPrefs, toggleFlag, setManualOrder, getOrderIndex } from '../../lib/contactPrefs.js';
+import { useLeadPrefs, toggleFlag, setManualOrder, getOrderIndex } from '../../lib/leadPrefs.js';
 import { formatDisplayDate } from '../../lib/calendar.js';
 import ImportExportBar from './ImportExportBar.jsx';
 
@@ -26,9 +26,9 @@ function StatusBadge({ r }) {
   return <span className={`crm-status-badge ${className}`}>{text}</span>;
 }
 
-export default function ContactTable({ records, filters, chartFilter, onEdit, onDelete, onImport, onToggleAdd, addOpen, onExport }) {
+export default function LeadTable({ records, filters, chartFilter, onEdit, onDelete, onImport, onToggleAdd, addOpen, onExport }) {
   const calendar = useUiStore((u) => u.calendar);
-  const { order, flags } = useContactPrefs();
+  const { order, flags } = useLeadPrefs();
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
   const [sort, setSort] = useState(null);
@@ -117,7 +117,7 @@ export default function ContactTable({ records, filters, chartFilter, onEdit, on
   return (
     <div className="crm-section">
       <div className="crm-section-title-row">
-        <div className="crm-section-title">مخاطبین</div>
+        <div className="crm-section-title">سرنخ‌ها</div>
         <div className="crm-result-count" id="crmResultCount">
           {list.length.toLocaleString('en-US')} نتیجه از {records.length.toLocaleString('en-US')}
         </div>
@@ -130,7 +130,7 @@ export default function ContactTable({ records, filters, chartFilter, onEdit, on
           <span className="crm-header-divider"/>
           <button type="button" className="crm-export-btn" onClick={onExport}><DownloadIcon/>خروجی اکسل</button>
           <button type="button" className="crm-add-btn" onClick={onToggleAdd}>
-            <PlusIcon/>{addOpen ? 'بستن فرم' : 'افزودن مشتری جدید'}</button>
+            <PlusIcon/>{addOpen ? 'بستن فرم' : 'افزودن سرنخ جدید'}</button>
         </div>
       </div>
       {manual && <div className="crm-manual-hint">ترتیب دستی فعال — ردیف‌ها را با کشیدن مرتب کنید</div>}
@@ -160,7 +160,7 @@ export default function ContactTable({ records, filters, chartFilter, onEdit, on
                 >
                   <td><span className={`crm-coord-tag ${coordClass(r.coordinator)}`}>{r.coordinator ? coordLabel(r.coordinator) : '-'}</span></td>
                   <td>
-                    {r.converted && <span className="crm-customer-badge">مشتری</span>}
+                    {r.converted && <span className="crm-lead-badge">سرنخ تبدیل‌شده</span>}
                     <span className="crm-company-text">{r.company || '-'}</span>
                   </td>
                   <td className="crm-product-text">{r.product || '-'}</td>

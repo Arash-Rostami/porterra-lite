@@ -2,36 +2,40 @@
 import { useState, useMemo } from 'react';
 import Modal from '../ui/Modal.jsx';
 import Dropdown from '../ui/Dropdown.jsx';
-import ProductField from '../contacts/ProductField.jsx';
+import DateField from '../ui/DateField.jsx';
+import ProductField from './ProductField.jsx';
 import Utils from '../../lib/utils.js';
-import { coordLabel, coordClass, statusBadgeInfo, coordOptions, CATEGORY_OPTS, RESULT_OPTS, PRIORITY_OPTS, COMMENT_AUTHORS } from '../../lib/filters.js';
-import { custKey, updateRecord, deleteRecordWithLog, addRecords, addChangeLogEntry, addComment, addReminder, getUnifiedFeed } from '../../lib/store.js';
+import { coordLabel, coordClass, statusBadgeInfo, coordOptions, RESULT_OPTS, PRIORITY_OPTS, sourceSuggestions, commentAuthors } from '../../lib/filters.js';
+import { useStore, custKey, updateRecord, deleteRecordWithLog, addRecords, addChangeLogEntry, addComment, addReminder, getUnifiedFeed } from '../../lib/store.js';
 import { confirm } from '../../lib/confirm.js';
 import { toast } from '../ui/Toast.jsx';
 import { CheckIcon, XCircleIcon, PlusIcon, TrashIcon } from '../ui/Icon.jsx';
 import { useUiStore } from '../../lib/uiStore.js';
 import { formatDisplayDate } from '../../lib/calendar.js';
 
-const FIELD_LABELS = { coordinator: 'کارشناس', company: 'شرکت', name: 'مخاطب', phone: 'تلفن', product: 'محصول', category: 'دسته محصول', source: 'منبع سرنخ', date: 'تاریخ تماس', price: 'قیمت', result: 'نتیجه', priority: 'اولویت', notes: 'یادداشت', converted: 'تبدیل به مشتری', deactivateReason: 'دلیل غیرفعال شدن' };
+const FIELD_LABELS = { coordinator: 'کارشناس', company: 'شرکت', name: 'مخاطب', phone: 'تلفن', product: 'محصول', categoryId: 'دسته محصول', source: 'منبع سرنخ', date: 'تاریخ تماس', price: 'قیمت', result: 'نتیجه', priority: 'اولویت', notes: 'یادداشت', converted: 'سرنخ تبدیل‌شده', deactivateReason: 'دلیل غیرفعال شدن' };
 
 function formFromRecord(rec) {
   return {
     coordinator: rec.coordinator || '', company: rec.company || '', name: rec.name || '', phone: rec.phone || '',
-    product: rec.product || '', category: rec.category || '', source: rec.source || '', date: Utils.toISODate(rec.date),
+    product: rec.product || '', categoryId: rec.categoryId || '', source: rec.source || '', date: Utils.toISODate(rec.date),
     price: rec.price || '', result: rec.result || '', priority: rec.priority || '', notes: rec.notes || '', converted: !!rec.converted,
     deactivateReason: rec.deactivateReason || '',
   };
 }
 const emptyReminder = { date: '', time: '', for: '', text: '' };
-const emptyQuickCall = { coordinator: '', name: '', phone: '', product: '', category: '', source: '', date: '', price: '', result: '', priority: '', notes: '', deactivateReason: '' };
+const emptyQuickCall = { coordinator: '', name: '', phone: '', product: '', categoryId: '', source: '', date: '', price: '', result: '', priority: '', notes: '', deactivateReason: '' };
 
 function StatusBadge({ r }) {
   const { text, className } = statusBadgeInfo(r);
   return <span className={`crm-status-badge ${className}`}>{text}</span>;
 }
 
-export default function CustomerProfileModal({ recordId, records, customerMeta, onClose, onOpenRecord }) {
+export default function LeadProfileModal({ recordId, records, companyMeta, onClose, onOpenRecord }) {
   const calendar = useUiStore((u) => u.calendar);
+  const categories = useStore((s) => s.categories);
+  const categoryOptions = useMemo(() => categories.map((c) => ({ value: c.id, label: c.name })), [categories]);
+  const sourceOpts = useMemo(() => sourceSuggestions(records), [records]);
   const rec = records.find((r) => r.id === recordId);
   const [form, setForm] = useState(() => (rec ? formFromRecord(rec) : null));
   const [editor, setEditor] = useState('');
@@ -62,7 +66,7 @@ export default function CustomerProfileModal({ recordId, records, customerMeta, 
     const before = { ...rec };
     const next = {
       coordinator: form.coordinator || null, company: form.company.trim() || null, name: form.name.trim() || null,
-      phone: form.phone.trim() || null, product: form.product.trim() || null, category: form.category || null,
+      phone: form.phone.trim() || null, product: form.product.trim() || null, categoryId: form.categoryId || null,
       source: form.source.trim() || null, date: Utils.fromISODate(form.date) || null, price: form.price.trim() || null,
       result: form.result || null, priority: form.priority || null, notes: form.notes.trim() || null, converted: form.converted,
       deactivateReason: form.result === 'غیرفعال' ? form.deactivateReason.trim() : null,
@@ -70,8 +74,10 @@ export default function CustomerProfileModal({ recordId, records, customerMeta, 
     updateRecord(rec.id, next);
 
     const changes = [];
+    const catName = (id) => (id ? (categories.find((c) => c.id === id)?.name || id) : '');
     for (const f in FIELD_LABELS) {
-      const oldV = before[f], newV = next[f];
+      let oldV = before[f], newV = next[f];
+      if (f === 'categoryId') { oldV = catName(before.categoryId); newV = catName(next.categoryId); }
       if (String(oldV || '') !== String(newV || '')) changes.push(`${FIELD_LABELS[f]}: «${oldV || '-'}» → «${newV || '-'}»`);
     }
     const k = custKey(next.company || before.company);
@@ -118,7 +124,7 @@ export default function CustomerProfileModal({ recordId, records, customerMeta, 
       id: 'CALL-' + Date.now() + '-' + Math.floor(Math.random() * 100000),
       converted: rec.converted, coordinator: coordinatorSel, company: rec.company,
       name: quick.name.trim() || null, phone: quick.phone.trim() || null, product: quick.product.trim() || null,
-      category: quick.category || null, source: quick.source.trim() || null,
+      categoryId: quick.categoryId || null, source: quick.source.trim() || null,
       date: (quick.date ? Utils.fromISODate(quick.date) : '') || Utils.todayDdMmYyyy(),
       price: quick.price.trim() || null, result: quick.result || null, priority: quick.priority || null, notes: quick.notes.trim() || null,
       deactivateReason: quick.result === 'غیرفعال' ? quick.deactivateReason.trim() : null,
@@ -155,7 +161,7 @@ export default function CustomerProfileModal({ recordId, records, customerMeta, 
     <Modal
       open
       onClose={onClose}
-      title="پروفایل مشتری"
+      title="پروفایل سرنخ"
       width="4xl"
       actions={<>
         <button type="button" className="crm-btn-primary" onClick={handleSave}><CheckIcon />ذخیره تغییرات</button>
@@ -167,10 +173,10 @@ export default function CustomerProfileModal({ recordId, records, customerMeta, 
             <div className="crm-field -span2"><label>نام شرکت</label><input className="crm-input" value={form.company} onChange={setInput('company')} /></div>
             <div className="crm-field"><label>نام مخاطب</label><input className="crm-input" value={form.name} onChange={setInput('name')} /></div>
             <div className="crm-field"><label>تلفن</label><input className="crm-input crm-mono" value={form.phone} onChange={setInput('phone')} /></div>
-            <div className="crm-field"><label>محصول</label><ProductField value={form.product} onChange={set('product')} onCategorySelect={(cat) => setForm((s) => (s.category ? s : { ...s, category: cat }))} /></div>
-            <div className="crm-field"><label>دسته محصول</label><Dropdown value={form.category} onChange={set('category')} options={CATEGORY_OPTS} placeholder="انتخاب کنید" /></div>
-            <div className="crm-field"><label>منبع سرنخ</label><input className="crm-input" value={form.source} onChange={setInput('source')} /></div>
-            <div className="crm-field"><label>تاریخ تماس</label><input type="date" className="crm-input crm-mono" value={form.date} onChange={setInput('date')} /></div>
+            <div className="crm-field"><label>محصول</label><ProductField value={form.product} onChange={set('product')} onCategorySelect={(cid) => setForm((s) => (s.categoryId ? s : { ...s, categoryId: cid }))} /></div>
+            <div className="crm-field"><label>دسته محصول</label><Dropdown value={form.categoryId} onChange={set('categoryId')} options={categoryOptions} placeholder="انتخاب کنید" /></div>
+            <div className="crm-field"><label>منبع سرنخ</label><input className="crm-input" list="crm-src-edit" value={form.source} onChange={setInput('source')} maxLength={64} placeholder="منبع سرنخ" /><datalist id="crm-src-edit">{sourceOpts.map((s) => <option key={s} value={s} />)}</datalist></div>
+            <div className="crm-field"><label>تاریخ تماس</label><DateField className="crm-input crm-mono" value={form.date} onChange={set('date')} /></div>
             <div className="crm-field"><label>آخرین قیمت اعلامی</label><input className="crm-input crm-mono" value={form.price} onChange={setInput('price')} /></div>
             <div className="crm-field"><label>نتیجه</label><Dropdown value={form.result} onChange={set('result')} options={RESULT_OPTS} placeholder="انتخاب کنید" /></div>
             <div className="crm-field"><label>اولویت</label><Dropdown value={form.priority} onChange={set('priority')} options={PRIORITY_OPTS} placeholder="انتخاب کنید" /></div>
@@ -181,15 +187,15 @@ export default function CustomerProfileModal({ recordId, records, customerMeta, 
             <div className="crm-field -span3">
               <label className="crm-toggle-label">
                 <input type="checkbox" checked={form.converted} onChange={(e) => setForm((s) => ({ ...s, converted: e.target.checked }))} />
-                <span>این سرنخ به مشتری تبدیل شده</span>
+                <span>این سرنخ تبدیل شده</span>
               </label>
             </div>
-            <div className="crm-field -span2"><label>تغییر توسط</label><Dropdown value={editor} onChange={setEditor} options={COMMENT_AUTHORS} placeholder="انتخاب کنید" /></div>
+            <div className="crm-field -span2"><label>تغییر توسط</label><Dropdown value={editor} onChange={setEditor} options={commentAuthors()} placeholder="انتخاب کنید" /></div>
             {form.result === 'در حال پیگیری' && (
               <div className="crm-field -span3 crm-reminder-block -visible">
                 <label>ایجاد یادآوری برای این پیگیری (اختیاری)</label>
                 <div className="crm-reminder-fields">
-                  <input type="date" className="crm-input crm-mono" value={reminder.date} onChange={(e) => setReminder({ ...reminder, date: e.target.value })} />
+                  <DateField className="crm-input crm-mono" value={reminder.date} onChange={(v) => setReminder({ ...reminder, date: v })} />
                   <input type="time" className="crm-input crm-mono" value={reminder.time} onChange={(e) => setReminder({ ...reminder, time: e.target.value })} />
                   <Dropdown value={reminder.for} onChange={(v) => setReminder({ ...reminder, for: v })} options={coordOptions()} placeholder="برای چه کسی" />
                   <input className="crm-input" value={reminder.text} onChange={(e) => setReminder({ ...reminder, text: e.target.value })} placeholder="متن یادآوری (اختیاری)" />
@@ -201,7 +207,7 @@ export default function CustomerProfileModal({ recordId, records, customerMeta, 
           <div className="crm-profile-block">
             <div className="crm-profile-block-head">
               <div className="crm-profile-block-title">تاریخچه تماس‌ها <span>({history.length.toLocaleString('en-US')} تماس)</span></div>
-              <button type="button" className="crm-btn-primary" onClick={() => setQuickOpen((o) => !o)}><PlusIcon />ثبت تماس جدید با این مشتری</button>
+              <button type="button" className="crm-btn-primary" onClick={() => setQuickOpen((o) => !o)}><PlusIcon />ثبت تماس جدید با این سرنخ</button>
             </div>
             {quickOpen && (
               <div className="crm-quickcall-form -open">
@@ -209,10 +215,10 @@ export default function CustomerProfileModal({ recordId, records, customerMeta, 
                   <div className="crm-field"><label>کارشناس</label><Dropdown value={quick.coordinator} onChange={(v) => setQuick({ ...quick, coordinator: v })} options={coordOptions()} placeholder="انتخاب کنید" /></div>
                   <div className="crm-field"><label>نام مخاطب</label><input className="crm-input" value={quick.name} onChange={(e) => setQuick({ ...quick, name: e.target.value })} /></div>
                   <div className="crm-field"><label>تلفن</label><input className="crm-input crm-mono" value={quick.phone} onChange={(e) => setQuick({ ...quick, phone: e.target.value })} /></div>
-                  <div className="crm-field"><label>محصول</label><ProductField value={quick.product} onChange={(v) => setQuick({ ...quick, product: v })} onCategorySelect={(cat) => setQuick((s) => (s.category ? s : { ...s, category: cat }))} /></div>
-                  <div className="crm-field"><label>دسته محصول</label><Dropdown value={quick.category} onChange={(v) => setQuick({ ...quick, category: v })} options={CATEGORY_OPTS} placeholder="انتخاب کنید" /></div>
-                  <div className="crm-field"><label>منبع سرنخ</label><input className="crm-input" value={quick.source} onChange={(e) => setQuick({ ...quick, source: e.target.value })} /></div>
-                  <div className="crm-field"><label>تاریخ تماس</label><input type="date" className="crm-input crm-mono" value={quick.date} onChange={(e) => setQuick({ ...quick, date: e.target.value })} /></div>
+                  <div className="crm-field"><label>محصول</label><ProductField value={quick.product} onChange={(v) => setQuick({ ...quick, product: v })} onCategorySelect={(cid) => setQuick((s) => (s.categoryId ? s : { ...s, categoryId: cid }))} /></div>
+                  <div className="crm-field"><label>دسته محصول</label><Dropdown value={quick.categoryId} onChange={(v) => setQuick({ ...quick, categoryId: v })} options={categoryOptions} placeholder="انتخاب کنید" /></div>
+                  <div className="crm-field"><label>منبع سرنخ</label><input className="crm-input" list="crm-src-quick" value={quick.source} onChange={(e) => setQuick({ ...quick, source: e.target.value })} maxLength={64} placeholder="منبع سرنخ" /><datalist id="crm-src-quick">{sourceOpts.map((s) => <option key={s} value={s} />)}</datalist></div>
+                  <div className="crm-field"><label>تاریخ تماس</label><DateField className="crm-input crm-mono" value={quick.date} onChange={(v) => setQuick({ ...quick, date: v })} /></div>
                   <div className="crm-field"><label>آخرین قیمت اعلامی</label><input className="crm-input crm-mono" value={quick.price} onChange={(e) => setQuick({ ...quick, price: e.target.value })} /></div>
                   <div className="crm-field"><label>نتیجه</label><Dropdown value={quick.result} onChange={(v) => setQuick({ ...quick, result: v })} options={RESULT_OPTS} placeholder="انتخاب کنید" /></div>
                   <div className="crm-field"><label>اولویت</label><Dropdown value={quick.priority} onChange={(v) => setQuick({ ...quick, priority: v })} options={PRIORITY_OPTS} placeholder="انتخاب کنید" /></div>
@@ -224,7 +230,7 @@ export default function CustomerProfileModal({ recordId, records, customerMeta, 
                     <div className="crm-field -span3 crm-reminder-block -visible">
                       <label>ایجاد یادآوری برای این پیگیری (اختیاری)</label>
                       <div className="crm-reminder-fields">
-                        <input type="date" className="crm-input crm-mono" value={quickReminder.date} onChange={(e) => setQuickReminder({ ...quickReminder, date: e.target.value })} />
+                        <DateField className="crm-input crm-mono" value={quickReminder.date} onChange={(v) => setQuickReminder({ ...quickReminder, date: v })} />
                         <input type="time" className="crm-input crm-mono" value={quickReminder.time} onChange={(e) => setQuickReminder({ ...quickReminder, time: e.target.value })} />
                         <Dropdown value={quickReminder.for} onChange={(v) => setQuickReminder({ ...quickReminder, for: v })} options={coordOptions()} placeholder="برای چه کسی" />
                         <input className="crm-input" value={quickReminder.text} onChange={(e) => setQuickReminder({ ...quickReminder, text: e.target.value })} placeholder="متن یادآوری (اختیاری)" />
@@ -257,7 +263,7 @@ export default function CustomerProfileModal({ recordId, records, customerMeta, 
           <div className="crm-profile-block">
             <div className="crm-profile-block-title">مکاتبات</div>
             <div className="crm-feed-list">
-              {!feed.length ? <div className="crm-feed-empty">هنوز مکاتبه‌ای برای این مشتری ثبت نشده</div> : feed.map((item) => (
+              {!feed.length ? <div className="crm-feed-empty">هنوز مکاتبه‌ای برای این سرنخ ثبت نشده</div> : feed.map((item) => (
                 <div className={`crm-feed-item ${item.type === 'comment' ? '-comment' : '-change'}`} key={item.id}>
                   <div className="crm-feed-item-head"><b>{item.type === 'comment' ? item.author : (item.author || 'سیستم')}</b><span>{Utils.formatTs(item.ts, calendar)}</span></div>
                   <div>{item.text}</div>
@@ -265,7 +271,7 @@ export default function CustomerProfileModal({ recordId, records, customerMeta, 
               ))}
             </div>
             <div className="crm-comment-form">
-              <Dropdown value={commentAuthor} onChange={setCommentAuthor} options={COMMENT_AUTHORS} placeholder="از طرف" />
+              <Dropdown value={commentAuthor} onChange={setCommentAuthor} options={commentAuthors()} placeholder="از طرف" />
               <textarea className="crm-textarea" rows={2} value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="نظر یا یادداشت خودتو بنویس..." />
               <button type="button" className="crm-btn-primary" onClick={submitComment}><CheckIcon />ثبت نظر</button>
             </div>

@@ -22,3 +22,4 @@ export function PowerIcon(props) { return <svg {...base} {...props}><path d="M12
 export function SearchIcon(props) { return <svg {...base} {...props}><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>; }
 export function FilterIcon(props) { return <svg {...base} {...props}><path d="M21 4H3l7 8v7l4 2v-9z" /></svg>; }
 export function FlagIcon(props) { return <svg {...base} {...props}><path d="M4 22V4" /><path d="M4 4h11l-1.5 3L15 10H4" /></svg>; }
+export function InfoIcon(props) { return <svg {...base} {...props}><circle cx="12" cy="12" r="9" /><path d="M12 16v-5" /><path d="M12 8h.01" /></svg>; }

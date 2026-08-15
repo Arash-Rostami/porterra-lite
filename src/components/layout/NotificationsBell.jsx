@@ -4,12 +4,13 @@ import { getDueReminders, markReminderDone, findLatestComment, custKey, useScope
 import { openProfile } from '../../lib/uiStore.js';
 import { coordLabel } from '../../lib/filters.js';
 import { BellIcon, CheckIcon } from '../ui/Icon.jsx';
+import { toast } from '../ui/Toast.jsx';
 import Utils from '../../lib/utils.js';
 import { useUiStore } from '../../lib/uiStore.js';
 
 // surfaces due reminders + latest comment on every tab, not just Suggestions
 export default function NotificationsBell() {
-  const { records, reminders, customerMeta } = useScopedData();
+  const { records, reminders, companyMeta } = useScopedData();
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
   const calendar = useUiStore((u) => u.calendar);
@@ -23,7 +24,7 @@ export default function NotificationsBell() {
   }, []);
 
   const due = getDueReminders(reminders);
-  const latestComment = findLatestComment(customerMeta, records);
+  const latestComment = findLatestComment(companyMeta, records);
 
   function goTo(id) {
     openProfile(id);
@@ -51,7 +52,7 @@ export default function NotificationsBell() {
                   {rm.text && <div className="crm-notif-item-text">{rm.text}</div>}
                   <div className="crm-notif-item-meta">{rm.dueDate}{rm.dueTime ? ' — ' + rm.dueTime : ''}</div>
                 </div>
-                <button type="button" className="crm-notif-done-btn" title="انجام شد" onClick={(e) => { e.stopPropagation(); markReminderDone(rm.id); }}>
+                <button type="button" className="crm-notif-done-btn" title="انجام شد" onClick={(e) => { e.stopPropagation(); markReminderDone(rm.id); toast('یادآوری به‌عنوان انجام‌شده علامت خورد'); }}>
                   <CheckIcon />
                 </button>
               </div>

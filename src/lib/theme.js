@@ -11,7 +11,6 @@ export function chartTextColor(dark) {
   return dark ? '#B9C7C2' : '#5C6B66';
 }
 
-// module-level so a toggle anywhere flips the class for every caller; per-component useState left /login and /dashboard stale
 let darkState = DEFAULT_DARK;
 let hydrated = false;
 const listeners = new Set();

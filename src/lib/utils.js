@@ -19,6 +19,15 @@ export default class Utils {
         return (s || '').toString().replace(/\s+/g, ' ').trim();
     }
 
+    static normalizePhone(s) {
+        if (!s) return '';
+        let out = String(s)
+            .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06F0))
+            .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660));
+        const plus = /^\s*\+/.test(String(s)) ? '+' : '';
+        return plus + out.replace(/[^0-9]/g, '');
+    }
+
     static parseDate(str) {
         if (!str) return null;
         const parts = str.split('.');

@@ -8,7 +8,7 @@ import { openProfile } from '../../lib/uiStore.js';
 import { toast } from '../../components/ui/Toast.jsx';
 
 export default function SuggestionsPage() {
-    const { records, reminders, customerMeta } = useScopedData();
+    const { records, reminders, companyMeta } = useScopedData();
     const byAgent = computeSuggestions(records);
 
     function handleMarkDone(id) {
@@ -19,7 +19,7 @@ export default function SuggestionsPage() {
     return (
         <div className="crm-tab-panel" id="crmPanelSuggestions">
             <ReminderBanner byAgent={byAgent} />
-            <CommentBanner customerMeta={customerMeta} records={records} onOpenProfile={openProfile} />
+            <CommentBanner companyMeta={companyMeta} records={records} onOpenProfile={openProfile} />
             <RemindersList reminders={reminders} records={records} onMarkDone={handleMarkDone} onOpenProfile={openProfile} />
             <SuggestionsPanel byAgent={byAgent} onOpenProfile={openProfile} />
         </div>

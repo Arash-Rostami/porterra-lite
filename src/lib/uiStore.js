@@ -106,13 +106,17 @@ export function applySourceFilter(source, top) {
     setFilters({ ...ui.filters, coordinator: '', category: '', source, dateFrom: '', dateTo: '' });
   }
 }
-export function applyMonthFilter(y, m, label) {
-  setChartFilter({ type: 'month', y, m, label: `ماه: ${label}` });
+export function applyMonthFilter(dateFrom, dateTo, label) {
+  setChartFilter({ type: 'month', dateFrom, dateTo, label: `ماه: ${label}` });
   setFilters({ ...ui.filters, coordinator: '', category: '', source: '', dateFrom: '', dateTo: '' });
 }
-export function applyDayFilter(y, m, day, agent, label) {
-  setChartFilter({ type: 'day', y, m, day, agent, label });
+export function applyDayFilter(date, agent, label) {
+  setChartFilter({ type: 'day', date, agent, label });
   setFilters({ ...ui.filters, coordinator: '', category: '', source: '', dateFrom: '', dateTo: '' });
+}
+export function applyKpiFilter(key, label) {
+  setChartFilter({ type: 'kpi', key, label });
+  setFilters({ ...ui.filters, coordinator: '', category: '', source: '', status: '', dateFrom: '', dateTo: '', showDeactivated: true });
 }
 export function setCoordinatorFilter(coordinator) {
   setFilters({ ...ui.filters, coordinator });

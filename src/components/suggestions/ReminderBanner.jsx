@@ -34,10 +34,10 @@ export function ReminderBanner({ byAgent }) {
   );
 }
 
-export function CommentBanner({ customerMeta, records, onOpenProfile }) {
+export function CommentBanner({ companyMeta, records, onOpenProfile }) {
   const [closed, setClosed] = useState(false);
   const calendar = useUiStore((u) => u.calendar);
-  const found = findLatestComment(customerMeta, records);
+  const found = findLatestComment(companyMeta, records);
   if (closed || !found) return null;
   const { comment, record, companyLabel } = found;
   return (

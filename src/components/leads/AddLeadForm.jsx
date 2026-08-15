@@ -2,24 +2,50 @@
 import { useState, useMemo, useEffect } from 'react';
 import Modal from '../ui/Modal.jsx';
 import Dropdown from '../ui/Dropdown.jsx';
+import DateField from '../ui/DateField.jsx';
 import ProductField from './ProductField.jsx';
 import Utils from '../../lib/utils.js';
 import { findDuplicateCompany, findDuplicatePhone } from '../../lib/duplicates.js';
-import { coordOptions, CATEGORY_OPTS, RESULT_OPTS, PRIORITY_OPTS } from '../../lib/filters.js';
+import { coordOptions, RESULT_OPTS, PRIORITY_OPTS, sourceSuggestions } from '../../lib/filters.js';
+import { findLeadByCompany } from '../../lib/apiClient.js';
+import { useStore } from '../../lib/store.js';
 import { toast } from '../ui/Toast.jsx';
 import { CheckIcon, XCircleIcon } from '../ui/Icon.jsx';
 
-const empty = { coordinator: '', company: '', name: '', phone: '', product: '', category: '', source: '', date: '', price: '', result: '', priority: '', notes: '', deactivateReason: '' };
+const empty = { coordinator: '', company: '', name: '', phone: '', product: '', categoryId: '', source: '', date: '', price: '', result: '', priority: '', notes: '', deactivateReason: '' };
 
 // create and edit share the same <Modal> chrome for UI consistency
-export default function AddContactForm({ open, records, defaultCoordinator, onSubmit, onCancel }) {
+export default function AddLeadForm({ open, records, defaultCoordinator, onSubmit, onCancel }) {
   const [f, setF] = useState(empty);
+  const categories = useStore((s) => s.categories);
+  const categoryOptions = useMemo(() => categories.map((c) => ({ value: c.id, label: c.name })), [categories]);
+  const sourceOpts = useMemo(() => sourceSuggestions(records), [records]);
   const set = (k) => (v) => setF((s) => ({ ...s, [k]: v }));
   const setInput = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }));
 
   useEffect(() => {
     if (open && defaultCoordinator) setF((s) => (s.coordinator ? s : { ...s, coordinator: defaultCoordinator }));
   }, [open, defaultCoordinator]);
+
+  async function handleCompanyBlur() {
+    const company = f.company.trim();
+    if (!company) return;
+    try {
+      const { lead } = await findLeadByCompany(company);
+      if (!lead) return;
+      setF((s) => ({
+        ...s,
+        coordinator: s.coordinator || lead.coordinator || '',
+        name: s.name || lead.name || '',
+        phone: s.phone || lead.phone || '',
+        product: s.product || lead.product || '',
+        categoryId: s.categoryId || lead.categoryId || '',
+        source: s.source || lead.source || '',
+      }));
+      toast('اطلاعات این شرکت از سابقه قبلی پر شد — قابل ویرایش است');
+    } catch {
+    }
+  }
 
   const companyDup = useMemo(() => findDuplicateCompany(records, f.company), [records, f.company]);
   const phoneDup = useMemo(() => findDuplicatePhone(records, f.phone), [records, f.phone]);
@@ -37,7 +63,7 @@ export default function AddContactForm({ open, records, defaultCoordinator, onSu
       name: f.name.trim() || null,
       phone: f.phone.trim() || null,
       product: f.product.trim() || null,
-      category: f.category || null,
+      categoryId: f.categoryId || null,
       source: f.source.trim() || null,
       date: (f.date ? Utils.fromISODate(f.date) : '') || Utils.todayDdMmYyyy(),
       price: f.price.trim() || null,
@@ -48,7 +74,7 @@ export default function AddContactForm({ open, records, defaultCoordinator, onSu
     };
     onSubmit(rec);
     reset();
-    toast('مخاطب جدید ثبت شد');
+    toast('سرنخ جدید ثبت شد');
   }
 
   // close clears the draft so the next open is fresh
@@ -61,11 +87,11 @@ export default function AddContactForm({ open, records, defaultCoordinator, onSu
     <Modal
       open={open}
       onClose={close}
-      title="ثبت مخاطب جدید"
+      title="ثبت سرنخ جدید"
       description="با ثبت، این رکورد فوراً به پنل، نمودارها و جدول زیر اضافه می‌شود."
       width="4xl"
       actions={<>
-        <button type="button" className="crm-btn-primary" onClick={submit}><CheckIcon />ثبت مخاطب</button>
+        <button type="button" className="crm-btn-primary" onClick={submit}><CheckIcon />ثبت سرنخ</button>
         <button type="button" className="crm-btn-ghost" onClick={close}><XCircleIcon />انصراف</button>
       </>}
     >
@@ -76,7 +102,7 @@ export default function AddContactForm({ open, records, defaultCoordinator, onSu
         </div>
         <div className="crm-field -span2">
           <label>نام شرکت *</label>
-          <input className="crm-input" value={f.company} onChange={setInput('company')} required placeholder="مثلاً: شرکت نمونه صنعت" />
+          <input className="crm-input" value={f.company} onChange={setInput('company')} onBlur={handleCompanyBlur} required placeholder="مثلاً: شرکت نمونه صنعت" />
           {companyDup && <div className="crm-dup-warning -show">{companyDup}</div>}
         </div>
         <div className="crm-field">
@@ -90,19 +116,20 @@ export default function AddContactForm({ open, records, defaultCoordinator, onSu
         </div>
         <div className="crm-field">
           <label>محصول</label>
-          <ProductField value={f.product} onChange={set('product')} onCategorySelect={(cat) => setF((s) => (s.category ? s : { ...s, category: cat }))} />
+          <ProductField value={f.product} onChange={set('product')} onCategorySelect={(cid) => setF((s) => (s.categoryId ? s : { ...s, categoryId: cid }))} />
         </div>
         <div className="crm-field">
           <label>دسته محصول</label>
-          <Dropdown value={f.category} onChange={set('category')} options={CATEGORY_OPTS} placeholder="انتخاب کنید" />
+          <Dropdown value={f.categoryId} onChange={set('categoryId')} options={categoryOptions} placeholder="انتخاب کنید" />
         </div>
         <div className="crm-field">
           <label>منبع سرنخ</label>
-          <input className="crm-input" value={f.source} onChange={setInput('source')} placeholder="مثلاً: نمایشگاه، معرفی، ..." />
+          <input className="crm-input" list="crm-src-add" value={f.source} onChange={setInput('source')} maxLength={64} placeholder="منبع سرنخ" />
+          <datalist id="crm-src-add">{sourceOpts.map((s) => <option key={s} value={s} />)}</datalist>
         </div>
         <div className="crm-field">
           <label>تاریخ تماس</label>
-          <input type="date" className="crm-input crm-mono" value={f.date} onChange={setInput('date')} />
+          <DateField className="crm-input crm-mono" value={f.date} onChange={set('date')} />
         </div>
         <div className="crm-field">
           <label>آخرین قیمت اعلامی</label>

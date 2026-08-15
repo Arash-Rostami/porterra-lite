@@ -10,10 +10,10 @@ export function findDuplicateCompany(records, companyInput) {
 }
 
 export function findDuplicatePhone(records, phoneInput) {
-  const phone = (phoneInput || '').replace(/\D/g, '');
+  const phone = Utils.normalizePhone(phoneInput);
   if (phone.length < 6) return null;
   const tail = phone.slice(-8);
-  const match = records.find((r) => r.phone && r.phone.replace(/\D/g, '').slice(-8) === tail);
+  const match = records.find((r) => r.phone && Utils.normalizePhone(r.phone).slice(-8) === tail);
   if (!match) return null;
   return `⚠️ این شماره قبلاً برای «${match.company || '-'}» توسط ${coordLabel(match.coordinator)} ثبت شده`;
 }

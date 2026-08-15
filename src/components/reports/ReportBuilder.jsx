@@ -1,9 +1,11 @@
 'use client';
 import {useMemo, useState} from 'react';
 import Dropdown from '../ui/Dropdown.jsx';
+import DateField from '../ui/DateField.jsx';
 import {effectiveResult, filterOptionsFrom, getFiltered, STATUS_OPTS} from '../../lib/filters.js';
 import {toast} from '../ui/Toast.jsx';
 import {DownloadIcon} from '../ui/Icon.jsx';
+import PhoneLink from '../ui/PhoneLink.jsx';
 
 function ChevronIcon() {
     return (
@@ -25,7 +27,7 @@ const REPORT_COLUMNS = [
     {key: 'price', label: 'آخرین قیمت اعلامی'},
     {key: 'result', label: 'نتیجه'},
     {key: 'priority', label: 'اولویت'},
-    {key: 'converted', label: 'تبدیل به مشتری'},
+    {key: 'converted', label: 'سرنخ تبدیل‌شده'},
 ];
 const DEFAULT_COLS = ['coordinator', 'company', 'product', 'date', 'result'];
 const PREVIEW_CAP = 200;
@@ -89,15 +91,13 @@ export default function ReportBuilder({records}) {
                     <Dropdown value={filters.category} onChange={set('category')} options={opts.categories}
                               placeholder="همه دسته‌ها"/>
                     <Dropdown value={filters.source} onChange={set('source')} options={opts.sources}
-                              placeholder="همه منابع"/>
+                              placeholder="همه منابع سرنخ"/>
                     <Dropdown value={filters.status} onChange={set('status')} options={STATUS_OPTS}
                               placeholder="همه وضعیت‌ها"/>
                     <div className="crm-date-range">
-                        <input type="date" className="crm-input crm-mono" value={filters.dateFrom}
-                               onChange={setInput('dateFrom')}/>
+                        <DateField className="crm-input crm-mono" value={filters.dateFrom} onChange={set('dateFrom')}/>
                         <span>تا</span>
-                        <input type="date" className="crm-input crm-mono" value={filters.dateTo}
-                               onChange={setInput('dateTo')}/>
+                        <DateField className="crm-input crm-mono" value={filters.dateTo} onChange={set('dateTo')}/>
                     </div>
 
                     <button type="button" className={`crm-cols-toggle${colsOpen ? ' -open' : ''}`} onClick={() => setColsOpen((s) => !s)}>
@@ -144,7 +144,7 @@ export default function ReportBuilder({records}) {
                         </thead>
                         <tbody>
                         {result.slice(0, PREVIEW_CAP).map((r) => (
-                            <tr key={r.id}>{activeCols.map((c) => <td key={c.key}>{cellValue(r, c.key)}</td>)}</tr>
+                            <tr key={r.id}>{activeCols.map((c) => <td key={c.key}>{c.key === 'phone' ? <PhoneLink phone={r.phone} /> : cellValue(r, c.key)}</td>)}</tr>
                         ))}
                         </tbody>
                     </table>

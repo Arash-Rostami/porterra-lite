@@ -25,7 +25,7 @@ function AgentReportCard({ d }) {
       <div className="crm-agent-report-row"><span>استعلام باز</span><Bar val={d.quoteOpen} total={d.total} color="#1F6F72" /><b>{d.quoteOpen.toLocaleString('en-US')}</b></div>
       <div className="crm-agent-report-row"><span>استعلام موفق</span><Bar val={d.quoteWon} total={d.total} color="#3E7A4F" /><b>{d.quoteWon.toLocaleString('en-US')}</b></div>
       <div className="crm-agent-report-row"><span>استعلام ناموفق</span><Bar val={d.quoteLost} total={d.total} color="#B4532A" /><b>{d.quoteLost.toLocaleString('en-US')}</b></div>
-      <div className="crm-agent-report-conversion"><span>نرخ تبدیل به مشتری</span><span>{d.conversionRate}٪ ({d.customers.toLocaleString('en-US')} نفر)</span></div>
+      <div className="crm-agent-report-conversion"><span>نرخ تبدیل سرنخ</span><span>{d.conversionRate}٪ ({d.converted.toLocaleString('en-US')} نفر)</span></div>
     </div>
   );
 }

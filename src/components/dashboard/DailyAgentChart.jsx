@@ -4,11 +4,13 @@ import Chart from 'chart.js/auto';
 import { computeDailyAgentData } from '../../lib/analytics.js';
 import { chartGridColor, chartTextColor } from '../../lib/theme.js';
 import { coordLabel } from '../../lib/filters.js';
+import { useUiStore } from '../../lib/uiStore.js';
 
 export default function DailyAgentChart({ records, dark, onSelectDay }) {
+  const calendar = useUiStore((u) => u.calendar);
   const canvasRef = useRef(null);
   const chartRef = useRef(null);
-  const { y, m, labels, datasets, agents, cap, wasCapped, totalThisMonth, activeDays, monthLabel } = computeDailyAgentData(records);
+  const { y, labels, datasets, agents, cap, wasCapped, totalThisMonth, activeDays, monthLabel, dayDates } = computeDailyAgentData(records, calendar);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -42,11 +44,11 @@ export default function DailyAgentChart({ records, dark, onSelectDay }) {
       const p0 = points[0];
       const day = p0.index + 1;
       const agent = agents[p0.datasetIndex];
-      onSelectDay(y, m, day, agent, `${coordLabel(agent)} — روز ${day} ${monthLabel}`);
+      onSelectDay(dayDates[p0.index], agent, `${coordLabel(agent)} — روز ${day} ${monthLabel}`);
     };
     return () => chartRef.current?.destroy();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [records, dark]);
+  }, [records, dark, calendar]);
 
   return (
     <div className="crm-section">
@@ -57,7 +59,7 @@ export default function DailyAgentChart({ records, dark, onSelectDay }) {
       </div>
       <div className="crm-chart-chips" id="crmDailyAgentChips">
         {activeDays.map((d) => (
-          <button key={d.i} type="button" className="crm-chart-chip" onClick={() => onSelectDay(y, m, d.i + 1, null, `روز ${d.lab} ${monthLabel} — همه کارشناسان`)}>
+          <button key={d.i} type="button" className="crm-chart-chip" onClick={() => onSelectDay(d.date, null, `روز ${d.lab} ${monthLabel} — همه کارشناسان`)}>
             روز {d.lab} ({d.total.toLocaleString('en-US')})
           </button>
         ))}

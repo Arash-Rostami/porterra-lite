@@ -2,21 +2,21 @@
 import { computeKpis } from '../../lib/analytics.js';
 import useCountUp from '../../lib/useCountUp.js';
 
-function KpiCard({ label, value, cls }) {
+function KpiCard({ label, value, cls, onClick }) {
   const display = useCountUp(value);
   return (
-    <div className={`crm-kpi${cls ? ' ' + cls : ''}`}>
+    <button type="button" className={`crm-kpi${cls ? ' ' + cls : ''}`} onClick={onClick}>
       <div className="crm-kpi-label">{label}</div>
       <div className="crm-kpi-value">{display}</div>
-    </div>
+    </button>
   );
 }
 
-export default function KpiCards({ records }) {
+export default function KpiCards({ records, onSelectKpi }) {
   const kpis = computeKpis(records);
   return (
     <div className="crm-kpis" id="crmKpis">
-      {kpis.map((k) => <KpiCard key={k.label} {...k} />)}
+      {kpis.map((k) => <KpiCard key={k.key} {...k} onClick={() => onSelectKpi(k.key, k.label)} />)}
     </div>
   );
 }

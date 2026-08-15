@@ -48,6 +48,13 @@ Set in the Chabokan dashboard, never in files. Applied at container start — **
 - `.gitignore` keeps `node_modules`, `.next`, `.env*`, `.porterra`, `.claude/tmp` off the server. Only source goes up — no secrets in files.
 - `.porterra/` (offline queue + snapshot) is runtime state. Chabokan "next" FS may reset on redeploy; for <10 users on a reliable cloud DB, best-effort offline is fine (the queue only fills when the DB is unreachable, which is rare).
 
+## DB schema — categories table
+A `categories` lookup table (id VARCHAR(40) PK, name UNIQUE, is_custom TINYINT, created_at BIGINT)
+was added with 2 seeded base categories (CAT-chempoly = "Chemical/Polymer", CAT-solar = "Solar").
+`products.category_id` and `contacts.category_id` are FK → `categories(id)` `ON DELETE RESTRICT`.
+The migration (`docs/MIGRATION.md`) runs §1–§6 only — the legacy free-text `category` column on
+products/contacts is intentionally retained as dormant legacy/audit (§7 is documented but not run).
+
 ## CLI quick reference
 - `chabok login` — sign in
 - `chabok deploy` — upload + deploy

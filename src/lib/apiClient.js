@@ -31,10 +31,11 @@ export const getCurrentUser = () => req('GET', '/api/auth/me');
 export const login = (email, password) => req('POST', '/api/auth/login', { email, password });
 export const logout = () => req('POST', '/api/auth/logout');
 
-export const createContact = (rec) => req('POST', '/api/contacts', { rec });
-export const updateContact = (id, patch) => req('PATCH', `/api/contacts/${enc(id)}`, { patch });
-export const deleteContact = (payload) =>
-  req('DELETE', `/api/contacts/${enc(payload.id)}`, payload.changeLogEntry ? { changeLogEntry: payload.changeLogEntry } : undefined);
+export const createLead = (rec) => req('POST', '/api/leads', { rec });
+export const updateLead = (id, patch) => req('PATCH', `/api/leads/${enc(id)}`, { patch });
+export const deleteLead = (payload) =>
+  req('DELETE', `/api/leads/${enc(payload.id)}`, payload.changeLogEntry ? { changeLogEntry: payload.changeLogEntry } : undefined);
+export const findLeadByCompany = (company) => req('GET', `/api/leads/by-company?company=${enc(company)}`);
 
 export const addChangeLog = (p) => req('POST', '/api/activity', { ...p, type: 'change' });
 export const addComment = (p) => req('POST', '/api/activity', { ...p, type: 'comment' });
@@ -49,10 +50,13 @@ export const deleteReminder = (id) => req('DELETE', `/api/reminders/${enc(id)}`)
 export const createProduct = (product) => req('POST', '/api/products', { product });
 export const updateProductAction = (id, patch) => req('PATCH', `/api/products/${enc(id)}`, { patch });
 export const deleteProductAction = (id) => req('DELETE', `/api/products/${enc(id)}`);
+export const createCategory = (category) => req('POST', '/api/categories', { category });
+export const updateCategoryAction = (id, patch) => req('PATCH', `/api/categories/${enc(id)}`, { patch });
+export const deleteCategoryAction = (id) => req('DELETE', `/api/categories/${enc(id)}`);
 export const announceQuotePrice = (id, price, priceType, terms) => req('PATCH', `/api/quotes/${enc(id)}`, { action: 'announce-price', price, priceType, terms });
 export const resolveQuote = (id, result, failReason) => req('PATCH', `/api/quotes/${enc(id)}`, { action: 'resolve', result, failReason });
 
-export const importRecords = (records) => req('POST', '/api/contacts/import', { records });
+export const importRecords = (records) => req('POST', '/api/leads/import', { records });
 export const syncNow = () => req('POST', '/api/sync');
 export const resetToSeed = () => req('POST', '/api/admin/reset');
 

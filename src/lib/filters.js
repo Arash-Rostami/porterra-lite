@@ -2,8 +2,10 @@ import Utils from './utils.js';
 
 export const COORD_LABELS = { FARNAZ: 'فرناز', PARDIS: 'پردیس', ZOHREH: 'زهره' };
 export const COORD_OPTS = [{ value: 'FARNAZ', label: 'فرناز' }, { value: 'PARDIS', label: 'پردیس' }, { value: 'ZOHREH', label: 'زهره' }];
-export const COMMENT_AUTHORS = ['فرناز', 'پردیس', 'زهره'];
-export const CATEGORY_OPTS = ['Chemical/Polymer', 'Solar'];
+export function commentAuthors() {
+  return Object.values(AGENT_DIRECTORY).sort((a, b) => a.localeCompare(b));
+}
+export const SOURCE_OPTS = ['ادمونت', 'اینترنت', 'نمایشگاه', 'مدیریت', 'ارتباطات', 'بازاریابی', 'همکاران', 'مشتری ورودی'];
 export const RESULT_OPTS = ['در حال پیگیری', 'در حال استعلام', 'بی‌پاسخ', 'غیرفعال'];
 export const STATUS_OPTS = ['در حال پیگیری', 'در حال استعلام', 'بی‌پاسخ', 'غیرفعال', 'بدون وضعیت'];
 export const PRIORITY_OPTS = ['بالا', 'متوسط', 'پایین'];
@@ -18,6 +20,15 @@ export function setAgentDirectory(agents) {
 
 export function coordLabel(v) {
   return AGENT_DIRECTORY[v] || COORD_LABELS[v] || v;
+}
+
+export function coordCodeFromLabel(label) {
+  const s = Utils.normSpace(label || '');
+  if (!s) return null;
+  for (const code in AGENT_DIRECTORY) {
+    if (Utils.normSpace(AGENT_DIRECTORY[code]) === s) return code;
+  }
+  return null;
 }
 
 export function coordOptions() {
@@ -120,16 +131,31 @@ export function getFiltered(records, filters, chartFilter, sort) {
     base = base.filter((r) => {
       if (cf.type === 'month') {
         const dt = Utils.parseDate(r.date);
-        return dt && dt.getFullYear() === cf.y && dt.getMonth() + 1 === cf.m;
+        if (!dt) return false;
+        const fromDt = cf.dateFrom ? Utils.parseDate(cf.dateFrom) : null;
+        const toDt = cf.dateTo ? Utils.parseDate(cf.dateTo) : null;
+        if (fromDt && dt < fromDt) return false;
+        if (toDt && dt > toDt) return false;
+        return true;
       }
       if (cf.type === 'day') {
         const dt = Utils.parseDate(r.date);
-        if (!dt || dt.getFullYear() !== cf.y || dt.getMonth() !== cf.m || dt.getDate() !== cf.day) return false;
+        const target = Utils.parseDate(cf.date);
+        if (!dt || !target || dt.getTime() !== target.getTime()) return false;
         if (cf.agent) return Utils.normSpace(r.coordinator) === cf.agent;
         return true;
       }
       if (cf.type === 'otherSource') {
         return !cf.topSet.has(Utils.normSpace(r.source) || 'نامشخص');
+      }
+      if (cf.type === 'kpi') {
+        if (cf.key === 'total') return true;
+        if (cf.key === 'converted') return !!r.converted;
+        if (cf.key === 'quoteOpen') return isQuoteOpen(r);
+        if (cf.key === 'deactivated') return r.result === 'غیرفعال';
+        if (cf.key === 'followUp') return r.result === 'در حال پیگیری';
+        if (cf.key === 'noAnswer') return effectiveResult(r) === 'بی‌پاسخ';
+        return true;
       }
       return true;
     });
@@ -160,4 +186,13 @@ export function filterOptionsFrom(records) {
     categories: Array.from(cats).sort((a, b) => a.localeCompare(b)),
     sources: Array.from(sources).sort((a, b) => a.localeCompare(b)),
   };
+}
+
+export function sourceSuggestions(records) {
+  const set = new Set(SOURCE_OPTS);
+  for (const r of records) {
+    const s = Utils.normSpace(r.source);
+    if (s) set.add(s);
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b));
 }

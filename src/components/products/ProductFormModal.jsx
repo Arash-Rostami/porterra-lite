@@ -4,36 +4,52 @@ import Modal from '../ui/Modal.jsx';
 import Dropdown from '../ui/Dropdown.jsx';
 import { toast } from '../ui/Toast.jsx';
 import { CheckIcon, PlusIcon, XCircleIcon } from '../ui/Icon.jsx';
-import { CATEGORY_OPTS } from '../../lib/filters.js';
+import { useStore, addCategory } from '../../lib/store.js';
 
-const empty = { name: '', category: '' };
+const empty = { name: '', categoryId: '' };
 
 export default function ProductFormModal({ open, product, onSubmit, onCancel }) {
+  const categories = useStore((s) => s.categories);
   const [f, setF] = useState(empty);
+  const [catOpen, setCatOpen] = useState(false);
+  const [catName, setCatName] = useState('');
   const isEdit = !!product;
 
   useEffect(() => {
     if (!open) return;
-    setF(product ? { name: product.name || '', category: product.category || '' } : empty);
+    setF(product ? { name: product.name || '', categoryId: product.categoryId || '' } : empty);
   }, [open, product]);
 
   function submit() {
     if (!f.name.trim()) { toast('نام محصول الزامی است'); return; }
-    if (!f.category) { toast('دسته‌بندی الزامی است'); return; }
+    if (!f.categoryId) { toast('دسته‌بندی الزامی است'); return; }
     if (isEdit) {
-      onSubmit({ name: f.name.trim(), category: f.category });
+      onSubmit({ name: f.name.trim(), categoryId: f.categoryId });
     } else {
       onSubmit({
         id: 'PROD-' + Date.now() + '-' + Math.floor(Math.random() * 10000),
         name: f.name.trim(),
-        category: f.category,
+        categoryId: f.categoryId,
         isCustom: true,
         createdAt: Date.now(),
       });
     }
   }
 
+  function saveCategory() {
+    const trimmed = catName.trim();
+    if (!trimmed) { toast('نام دسته‌بندی را وارد کنید'); return; }
+    const id = 'CAT-' + Date.now() + '-' + Math.floor(Math.random() * 10000);
+    addCategory({ id, name: trimmed, isCustom: true, createdAt: Date.now() });
+    setF((s) => ({ ...s, categoryId: id }));
+    setCatName('');
+    setCatOpen(false);
+    toast('دسته‌بندی جدید ثبت شد');
+  }
+
   function close() { onCancel(); }
+
+  const catOptions = categories.map((c) => ({ value: c.id, label: c.name }));
 
   return (
     <Modal
@@ -53,10 +69,28 @@ export default function ProductFormModal({ open, product, onSubmit, onCancel }) 
         </div>
         <div className="crm-field -span2">
           <label>دسته‌بندی *</label>
-          <Dropdown value={f.category} onChange={(v) => setF((s) => ({ ...s, category: v }))} options={CATEGORY_OPTS} placeholder="انتخاب کنید" />
+          <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
+            <Dropdown value={f.categoryId} onChange={(v) => setF((s) => ({ ...s, categoryId: v }))} options={catOptions} placeholder="انتخاب کنید" />
+            <button type="button" className="crm-flag-btn" title="افزودن دسته‌بندی جدید" onClick={() => setCatOpen(true)}><PlusIcon /></button>
+          </div>
         </div>
       </div>
       <div className="crm-required-note">فیلدهای ستاره‌دار الزامی هستند.</div>
+      <Modal
+        open={catOpen}
+        onClose={() => setCatOpen(false)}
+        title="افزودن دسته‌بندی جدید"
+        width="sm"
+        actions={<>
+          <button type="button" className="crm-btn-primary" onClick={saveCategory}><CheckIcon />ثبت</button>
+          <button type="button" className="crm-btn-ghost" onClick={() => setCatOpen(false)}><XCircleIcon />انصراف</button>
+        </>}
+      >
+        <div className="crm-field -span2">
+          <label>نام دسته‌بندی *</label>
+          <input className="crm-input" value={catName} onChange={(e) => setCatName(e.target.value)} placeholder="مثلاً: پلاستیک" autoFocus />
+        </div>
+      </Modal>
     </Modal>
   );
 }

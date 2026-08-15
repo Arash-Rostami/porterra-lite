@@ -19,13 +19,20 @@ canonical date format used everywhere in this app — never `Date` objects in st
 Jalali `DD <month> JYYY — HH:MM`, both Asia/Tehran-anchored via `Intl.DateTimeFormat` so
 login/comment timestamps stay stable across server/viewer TZs),
 `escapeHtml`/`escapeAttr` (unused now that React escapes by default, kept for parity —
-harmless to leave, safe to delete if you're cleaning up).
+harmless to leave, safe to delete if you're cleaning up). `normalizePhone(s)` converts
+Persian (`۰-۹`) and Arabic-Indic (`٠-٩`) digits to Latin, preserves a leading `+`, strips
+non-dial chars; `PhoneLink` (`src/components/ui/PhoneLink.jsx`) uses it to build `tel:`
+URIs for read-only phone displays (agent suggestions, suggestions panel, report preview
+phone column) — phone edit inputs stay plain `<input>`.
 
 ### `filters.js`
-- Also holds the app's shared enum constants (`COORD_OPTS`, `COMMENT_AUTHORS`, `CATEGORY_OPTS`,
-  `RESULT_OPTS`, `STATUS_OPTS`, `PRIORITY_OPTS`, `PRICE_TYPE_OPTS`) — these used to be duplicated
-  per-component; this file already owned `COORD_LABELS` so the rest of the label/option vocabulary
-  lives beside it instead of a separate constants module.
+- Also holds the app's shared enum constants (`COORD_OPTS`, `RESULT_OPTS`, `STATUS_OPTS`,
+  `PRIORITY_OPTS`, `PRICE_TYPE_OPTS`) — these used to be duplicated per-component; this file
+  already owned `COORD_LABELS` so the rest of the label/option vocabulary lives beside it instead
+  of a separate constants module. `COMMENT_AUTHORS` was removed — replaced by `commentAuthors()`
+  (below). The hardcoded `AGENT_OPTS` 3-option dropdown in `UserFormModal` was also removed —
+  `agentCode` is now a free-text input (`.trim().toUpperCase()` on submit, both create and edit),
+  which is what unblocks onboarding a 4th+ expert.
 - `COORD_LABELS`/`COORD_OPTS` are now a **fallback only**, not the source of truth — the real
   coordinator/agent list comes from active `users` rows (`agentCode`/`displayName`), loaded once
   at boot into a module-level registry via `setAgentDirectory(agents)` (called from `store.js`'s
@@ -36,7 +43,35 @@ harmless to leave, safe to delete if you're cleaning up).
   both part of the cached `snapshot.json`, so a normal offline session still has real data).
   `coordClass(co)` still special-cases exactly `FARNAZ`/`PARDIS`/`ZOHREH` for their brand colors
   and falls back to `-other` for any other agent — same treatment as `agentColor()` in
-  `analytics.js`, intentionally not extended to a per-agent color table.
+  `analytics.js`, intentionally not extended to a per-agent color table. `commentAuthors()`
+  returns the active agents' display names (`Object.values(AGENT_DIRECTORY).sort(...)`) and feeds
+  the two "تغییر توسط"/"از طرف" author dropdowns in `LeadProfileModal`. `coordCodeFromLabel(label)`
+  is the reverse of `coordLabel` (display name → `agentCode`, or null); `excel.js`'s
+  `normalizeImportCoordinator` tries it first so an imported display name (e.g. `'فرناز'`) for any
+  active agent resolves to its code, then falls back to the legacy 3-name map, then raw passthrough.
+  Onboarding a new expert = a `users` row with role `agent` + a unique `agentCode`; after
+  `loadAll`/`syncNow` it appears in `coordOptions()`, `commentAuthors()`, the agents panel (chips
+  derive from `r.coordinator`), and analytics (auto HSL color via `agentColor()`). `COORD_OPTS`/
+  `COORD_LABELS`/`coordClass`/`AGENT_COLORS` remain as intentional legacy fallback/color logic —
+  same precedent as `badgeClass`/`catColors` below — not dead code.
+- `SOURCE_OPTS` is now a **seed/fallback only** — lead source forms (`AddLeadForm`,
+  `LeadProfileModal` edit + quick-call) use a free-text `<input className="crm-input"
+  list="...">` + a native `<datalist>` of suggestions from `sourceSuggestions(records)`
+  (the 8 `SOURCE_OPTS` defaults ∪ distinct `Utils.normSpace(r.source)` from records,
+  memoized per form); the source filter dropdowns (`LeadFilters`, `ReportBuilder`) use the
+  data-driven `opts.sources` from `filterOptionsFrom(records)` instead of `SOURCE_OPTS`.
+  Adding a source = type it on a lead once and save; it then appears in every form's
+  suggestion list and every filter dropdown automatically via the record-derived option
+  lists — no `sources` table, no migration, no FK; rename/delete unsupported (a source
+  "exists" while leads use it — same no-table trade-off as `agentCode`). `SOURCE_OPTS`/
+  `filterOptionsFrom` (which already returns a data-driven `.sources` list) are unchanged.
+- `badgeClass(cat)` (here) and `catColors` (`analytics.js`) are **intentional color logic keyed
+  on the hydrated category NAME**, not a category list. They survived the category→`category_id`
+  migration on purpose — `hydrateAllCategoryNames()` (store.js) resolves `categoryId`→display
+  `name` onto every record/product as `r.category`/`p.category`, so these name-keyed color helpers
+  keep working unchanged. Do not flag them as dead or migrate them to `categoryId`. (The old
+  hardcoded `CATEGORY_OPTS` form list was removed — category dropdowns now read
+  `useStore((s)=>s.categories)` instead.)
 - `result` is now a 4-state enum, never `'موفق'`/`'ناموفق'` directly: `'در حال پیگیری'` (follow-up),
   `'در حال استعلام'` (an inquiry/quote is open — see the `quote*` fields below), `'بی‌پاسخ'`
   (no answer), `'غیرفعال'` (deactivated, requires `deactivateReason`). `'موفق'`/`'ناموفق'` only
@@ -62,10 +97,11 @@ harmless to leave, safe to delete if you're cleaning up).
 - `getFiltered(records, filters, chartFilter, sort)` — the single function the contacts
   table's row-list comes from. Order of operations matters and mirrors the original exactly:
   dropdown filters → date range → chart drill-down (`chartFilter`) → smart search → sort.
-- `chartFilter` shapes: `{type:'month', y, m}`, `{type:'day', y, m, day, agent}`,
-  `{type:'otherSource', topSet}`. This is a *separate* filter dimension from
-  `filters.category`/`filters.source` — see the `uiStore.js` note below for the rule about
-  keeping them mutually exclusive.
+- `chartFilter` shapes: `{type:'month', dateFrom, dateTo}` (Gregorian dd.mm.yyyy bounds —
+  a date range, not a `{y,m}` pair, so it works whether the chart bucketed by Gregorian or
+  Jalali month), `{type:'day', date, agent}` (single Gregorian dd.mm.yyyy), `{type:'otherSource',
+  topSet}`. This is a *separate* filter dimension from `filters.category`/`filters.source` — see
+  the `uiStore.js` note below for the rule about keeping them mutually exclusive.
 
 ### `suggestions.js`
 `computeSuggestions(records)` — the "who to call today" engine, grouped by agent. Algorithm
@@ -80,13 +116,16 @@ harmless to leave, safe to delete if you're cleaning up).
 5. `isNoAnswer = effectiveResult === 'بی‌پاسخ'` → always surfaced regardless of days elapsed.
 6. Everything else (e.g. "در حال پیگیری") only surfaces once `days >= 3` OR priority rank 3.
 `filterAgentSuggestions` applies the optional per-agent category/product/search UI filters
-on top of the computed pool, and caps the visible list (6 normally, 20 while searching) —
-this cap is cosmetic (`shown`), `filtered.length` (uncapped) is what's shown in the count.
+on top of the computed pool and returns the sorted `filtered` list; `SuggestionsPanel.jsx`
+paginates it client-side (same pagination pattern as `LeadTable.jsx`/`AgentProfileModal.jsx`)
+rather than the function itself capping the visible count.
 
 ### `duplicates.js`
 `findDuplicateCompany` — exact match after `normSpace().toLowerCase()`. `findDuplicatePhone`
 — compares the **last 8 digits** after stripping non-digits, to tolerate `0912…` vs
-`+98912…` formats. Both are live-as-you-type warnings, not hard blocks — the prototype never
+`+98912…` formats. Both sides now route through `Utils.normalizePhone` so Persian/Arabic-digit
+phones are detected (the old `.replace(/\D/g,'')` silently dropped them). Both are
+live-as-you-type warnings, not hard blocks — the prototype never
 prevented saving a duplicate, only warned. Keep it that way; hard-blocking would be a
 behavior change, not a bug fix.
 
@@ -102,7 +141,7 @@ when `effectiveResult === 'در حال استعلام'` — **never** compares `
 `computeAgentReport` — per-agent totals across all records; `computeAgentStats` — same tally
 for one agent with an optional date range (agent profile modal). `agentColor` — 3 hardcoded
 brand colors for FARNAZ/PARDIS/ZOHREH, falls back to a deterministic HSL hash for any other
-coordinator. `computeFunnelStages` returns `{stages, leadToCustomerRate, quoteToSaleRate}` —
+coordinator. `computeFunnelStages` returns `{stages, leadConversionRate, quoteToSaleRate}` —
 3 stages (total leads → open+resolved quotes → `converted` count) plus the two conversion
 rates the quote-model spec calls for, replacing the old 4-stage "price-field-truthy" funnel.
 `computeTrendData`/`computeDailyAgentData`/`computeCategoryData`/`computeSourceData` — pure
@@ -116,16 +155,26 @@ it's there on purpose.
 `parseImportFile` reads any `.xlsx`/`.xls`, matches columns via `IMPORT_ALIASES` (Persian
 or English header names, case-insensitive), and skips rows with no company name. It returns
 data only — the caller (`ImportExportBar.jsx`) decides how to merge/persist/toast, matching
-the original's separation of "read the file" from "what happens on import."
+the original's separation of "read the file" from "what happens on import." The leads
+export (`src/app/leads/page.js` `handleExport`) passes
+`getFiltered(records, filters, chartFilter)` into `exportToExcel`, so export respects the
+active filter + chart drill-down, not the raw scoped set.
 
 ### `calendar.js`
-Jalali/Persian date conversion, **display-only**. Exports `JALALI_MONTHS`, `FA_MONTHS`
-(Persian month names for Gregorian months, index 0 = January — used for trend-chart / company
-report month labels; folded in from the deleted `constants.js`),
-`gregorianToJalali(gy,gm,gd)`, `formatDisplayDate(ddmmyyyy, calendar)`. Dates are always
-*stored* as Gregorian `dd.mm.yyyy`; only rendering flips to Jalali when the toggle is on.
-Chart month-bucket grouping stays Gregorian on purpose — re-bucketing by Jalali month would
-change what's grouped together, not just the label.
+Jalali/Persian date conversion. Exports `JALALI_MONTHS`, `FA_MONTHS` (Persian month names for
+Gregorian months, index 0 = January — used for trend-chart / company report month labels when
+the toggle is off; folded in from the deleted `constants.js`), `gregorianToJalali(gy,gm,gd)`,
+`jalaliToGregorian(jy,jm,jd)` (its inverse, same algorithm family/constants — used by `DateField`
+and the analytics month-bucketing below), `jalaliMonthLength(jy,jm)` (resolves Esfand's 29-vs-30
+days by round-tripping through both conversion functions rather than a separate leap-year
+formula), `formatDisplayDate(ddmmyyyy, calendar)`. Dates are always *stored* as Gregorian
+`dd.mm.yyyy` — the toggle never changes that. What it *does* change: `DateField.jsx`
+(`src/components/ui/DateField.jsx`) renders Jalali day/month/year `Dropdown`s instead of the
+native `<input type="date">`, converting to/from the same Gregorian ISO value contract; and
+`computeTrendData`/`computeDailyAgentData` in `analytics.js` bucket by Jalali month instead of
+Gregorian when passed `calendar === 'jalali'`. Because of that second point, the chart
+click-to-filter payload (`applyMonthFilter`/`applyDayFilter` in `uiStore.js`) is a Gregorian
+date-range/date, not a `{y,m}`/`{y,m,day}` int pair — see the `uiStore.js` note below.
 
 ### `store.js`
 Also holds `products` (loaded once at boot alongside `records`) and three quote/product actions
@@ -135,7 +184,15 @@ quote actions stamp `Utils.todayDdMmYyyy()` client-side for the optimistic updat
 route recomputes the same value authoritatively, so the two only diverge if the client's clock is
 wrong, and a `loadAll`/`syncNow` refresh corrects it.
 
-Client singleton holding `records`/`customerMeta`/`reminders`/`currentUser`, backed by
+Also holds `categories` (loaded once at boot alongside `records`/`products`) with
+`addCategory`/`updateCategory`/`deleteCategory` mutators following the same optimistic-`persist()`
+pattern. `hydrateAllCategoryNames()` resolves `categoryId`→display `name` onto every record/product
+as `r.category`/`p.category` so all existing readers (filters, analytics, charts, badge colors) stay
+name-based and unchanged — called on `loadAll`/`syncNow` and after `updateRecord`/`addProduct`/
+`updateProduct`/`addRecords`/`updateCategory` (a category rename re-hydrates every record/product in
+one pass).
+
+Client singleton holding `records`/`companyMeta`/`reminders`/`currentUser`, backed by
 **MySQL via the REST API in `src/app/api/*` (client `apiClient.js` → server `serverOps.js`)** —
 the prototype's `window.storage` is gone, and the former `src/app/actions.js` Server Actions
 layer is gone too (replaced wholesale by the API). `loadAll()` calls `loadAllDataAction` once
@@ -143,14 +200,17 @@ layer is gone too (replaced wholesale by the API). `loadAll()` calls `loadAllDat
 `currentUser`; mutations go through `persist(rollback, actionFn)`, which applies the change
 optimistically and rolls back on failure, redirecting to `/login` on `UNAUTHORIZED`/`FORBIDDEN`.
 `logout()` clears state and redirects. `custKey` (company normalization) lives here rather than
-`filters.js` only because it's needed to key `customerMeta`/reminders — anything else needing a
+`filters.js` only because it's needed to key `companyMeta`/reminders — anything else needing a
 company key should import it from here. `useScopedData` (folded in from a separate
 `useScopedData.js`) is the read hook every top-level page uses instead of `useStore((s) =>
-s.records)`: it returns `{records, reminders, customerMeta}` filtered by the current user's
+s.records)`: it returns `{records, reminders, companyMeta}` filtered by the current user's
 `agentCode` when `uiStore.scope` is `'mine'` (the default), unfiltered when `'all'` (or for
 admins, who have no `agentCode` so `'mine'` is a no-op) — the default view is per-user while
 the underlying data stays shared. `resetToSeed()` mirrors the prototype's "بازگشت به داده
-اولیه" footer button (admin-only server-side now). `syncNow()` replays the offline queue and
+اولیه" footer button (admin-only server-side now). `src/data/seed.js` is legacy — seed data
+still uses the old `category` name shape, so a reset yields leads with `NULL` `category_id`.
+Acceptable because it's an admin-only "wipe to initial data" path, unused on the production DB.
+`syncNow()` replays the offline queue and
 swaps in the fresh server data.
 
 **Read path & DB-hit pattern (for future reference):** `loadAllData` reads from **MySQL as
@@ -161,19 +221,19 @@ are optimistic and the in-memory store is the UI's source of truth, so a normal 
 round-trips (the `getUserById` auth re-validation + the one write). No polling/interval runs
 while online (the 20s `syncNow` timer in `AppShell` fires only while `offline === true`).
 `snapshot.json` is rewritten after every successful load/sync, so a slightly-stale full copy of
-`records`/`customerMeta`/`reminders` always sits on disk in plaintext JSON — that's the offline
+`records`/`companyMeta`/`reminders` always sits on disk in plaintext JSON — that's the offline
 fallback and the reason `.porterra/` must stay gitignored and local.
 
 ### `auth.js`, `crypto.js` — new infra (NOT prototype ports)
 These three exist only because of the login + multi-user + MySQL migration; they have no
 ancestor in `panel_mostaqel_moshtarian.html`. (The offline queue/snapshot mechanics that
 used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
-- **`contactPrefs.js`** (new, also not a prototype port): per-user **view** preferences for the
-  contacts table — a manual row order (`order`: `string[]` of record ids) and a set of
+- **`leadPrefs.js`** (new, also not a prototype port): per-user **view** preferences for the
+  leads table — a manual row order (`order`: `string[]` of record ids) and a set of
   "important" flags (`flags`: `string[]`). Persisted in `localStorage` keyed per username
-  (`crm_contact_order_${username}` / `crm_contact_flags_${username}`), same convention as
-  `uiStore.js`'s `scope`. `initContactPrefsForUser` runs from `store.loadAll`; `resetContactPrefs`
-  from `store.logout`. **Manual ordering is applied in `ContactTable.jsx` *after* `getFiltered`
+  (`crm_lead_order_${username}` / `crm_lead_flags_${username}`), same convention as
+  `uiStore.js`'s `scope`. `initLeadPrefsForUser` runs from `store.loadAll`; `resetLeadPrefs`
+  from `store.logout`. **Manual ordering is applied in `LeadTable.jsx` *after* `getFiltered`
   returns (passing `sort=null` in manual mode) — never inside `filters.js`**, whose order of
   operations mirrors the prototype and must stay pure. Records absent from `order` sort after
   the ranked ones, preserving their `getFiltered` order. Drag-drop reorders the full stored
@@ -208,7 +268,7 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
   `store.isUnauthorized` / `users.isUnauthorized` branch on. `serverOps.js` is the **server**
   orchestration moved verbatim out of `actions.js`: `tryOp`, `loadBootData` (MySQL→snapshot
   fallback + writeSnapshot), `syncData` (replay queue in one transaction → `loadAllFromDb` →
-  snapshot), `importContacts` (per-record queue on DB-down), `resetData`, `authenticateUser`.
+  snapshot), `importLeads` (per-record queue on DB-down), `resetData`, `authenticateUser`.
   It also inlines the offline queue/snapshot mechanics (append-only `queue.json`, atomic
   `snapshot.json` under `/.porterra/`) that were a separate `offline.js`.
   `apiHandler.js` exports `handle(fn)`, the one error→status mapper every route uses:
@@ -225,14 +285,16 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
 `queries.js` exports one consistent CRUD set per table — `listX`, `getXById`, `createX`,
 `updateX`, `deleteX` — every function takes an optional pooled `conn` (used when called inside
 `applyOp`'s transaction; otherwise runs on the pool). Coverage:
-- **`contacts`**: `listContacts`, `getContactById`, `createContact` (upsert), `updateContact`, `deleteContact`.
-  Holds the 8 quote/deactivation columns (`deactivate_reason`, `quote_price`, `quote_price_type`,
-  `quote_terms`, `quote_price_date`, `quote_result`, `quote_result_date`, `quote_fail_reason`) added
-  for the inquiry workflow — `quote_price_date`/`quote_result_date` are `dd.mm.yyyy` VARCHAR like
-  `date`, not SQL `DATE`, to match the rest of this app's date convention (`normDate` in
-  `mappers.js` covers all three). `updateContact` maps camelCase patch keys to snake_case columns
-  via the `CONTACT_UPDATE` `{k, col}` array (the multi-word quote fields don't collapse to their
-  column name the way the single-word legacy fields did).
+- **`contacts`** (table name kept as-is — "leads" in the app layer, `contacts` is the physical
+  MySQL table, deliberately not renamed to avoid a DB migration): `listLeads`, `getLeadById`,
+  `createLead` (upsert), `updateLead`, `deleteLead`. Holds the 8 quote/deactivation columns
+  (`deactivate_reason`, `quote_price`, `quote_price_type`, `quote_terms`, `quote_price_date`,
+  `quote_result`, `quote_result_date`, `quote_fail_reason`) added for the inquiry workflow —
+  `quote_price_date`/`quote_result_date` are `dd.mm.yyyy` VARCHAR like `date`, not SQL `DATE`, to
+  match the rest of this app's date convention (`normDate` in `mappers.js` covers all three).
+  `updateLead` maps camelCase patch keys to snake_case columns via the `LEAD_UPDATE` `{k, col}`
+  array (the multi-word quote fields don't collapse to their column name the way the single-word
+  legacy fields did).
 - **`customer_activity`**: `listActivity`, `getActivityById`, `createActivity` (upsert), `updateActivity`, `deleteActivity`.
 - **`reminders`**: `listReminders`, `getReminderById`, `createReminder` (upsert), `updateReminder`, `deleteReminder`.
 - **`users`**: `listUsers`/`listUsersRaw`, `getUserById`, `createUser`, `updateUser`, `deleteUser`, plus finders
@@ -246,17 +308,29 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
   inline "add on the fly" widget relies on that). Loaded once at boot via
   `loadAllFromDb`/`loadBootData` alongside contacts/activity/reminders; the `/products` page
   reads/writes this same `store.js` `products` state (via `addProduct`/`updateProduct`/
-  `deleteProduct`) rather than fetching independently like `/users` does.
+  `deleteProduct`) rather than fetching independently like `/users` does. The legacy free-text
+  `category` column on `products`/`contacts` is intentionally retained as dormant legacy/audit —
+  the app uses `category_id` exclusively.
+- **`categories`**: `listCategories`, `getCategoryById`, `createCategory`, `updateCategory`,
+  `deleteCategory` + `CATEGORY_COLS`/`CATEGORY_UPDATE` — same CRUD shape as the other tables.
+  `rowToCategory`/`categoryToRow` in `mappers.js`; `CategoryCreate`/`CategoryUpdate` Zod schemas
+  in `models.js`. POST `/api/categories` is `requireUser` (any authenticated user can create —
+  the inline create-category shortcut in `ProductField`/`ProductFormModal` relies on that);
+  PATCH/DELETE `/api/categories/[id]` is `requireElevated` (admin/developer only). DELETE is
+  blocked by `ON DELETE RESTRICT` — a category in use surfaces as a `VALIDATION` toast. Leads
+  and products now use `category_id` (FK → `categories(id)`); `LEAD_UPDATE`/`PRODUCT_UPDATE` both
+  map `categoryId`→`category_id`. `loadAllFromDb` loads categories alongside the other tables;
+  the `/products` and `/leads` import routes accept `categoryId`.
 
 Quote lifecycle (`PATCH /api/quotes/[id]`, one route handling both stage transitions via an
-`action` body field) reuses the existing `updateContact`/`applyOp('updateContact', ...)` path
-rather than adding new `applyOp` cases — it's still just a contact patch, with the server
+`action` body field) reuses the existing `updateLead`/`applyOp('updateLead', ...)` path
+rather than adding new `applyOp` cases — it's still just a lead patch, with the server
 computing `quotePriceDate`/`quoteResultDate` (`Utils.todayDdMmYyyy()`) and enforcing stage order
 (`announce-price` requires `result === 'در حال استعلام'`; `resolve` requires `quotePrice` already
 set **and `quoteResult` not already set** — `result` never transitions away from `'در حال
 استعلام'` once opened, so without that second check a resolved quote could be resolved again,
 flipping `quoteResult`/`converted` with no audit trail) before calling it. `QuoteResolve`'s Zod schema requires `failReason` when `result ===
-'ناموفق'` via `.refine`; `ContactCreate`/`ContactUpdate` similarly require `deactivateReason` when
+'ناموفق'` via `.refine`; `LeadCreate`/`LeadUpdate` similarly require `deactivateReason` when
 `result === 'غیرفعال'` via `.superRefine` — both are the server-side enforcement the prototype's
 handoff spec calls out as missing (client-only validation there).
 
@@ -266,8 +340,8 @@ only present keys (absent = unchanged). **`applyOp` is the offline-queueable mut
 and calls these same functions** — client-driven writes go through it (via `tryOp` in
 `serverOps.js`) so a DB-down mutation lands in the `/.porterra/queue.json` queue; do not call the
 `create/update/delete*` functions directly from an API route for client mutations unless you
-also wire the offline path. `loadAllFromDb` + `reseedContacts` are bulk read/reset, not CRUD.
-Row⇄object mapping lives in `mappers.js` (`rowToContact`/`rowToActivity`/`rowToReminder`/`rowToUser`
+also wire the offline path. `loadAllFromDb` + `reseedLeads` are bulk read/reset, not CRUD.
+Row⇄object mapping lives in `mappers.js` (`rowToLead`/`rowToActivity`/`rowToReminder`/`rowToUser`
 + `*ToRow`); the `*_COLS` arrays there are the single source of truth for column order.
 `models.js` holds the Zod schemas (`*Create`/`*Update`, `Id`, `LoginInput`) every API route
 handler validates via `parseOrThrow` before any SQL runs.

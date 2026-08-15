@@ -92,6 +92,11 @@ per Filament convention), `-none`→`var(--muted)`. `border-radius:8px` (the app
 rectangular radius — see "Border radius" below), pale solid bg +
 saturated text + alpha border — never a plain colored pill.
 
+## Phone display
+
+Read-only phone numbers render via `PhoneLink` (`<a href="tel:…" dir="ltr">` with
+`crm-mono`), not plain text; phone edit inputs remain plain `<input>`.
+
 ## Fonts — self-hosted, never a CDN
 
 `public/fonts/` holds the actual font files copied from
@@ -179,6 +184,12 @@ These are new surfaces with no BMS-CM ancestor; they follow the same token/tier 
 - **Header divider** (`.crm-header-divider`): a 1px vertical `--line` rule that separates the
   logout button from the rest of the header action cluster. Only exists because logout is
   icon-only (see below) and would otherwise read as just another control.
+- **User form `agentCode` field** (`UserFormModal.jsx`): a free-text code input (uppercased +
+  trimmed on save, both create and edit), not a dropdown — an admin types any unique code to
+  onboard a new expert (کارشناس).
+- **Lead `source` (منبع سرنخ) field** (`AddLeadForm`/`LeadProfileModal`): a free-text
+  `crm-input` with a native `<datalist>` suggestion list (not a `Dropdown`); suggestions =
+  existing sources from records ∪ the 8 `SOURCE_OPTS` defaults.
 - **Icon-only logout** (`.crm-logout-btn`): reuses `.crm-theme-toggle` chrome with a
   `LogoutIcon`, `title="خروج"` — same icon-only pattern as the calendar/font-scale/theme
   buttons. Never add a text label to it; the divider + title is the whole affordance.
@@ -190,11 +201,11 @@ These are new surfaces with no BMS-CM ancestor; they follow the same token/tier 
   (no card/shadow) — just `--ink-soft` text — so it reads as a quiet live caption, not a
   control. SSR-safe via `now=null` initial state set in `useEffect`.
 
-## Contacts table — flagged rows & manual order
+## Leads table — flagged rows & manual order
 
 Two per-user view affordances (no business data, not a BMS port — but following its
-conventions). State lives in `src/lib/contactPrefs.js` (`localStorage` keyed per username),
-wired into the table in `ContactTable.jsx`.
+conventions). State lives in `src/lib/leadPrefs.js` (`localStorage` keyed per username),
+wired into the table in `LeadTable.jsx`.
 
 - **Flagged-important row** (`tr.crm-row-flagged`): background `var(--accent-soft)` on the
   `td`s — the canonical mild accent tint (same token as soft-accent surfaces; pale blue light /
@@ -223,8 +234,8 @@ optional footer `actions` slot — mirrors BMS's own `<x-modal open="...">` Blad
 component (`resources/views/components/modal.blade.php`) down to the same named
 width scale (`xs` 20rem → `7xl` 80rem, same values as Filament's `fi-width-*`,
 default `3xl`/768px). Every create/edit surface renders through it now —
-`CustomerProfileModal.jsx` (edit) and `AgentProfileModal.jsx` (view) plus
-`AddContactForm.jsx` (create) which uses the same shell, body grid, and `actions`
+`LeadProfileModal.jsx` (edit) and `AgentProfileModal.jsx` (view) plus
+`AddLeadForm.jsx` (create) which uses the same shell, body grid, and `actions`
 footer as the profile modal so create and edit share one chrome. If you add a new
 create/edit modal anywhere in the app, do the same:
 
@@ -362,7 +373,7 @@ When you add a new labeled action button, give it the icon for its verb from thi
 
 A widget's actions (export, import, create/add) live inside that widget's own
 `.crm-section-title-row` — never in a bar floating above or below the `.crm-section`.
-Contacts used to break this (import/create sat in their own bar above the table,
+Leads used to break this (import/create sat in their own bar above the table,
 export sat in the filter toolbar); it was fixed to match Users/AgentReport/Suggestions,
 which already did this correctly. `.crm-table-actions` is the wrapper for a widget with
 more than one action button — `display:flex; gap:10px; margin-inline-start:auto` groups
@@ -375,16 +386,27 @@ utilities as icon-only `.crm-theme-toggle` buttons (`title` tooltip, no label), 
 them from the labeled buttons with a `.crm-header-divider`, then the labeled secondary
 action (`.crm-export-btn`), then the primary action last (`.crm-add-btn`/
 `.crm-btn-primary`) — quiet-to-prominent, DOM order left-to-right (so primary lands at
-the visual end in RTL). `ContactTable.jsx`'s action row is the reference implementation.
+the visual end in RTL). `LeadTable.jsx`'s action row is the reference implementation.
 
 **Same rule applies one level in, inside modals.** A nested block within a modal (e.g.
-`CustomerProfileModal`'s `.crm-profile-block` / `.crm-profile-block-head` /
+`LeadProfileModal`'s `.crm-profile-block` / `.crm-profile-block-head` /
 `.crm-profile-block-title`) is the modal-scoped equivalent of `.crm-section` /
 `.crm-section-title-row` / `.crm-section-title` — its action button belongs in the head
 row, and if it's the block's sole create action it must use the same primary-CTA look as
 `.crm-add-btn`/`.crm-btn-primary`, not a bespoke neutral style. (`.crm-quickcall-btn` used
 to be a one-off neutral/bordered button for «ثبت تماس جدید» — it's now just
 `.crm-btn-primary`, matching every other single-action widget header in the app.)
+
+## /categories tab — mirrors /products
+
+The `/categories` admin tab (sidebar "مدیریت" group) is a 1:1 structural clone of `/products`:
+same CRUD panel + form-modal pattern, same card/table/badge conventions. Its سفارشی/پایه
+(custom/base) type badge uses `crm-status-badge` (`-success` for سفارشی, `-none` for پایه)
+rather than `badgeClass` (`filters.js`) — `badgeClass` is category-**name**-specific color
+logic, meaningless for the custom/base flag. The form modal is the shared `Modal.jsx` shell
+with an inline create-category shortcut (Plus → modal → `addCategory` → auto-select) in
+`ProductField`/`ProductFormModal`, same inline-create pattern as the product add-on-the-fly
+widget.
 
 ## Absolute anti-patterns (same spirit as BMS's own list, `stylesPattern.md`)
 

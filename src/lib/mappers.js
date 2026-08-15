@@ -6,7 +6,7 @@ function normDate(v) {
 
 const n = (v) => (v === undefined || v === null || v === '' ? null : v);
 
-export function rowToContact(row) {
+export function rowToLead(row) {
   return {
     id: row.id,
     converted: Boolean(row.converted),
@@ -15,7 +15,7 @@ export function rowToContact(row) {
     name: row.name,
     phone: row.phone,
     product: row.product,
-    category: row.category,
+    categoryId: row.category_id,
     source: row.source,
     date: row.date,
     price: row.price,
@@ -37,7 +37,16 @@ export function rowToProduct(row) {
   return {
     id: row.id,
     name: row.name,
-    category: row.category,
+    categoryId: row.category_id,
+    isCustom: Boolean(row.is_custom),
+    createdAt: Number(row.created_at),
+  };
+}
+
+export function rowToCategory(row) {
+  return {
+    id: row.id,
+    name: row.name,
     isCustom: Boolean(row.is_custom),
     createdAt: Number(row.created_at),
   };
@@ -68,7 +77,7 @@ export function rowToReminder(row) {
   };
 }
 
-export function rowsToCustomerMeta(rows) {
+export function rowsToCompanyMeta(rows) {
   const meta = {};
   for (const row of rows) {
     const key = row.company_key;
@@ -80,7 +89,7 @@ export function rowsToCustomerMeta(rows) {
   return meta;
 }
 
-export function contactToRow(c) {
+export function leadToRow(c) {
   return {
     id: c.id,
     converted: c.converted ? 1 : 0,
@@ -89,7 +98,7 @@ export function contactToRow(c) {
     name: n(c.name),
     phone: n(c.phone),
     product: n(c.product),
-    category: n(c.category),
+    category_id: n(c.categoryId),
     source: n(c.source),
     date: normDate(n(c.date)),
     price: n(c.price),
@@ -111,9 +120,18 @@ export function productToRow(p) {
   return {
     id: p.id,
     name: p.name,
-    category: p.category,
+    category_id: n(p.categoryId),
     is_custom: p.isCustom ? 1 : 0,
     created_at: p.createdAt,
+  };
+}
+
+export function categoryToRow(c) {
+  return {
+    id: c.id,
+    name: c.name,
+    is_custom: c.isCustom ? 1 : 0,
+    created_at: c.createdAt,
   };
 }
 
@@ -156,12 +174,13 @@ export function rowToUser(row) {
   };
 }
 
-export const CONTACT_COLS = [
-  'id', 'converted', 'company', 'coordinator', 'name', 'phone', 'product', 'category', 'source', 'date', 'price', 'result', 'priority', 'notes',
+export const LEAD_COLS = [
+  'id', 'converted', 'company', 'coordinator', 'name', 'phone', 'product', 'category_id', 'source', 'date', 'price', 'result', 'priority', 'notes',
   'deactivate_reason', 'quote_price', 'quote_price_type', 'quote_terms', 'quote_price_date', 'quote_result', 'quote_result_date', 'quote_fail_reason',
 ];
 export const REMINDER_COLS = ['id', 'cust_key', 'company', 'due_date', 'due_time', 'for_agent', 'text', 'created_at', 'done'];
 export const ACTIVITY_COLS = ['id', 'company_key', 'type', 'ts', 'author', 'text'];
 export const USER_COLS = ['id', 'username', 'email', 'display_name', 'agent_code', 'password_cipher', 'role', 'active', 'last_login', 'created_at'];
 export const USER_SAFE_COLS = ['id', 'username', 'email', 'display_name', 'agent_code', 'role', 'active', 'last_login', 'created_at'];
-export const PRODUCT_COLS = ['id', 'name', 'category', 'is_custom', 'created_at'];
+export const PRODUCT_COLS = ['id', 'name', 'category_id', 'is_custom', 'created_at'];
+export const CATEGORY_COLS = ['id', 'name', 'is_custom', 'created_at'];

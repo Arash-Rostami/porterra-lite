@@ -2,7 +2,7 @@ import { withTransaction, isConnError } from './db.js';
 import {
   applyOp,
   loadAllFromDb,
-  reseedContacts,
+  reseedLeads,
   findUserByEmail,
   createUser,
   updateUserLastLogin,
@@ -10,7 +10,7 @@ import {
 import {mkdir, readdir, readFile, rename, unlink, writeFile} from 'fs/promises';
 import path from 'path';
 import { SEED_DATA } from '../data/seed.js';
-import { parseOrThrow, ContactCreate, LoginInput } from './models.js';
+import { parseOrThrow, LeadCreate, LoginInput } from './models.js';
 import { encryptString, decryptString } from './crypto.js';
 import { rowToUser } from './mappers.js';
 
@@ -92,7 +92,7 @@ export async function loadBootData() {
     data = await loadAllFromDb();
   } catch {
     const snap = await readSnapshot();
-    return { data: snap || { records: [], customerMeta: {}, reminders: [], products: [], agents: [] }, offline: true, queueCount: await getQueueCount() };
+    return { data: snap || { records: [], companyMeta: {}, reminders: [], products: [], agents: [], categories: [] }, offline: true, queueCount: await getQueueCount() };
   }
   await writeSnapshot(data).catch(() => {});
   return { data, offline: false, queueCount: await getQueueCount() };
@@ -115,15 +115,15 @@ export async function syncData() {
   }
 }
 
-export async function importContacts(records) {
-  const valid = records.map((r) => parseOrThrow(ContactCreate, r));
+export async function importLeads(records) {
+  const valid = records.map((r) => parseOrThrow(LeadCreate, r));
   try {
     await applyOp('importRecords', { records: valid });
     return { ok: true, count: valid.length };
   } catch (err) {
     if (isConnError(err)) {
       let queueCount = await getQueueCount();
-      for (const r of valid) queueCount = await appendOp('createContact', { rec: r });
+      for (const r of valid) queueCount = await appendOp('createLead', { rec: r });
       return { ok: false, queued: true, queueCount };
     }
     throw err;
@@ -131,7 +131,7 @@ export async function importContacts(records) {
 }
 
 export async function resetData() {
-  await reseedContacts(SEED_DATA);
+  await reseedLeads(SEED_DATA);
   return { ok: true };
 }
 

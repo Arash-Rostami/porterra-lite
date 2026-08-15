@@ -2,15 +2,15 @@ import { NextResponse } from 'next/server';
 import { handle } from '@/lib/apiHandler.js';
 import { requireUser } from '@/lib/auth.js';
 import { tryOp } from '@/lib/serverOps.js';
-import { parseOrThrow, ContactUpdate, Activity, Id } from '@/lib/models.js';
+import { parseOrThrow, LeadUpdate, Activity, Id } from '@/lib/models.js';
 
 export const PATCH = handle(async (req, ctx) => {
   await requireUser();
   const { id: rawId } = await ctx.params;
   const id = parseOrThrow(Id, rawId);
   const body = await req.json();
-  const patch = parseOrThrow(ContactUpdate, body.patch);
-  return NextResponse.json(await tryOp('updateContact', { id, patch }));
+  const patch = parseOrThrow(LeadUpdate, body.patch);
+  return NextResponse.json(await tryOp('updateLead', { id, patch }));
 });
 
 export const DELETE = handle(async (req, ctx) => {
@@ -21,5 +21,5 @@ export const DELETE = handle(async (req, ctx) => {
   const changeLogEntry = body.changeLogEntry
     ? parseOrThrow(Activity, { ...body.changeLogEntry, type: 'change' })
     : null;
-  return NextResponse.json(await tryOp('deleteContact', { id, changeLogEntry }));
+  return NextResponse.json(await tryOp('deleteLead', { id, changeLogEntry }));
 });

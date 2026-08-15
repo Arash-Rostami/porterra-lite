@@ -2,15 +2,18 @@ import {query, withTransaction} from './db.js';
 import {
     ACTIVITY_COLS,
     activityToRow,
-    CONTACT_COLS,
-    contactToRow,
+    CATEGORY_COLS,
+    categoryToRow,
+    LEAD_COLS,
+    leadToRow,
     PRODUCT_COLS,
     productToRow,
     REMINDER_COLS,
     reminderToRow,
-    rowsToCustomerMeta,
+    rowsToCompanyMeta,
     rowToActivity,
-    rowToContact,
+    rowToCategory,
+    rowToLead,
     rowToProduct,
     rowToReminder,
     rowToUser,
@@ -22,16 +25,16 @@ const ph = (n) => Array(n).fill('?').join(',');
 const exec = async (conn, sql, params) => (conn ? (await conn.query(sql, params))[0] : query(sql, params));
 const selectCols = (cols) => cols.map((c) => `\`${c}\``).join(',');
 
-const CONTACT_SET = CONTACT_COLS.filter((c) => c !== 'id');
+const LEAD_SET = LEAD_COLS.filter((c) => c !== 'id');
 const REMINDER_SET = REMINDER_COLS.filter((c) => c !== 'id');
-const CONTACT_UPDATE = [
+const LEAD_UPDATE = [
     {k: 'converted', col: 'converted'},
     {k: 'company', col: 'company'},
     {k: 'coordinator', col: 'coordinator'},
     {k: 'name', col: 'name'},
     {k: 'phone', col: 'phone'},
     {k: 'product', col: 'product'},
-    {k: 'category', col: 'category'},
+    {k: 'categoryId', col: 'category_id'},
     {k: 'source', col: 'source'},
     {k: 'date', col: 'date'},
     {k: 'price', col: 'price'},
@@ -51,39 +54,44 @@ const USER_SET = USER_COLS.filter((c) => c !== 'id' && c !== 'username' && c !==
 
 const USER_SELECT = selectCols(USER_COLS);
 const USER_SAFE_SELECT = selectCols(USER_SAFE_COLS);
-const CONTACT_SELECT = selectCols(CONTACT_COLS);
+const LEAD_SELECT = selectCols(LEAD_COLS);
 const ACTIVITY_SELECT = selectCols(ACTIVITY_COLS);
 const REMINDER_SELECT = selectCols(REMINDER_COLS);
 const PRODUCT_SELECT = selectCols(PRODUCT_COLS);
+const CATEGORY_SELECT = selectCols(CATEGORY_COLS);
 
-export async function listContacts(conn) {
-    const rows = await exec(conn, `SELECT ${CONTACT_SELECT} FROM \`contacts\``);
-    return (rows || []).map(rowToContact);
+export async function listLeads(conn) {
+    const rows = await exec(conn, `SELECT ${LEAD_SELECT} FROM \`contacts\``);
+    return (rows || []).map(rowToLead);
 }
-export async function getContactById(id, conn) {
-    const rows = await exec(conn, `SELECT ${CONTACT_SELECT} FROM \`contacts\` WHERE \`id\`=? LIMIT 1`, [id]);
-    return rows && rows[0] ? rowToContact(rows[0]) : null;
+export async function getLeadById(id, conn) {
+    const rows = await exec(conn, `SELECT ${LEAD_SELECT} FROM \`contacts\` WHERE \`id\`=? LIMIT 1`, [id]);
+    return rows && rows[0] ? rowToLead(rows[0]) : null;
 }
-export async function createContact(c, conn) {
-    const row = contactToRow(c);
-    const sql = `INSERT INTO \`contacts\` (\`${CONTACT_COLS.join('`,`')}\`)
-                 VALUES (${ph(CONTACT_COLS.length)})
-                 ON DUPLICATE KEY UPDATE ${CONTACT_SET.map((x) => `\`${x}\`=VALUES(\`${x}\`)`).join(',')}`;
-    await exec(conn, sql, CONTACT_COLS.map((c2) => row[c2]));
+export async function findLeadsByCompany(company, conn) {
+    const rows = await exec(conn, `SELECT ${LEAD_SELECT} FROM \`contacts\` WHERE LOWER(\`company\`)=LOWER(?)`, [company]);
+    return (rows || []).map(rowToLead);
 }
-async function upsertContacts(records, conn) {
-    const onDup = CONTACT_SET.map((x) => `\`${x}\`=VALUES(\`${x}\`)`).join(',');
+export async function createLead(c, conn) {
+    const row = leadToRow(c);
+    const sql = `INSERT INTO \`contacts\` (\`${LEAD_COLS.join('`,`')}\`)
+                 VALUES (${ph(LEAD_COLS.length)})
+                 ON DUPLICATE KEY UPDATE ${LEAD_SET.map((x) => `\`${x}\`=VALUES(\`${x}\`)`).join(',')}`;
+    await exec(conn, sql, LEAD_COLS.map((c2) => row[c2]));
+}
+async function upsertLeads(records, conn) {
+    const onDup = LEAD_SET.map((x) => `\`${x}\`=VALUES(\`${x}\`)`).join(',');
     for (let i = 0; i < records.length; i += 250) {
-        const rows = records.slice(i, i + 250).map(contactToRow);
-        const sql = `INSERT INTO \`contacts\` (\`${CONTACT_COLS.join('`,`')}\`)
-                     VALUES ` + rows.map((r) => `(${ph(CONTACT_COLS.length)})`).join(',') + ` ON DUPLICATE KEY UPDATE ${onDup}`;
-        await exec(conn, sql, rows.flatMap((r) => CONTACT_COLS.map((c) => r[c])));
+        const rows = records.slice(i, i + 250).map(leadToRow);
+        const sql = `INSERT INTO \`contacts\` (\`${LEAD_COLS.join('`,`')}\`)
+                     VALUES ` + rows.map((r) => `(${ph(LEAD_COLS.length)})`).join(',') + ` ON DUPLICATE KEY UPDATE ${onDup}`;
+        await exec(conn, sql, rows.flatMap((r) => LEAD_COLS.map((c) => r[c])));
     }
 }
-export async function updateContact(id, patch, conn) {
+export async function updateLead(id, patch, conn) {
     const sets = [];
     const params = [];
-    for (const {k, col} of CONTACT_UPDATE) {
+    for (const {k, col} of LEAD_UPDATE) {
         if (patch[k] === undefined) continue;
         sets.push(`\`${col}\`=?`);
         params.push(k === 'converted' ? (patch[k] ? 1 : 0) : (patch[k] === '' ? null : patch[k]));
@@ -92,7 +100,7 @@ export async function updateContact(id, patch, conn) {
     params.push(id);
     await exec(conn, `UPDATE \`contacts\` SET ${sets.join(',')} WHERE \`id\`=?`, params);
 }
-export async function deleteContact(id, conn) {
+export async function deleteLead(id, conn) {
     await exec(conn, 'DELETE FROM `contacts` WHERE `id`=?', [id]);
 }
 
@@ -179,18 +187,20 @@ export async function deleteReminder(id, conn) {
 }
 
 export async function loadAllFromDb() {
-    const [contactsRows, activityRows, reminderRows, productRows, agents] = await Promise.all([
-        query(`SELECT ${CONTACT_SELECT} FROM \`contacts\``),
+    const [leadRows, activityRows, reminderRows, productRows, categoryRows, agents] = await Promise.all([
+        query(`SELECT ${LEAD_SELECT} FROM \`contacts\``),
         query(`SELECT ${ACTIVITY_SELECT} FROM \`customer_activity\``),
         query(`SELECT ${REMINDER_SELECT} FROM \`reminders\``),
         query(`SELECT ${PRODUCT_SELECT} FROM \`products\``),
+        query(`SELECT ${CATEGORY_SELECT} FROM \`categories\` ORDER BY \`name\``),
         listActiveAgents(),
     ]);
     return {
-        records: contactsRows.map(rowToContact),
-        customerMeta: rowsToCustomerMeta(activityRows),
+        records: leadRows.map(rowToLead),
+        companyMeta: rowsToCompanyMeta(activityRows),
         reminders: reminderRows.map(rowToReminder),
         products: productRows.map(rowToProduct),
+        categories: categoryRows.map(rowToCategory),
         agents,
     };
 }
@@ -215,7 +225,7 @@ export async function createProduct(p, conn) {
 }
 const PRODUCT_UPDATE = [
     {k: 'name', col: 'name'},
-    {k: 'category', col: 'category'},
+    {k: 'categoryId', col: 'category_id'},
 ];
 export async function updateProduct(id, patch, conn) {
     const sets = [];
@@ -233,14 +243,47 @@ export async function deleteProduct(id, conn) {
     await exec(conn, 'DELETE FROM `products` WHERE `id`=?', [id]);
 }
 
-export async function reseedContacts(seedRecords) {
+export async function listCategories(conn) {
+    const rows = await exec(conn, `SELECT ${CATEGORY_SELECT} FROM \`categories\` ORDER BY \`name\``);
+    return (rows || []).map(rowToCategory);
+}
+export async function getCategoryById(id, conn) {
+    const rows = await exec(conn, `SELECT ${CATEGORY_SELECT} FROM \`categories\` WHERE \`id\`=? LIMIT 1`, [id]);
+    return rows && rows[0] ? rowToCategory(rows[0]) : null;
+}
+export async function createCategory(c, conn) {
+    const row = categoryToRow(c);
+    const sql = `INSERT INTO \`categories\` (\`${CATEGORY_COLS.join('`,`')}\`) VALUES (${ph(CATEGORY_COLS.length)})`;
+    await exec(conn, sql, CATEGORY_COLS.map((col) => row[col]));
+}
+const CATEGORY_UPDATE = [
+    {k: 'name', col: 'name'},
+    {k: 'isCustom', col: 'is_custom'},
+];
+export async function updateCategory(id, patch, conn) {
+    const sets = [];
+    const params = [];
+    for (const {k, col} of CATEGORY_UPDATE) {
+        if (patch[k] === undefined) continue;
+        sets.push(`\`${col}\`=?`);
+        params.push(k === 'isCustom' ? (patch[k] ? 1 : 0) : patch[k]);
+    }
+    if (!sets.length) return;
+    params.push(id);
+    await exec(conn, `UPDATE \`categories\` SET ${sets.join(',')} WHERE \`id\`=?`, params);
+}
+export async function deleteCategory(id, conn) {
+    await exec(conn, 'DELETE FROM `categories` WHERE `id`=?', [id]);
+}
+
+export async function reseedLeads(seedRecords) {
     await withTransaction(async (conn) => {
         await exec(conn, 'DELETE FROM `contacts`');
         for (let i = 0; i < seedRecords.length; i += 250) {
-            const rows = seedRecords.slice(i, i + 250).map(contactToRow);
-            const sql = `INSERT INTO \`contacts\` (\`${CONTACT_COLS.join('`,`')}\`)
-                         VALUES ` + rows.map((r) => `(${ph(CONTACT_COLS.length)})`).join(',');
-            await exec(conn, sql, rows.flatMap((r) => CONTACT_COLS.map((c) => r[c])));
+            const rows = seedRecords.slice(i, i + 250).map(leadToRow);
+            const sql = `INSERT INTO \`contacts\` (\`${LEAD_COLS.join('`,`')}\`)
+                         VALUES ` + rows.map((r) => `(${ph(LEAD_COLS.length)})`).join(',');
+            await exec(conn, sql, rows.flatMap((r) => LEAD_COLS.map((c) => r[c])));
         }
     });
 }
@@ -308,12 +351,12 @@ export async function deleteUser(id, conn) {
 
 export async function applyOp(op, payload, conn) {
     switch (op) {
-        case 'createContact':
-            return createContact(payload.rec, conn);
+        case 'createLead':
+            return createLead(payload.rec, conn);
         case 'importRecords':
-            return upsertContacts(payload.records, conn);
-        case 'updateContact':
-            return updateContact(payload.id, payload.patch, conn);
+            return upsertLeads(payload.records, conn);
+        case 'updateLead':
+            return updateLead(payload.id, payload.patch, conn);
         case 'addChangeLog':
             return createActivity({...payload.activity, type: 'change'}, conn);
         case 'addComment':
@@ -336,9 +379,15 @@ export async function applyOp(op, payload, conn) {
             return updateProduct(payload.id, payload.patch, conn);
         case 'deleteProduct':
             return deleteProduct(payload.id, conn);
-        case 'deleteContact': {
+        case 'createCategory':
+            return createCategory(payload.category, conn);
+        case 'updateCategory':
+            return updateCategory(payload.id, payload.patch, conn);
+        case 'deleteCategory':
+            return deleteCategory(payload.id, conn);
+        case 'deleteLead': {
             const run = async (c) => {
-                await deleteContact(payload.id, c);
+                await deleteLead(payload.id, c);
                 if (payload.changeLogEntry) await createActivity(payload.changeLogEntry, c);
             };
             return conn ? run(conn) : withTransaction(run);

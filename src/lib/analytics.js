@@ -1,6 +1,9 @@
 import Utils from './utils.js';
-import { FA_MONTHS } from './calendar.js';
+import { FA_MONTHS, JALALI_MONTHS, gregorianToJalali, jalaliToGregorian, jalaliMonthLength } from './calendar.js';
 import { effectiveResult, coordLabel } from './filters.js';
+
+const pad2 = (n) => String(n).padStart(2, '0');
+const ddmmyyyy = (y, m, d) => `${pad2(d)}.${pad2(m)}.${y}`;
 
 const AGENT_COLORS = {FARNAZ: '#45556c', PARDIS: '#155dfc', ZOHREH: '#f54a00'};
 
@@ -12,7 +15,7 @@ export function agentColor(name) {
 }
 
 function tally(recs) {
-    let noAnswer = 0, deactivated = 0, followUp = 0, quoteOpen = 0, quoteWon = 0, quoteLost = 0, customers = 0;
+    let noAnswer = 0, deactivated = 0, followUp = 0, quoteOpen = 0, quoteWon = 0, quoteLost = 0, converted = 0;
     for (const r of recs) {
         const eff = effectiveResult(r);
         if (eff === 'بی‌پاسخ') noAnswer++;
@@ -23,9 +26,14 @@ function tally(recs) {
             else if (r.quoteResult === 'ناموفق') quoteLost++;
             else quoteOpen++;
         }
-        if (r.converted) customers++;
+        if (r.converted) converted++;
     }
-    return {noAnswer, deactivated, followUp, quoteOpen, quoteWon, quoteLost, customers};
+    return {noAnswer, deactivated, followUp, quoteOpen, quoteWon, quoteLost, converted};
+}
+
+function quoteToSaleRate(t) {
+    const quoted = t.quoteOpen + t.quoteWon + t.quoteLost;
+    return quoted ? Math.round((t.quoteWon / quoted) * 100) : 0;
 }
 
 export function computeAgentReport(records) {
@@ -34,7 +42,7 @@ export function computeAgentReport(records) {
         const recs = records.filter((r) => Utils.normSpace(r.coordinator) === agent);
         const total = recs.length;
         const t = tally(recs);
-        return {agent, total, ...t, conversionRate: total ? Math.round((t.customers / total) * 100) : 0};
+        return {agent, total, ...t, conversionRate: total ? Math.round((t.converted / total) * 100) : 0, quoteToSaleRate: quoteToSaleRate(t)};
     }).sort((a, b) => b.total - a.total);
 }
 
@@ -53,7 +61,8 @@ export function computeAgentStats(records, agent, fromDt, toDt) {
     return {
         recs,
         total: recs.length, ...t,
-        conversionRate: recs.length ? Math.round((t.customers / recs.length) * 100) : 0
+        conversionRate: recs.length ? Math.round((t.converted / recs.length) * 100) : 0,
+        quoteToSaleRate: quoteToSaleRate(t),
     };
 }
 
@@ -72,10 +81,10 @@ export async function exportAgentReportToExcel(data) {
     const rows = data.map((d) => ({
         'کارشناس': coordLabel(d.agent), 'کل تماس‌ها': d.total, 'در حال پیگیری': d.followUp, 'بی‌پاسخ': d.noAnswer,
         'غیرفعال': d.deactivated, 'استعلام باز': d.quoteOpen, 'استعلام موفق': d.quoteWon, 'استعلام ناموفق': d.quoteLost,
-        'مشتری‌شده': d.customers, 'نرخ تبدیل (٪)': d.conversionRate,
+        'سرنخ تبدیل‌شده': d.converted, 'نرخ تبدیل سرنخ (٪)': d.conversionRate, 'نرخ تبدیل استعلام به فروش (٪)': d.quoteToSaleRate,
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
-    ws['!cols'] = [{wch: 14}, {wch: 12}, {wch: 12}, {wch: 10}, {wch: 10}, {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12}, {wch: 14}];
+    ws['!cols'] = [{wch: 14}, {wch: 12}, {wch: 12}, {wch: 10}, {wch: 10}, {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12}, {wch: 14}, {wch: 16}];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'گزارش کارشناس');
     const today = new Date();
@@ -84,21 +93,21 @@ export async function exportAgentReportToExcel(data) {
 }
 
 export function computeKpis(records) {
-  let customers = 0, openQuotes = 0, deactivated = 0, followUp = 0, noAnswer = 0;
+  let converted = 0, openQuotes = 0, deactivated = 0, followUp = 0, noAnswer = 0;
   for (const r of records) {
-    if (r.converted) customers++;
+    if (r.converted) converted++;
     if (r.result === 'در حال استعلام' && !r.quoteResult) openQuotes++;
     if (r.result === 'غیرفعال') deactivated++;
     if (r.result === 'در حال پیگیری') followUp++;
     if (effectiveResult(r) === 'بی‌پاسخ') noAnswer++;
   }
   return [
-    { label: 'تعداد کل سرنخ‌ها', value: records.length, cls: '' },
-    { label: 'مشتری شده', value: customers, cls: '-teal' },
-    { label: 'استعلام‌های در جریان', value: openQuotes, cls: '-amber' },
-    { label: 'غیرفعال شده', value: deactivated, cls: '' },
-    { label: 'در حال پیگیری', value: followUp, cls: '' },
-    { label: 'بی‌پاسخ', value: noAnswer, cls: '' },
+    { key: 'total', label: 'تعداد کل سرنخ‌ها', value: records.length, cls: '' },
+    { key: 'converted', label: 'سرنخ تبدیل‌شده', value: converted, cls: '-teal' },
+    { key: 'quoteOpen', label: 'استعلام‌های در جریان', value: openQuotes, cls: '-amber' },
+    { key: 'deactivated', label: 'غیرفعال شده', value: deactivated, cls: '' },
+    { key: 'followUp', label: 'در حال پیگیری', value: followUp, cls: '' },
+    { key: 'noAnswer', label: 'بی‌پاسخ', value: noAnswer, cls: '' },
   ];
 }
 
@@ -107,11 +116,11 @@ export function computeFunnelStages(records) {
   const quotes = records.filter((r) => r.result === 'در حال استعلام');
   const quotedCount = quotes.length;
   const salesCount = quotes.filter((q) => q.quoteResult === 'موفق').length;
-  const customersCount = records.filter((r) => r.converted).length;
+  const convertedCount = records.filter((r) => r.converted).length;
   const raw = [
     { label: 'کل سرنخ‌ها', value: total, color: '#64748b' },
     { label: 'در حال استعلام', value: quotedCount, color: '#ff6900' },
-    { label: 'فروش شده', value: customersCount, color: '#00bc7d' },
+    { label: 'فروش شده', value: convertedCount, color: '#00bc7d' },
   ];
   const stages = raw.map((s) => {
     const pct = total ? Math.round((s.value / total) * 100) : 0;
@@ -119,42 +128,70 @@ export function computeFunnelStages(records) {
   });
   return {
     stages,
-    leadToCustomerRate: total ? Math.round((customersCount / total) * 100) : 0,
+    leadConversionRate: total ? Math.round((convertedCount / total) * 100) : 0,
     quoteToSaleRate: quotedCount ? Math.round((salesCount / quotedCount) * 100) : 0,
   };
 }
 
-export function computeTrendData(records) {
+export function computeTrendData(records, calendar) {
+  const jalali = calendar === 'jalali';
   const counts = {};
   for (const r of records) {
     const dt = Utils.parseDate(r.date);
     if (!dt) continue;
-    const k = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0');
+    let y = dt.getFullYear(), m = dt.getMonth() + 1;
+    if (jalali) [y, m] = gregorianToJalali(y, m, dt.getDate());
+    const k = y + '-' + pad2(m);
     counts[k] = (counts[k] || 0) + 1;
   }
   const keys = Object.keys(counts).sort();
   const labels = keys.map((k) => {
     const [y, m] = k.split('-').map(Number);
-    return FA_MONTHS[m - 1] + ' ' + y;
+    return (jalali ? JALALI_MONTHS[m - 1] : FA_MONTHS[m - 1]) + ' ' + y;
+  });
+  const ranges = keys.map((k) => {
+    const [y, m] = k.split('-').map(Number);
+    if (jalali) {
+      const [fy, fm, fd] = [y, m, 1];
+      const [ty, tm, td] = [y, m, jalaliMonthLength(y, m)];
+      return { from: ddmmyyyy(...jalaliToGregorian(fy, fm, fd)), to: ddmmyyyy(...jalaliToGregorian(ty, tm, td)) };
+    }
+    const lastDay = new Date(y, m, 0).getDate();
+    return { from: ddmmyyyy(y, m, 1), to: ddmmyyyy(y, m, lastDay) };
   });
   const data = keys.map((k) => counts[k]);
-  return { keys, labels, data };
+  return { keys, labels, data, ranges };
 }
 
-export function computeDailyAgentData(records) {
+export function computeDailyAgentData(records, calendar) {
+  const jalali = calendar === 'jalali';
   const now = new Date();
-  const y = now.getFullYear(), m = now.getMonth();
-  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  let y, m, daysInMonth, monthLabel;
+  if (jalali) {
+    const [jy, jm] = gregorianToJalali(now.getFullYear(), now.getMonth() + 1, now.getDate());
+    y = jy; m = jm;
+    daysInMonth = jalaliMonthLength(jy, jm);
+    monthLabel = JALALI_MONTHS[jm - 1];
+  } else {
+    y = now.getFullYear(); m = now.getMonth() + 1;
+    daysInMonth = new Date(y, m, 0).getDate();
+    monthLabel = FA_MONTHS[m - 1];
+  }
+  const dayDates = Array.from({ length: daysInMonth }, (_, i) => (jalali ? ddmmyyyy(...jalaliToGregorian(y, m, i + 1)) : ddmmyyyy(y, m, i + 1)));
+
   const agents = Array.from(new Set(records.map((r) => Utils.normSpace(r.coordinator)).filter(Boolean))).sort();
   const counts = {};
   agents.forEach((a) => { counts[a] = new Array(daysInMonth).fill(0); });
   let totalThisMonth = 0;
   for (const r of records) {
     const dt = Utils.parseDate(r.date);
-    if (!dt || dt.getFullYear() !== y || dt.getMonth() !== m) continue;
+    if (!dt) continue;
+    let ry = dt.getFullYear(), rm = dt.getMonth() + 1, rd = dt.getDate();
+    if (jalali) [ry, rm, rd] = gregorianToJalali(ry, rm, rd);
+    if (ry !== y || rm !== m) continue;
     const agent = Utils.normSpace(r.coordinator);
     if (!agent) continue;
-    counts[agent][dt.getDate() - 1]++;
+    counts[agent][rd - 1]++;
     totalThisMonth++;
   }
 
@@ -181,9 +218,9 @@ export function computeDailyAgentData(records) {
   }));
 
   const dayTotals = labels.map((_, i) => agents.reduce((sum, a) => sum + counts[a][i], 0));
-  const activeDays = labels.map((lab, i) => ({ lab, i, total: dayTotals[i] })).filter((d) => d.total > 0);
+  const activeDays = labels.map((lab, i) => ({ lab, i, total: dayTotals[i], date: dayDates[i] })).filter((d) => d.total > 0);
 
-  return { y, m, labels, datasets, agents, cap, wasCapped, totalThisMonth, activeDays, monthLabel: FA_MONTHS[m] };
+  return { y, labels, datasets, agents, cap, wasCapped, totalThisMonth, activeDays, monthLabel, dayDates };
 }
 
 export function computeCategoryData(records) {

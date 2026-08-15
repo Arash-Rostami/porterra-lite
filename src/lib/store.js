@@ -2,10 +2,10 @@
 import {useSyncExternalStore, useMemo} from 'react';
 import Utils from './utils.js';
 import {SEED_DATA} from '../data/seed.js';
-import {toast} from '../components/ui/Toast.jsx';
+import {toast, toastShownRecently} from '../components/ui/Toast.jsx';
 import {initScopeForUser, useUiStore} from './uiStore.js';
 import {setAgentDirectory} from './filters.js';
-import {initContactPrefsForUser, resetContactPrefs} from './contactPrefs.js';
+import {initLeadPrefsForUser, resetLeadPrefs} from './leadPrefs.js';
 import {
     addChangeLog as addChangeLogAction,
     addComment as addCommentAction,
@@ -13,8 +13,11 @@ import {
     announceQuotePrice as announceQuotePriceAction,
     createProduct as createProductAction,
     deleteActivity as deleteActivityAction,
-    deleteContact as deleteContactAction,
+    deleteLead as deleteLeadAction,
     deleteProductAction,
+    createCategory as createCategoryAction,
+    updateCategoryAction,
+    deleteCategoryAction,
     deleteReminder as deleteReminderAction,
     importRecords as importRecordsAction,
     loadAllData as loadAllDataAction,
@@ -23,7 +26,7 @@ import {
     resolveQuote as resolveQuoteAction,
     syncNow as syncNowAction,
     updateActivity as updateActivityAction,
-    updateContact as updateContactAction,
+    updateLead as updateLeadAction,
     updateProductAction,
     updateReminder as updateReminderAction,
     logout as logoutAction,
@@ -31,9 +34,10 @@ import {
 
 let state = {
     records: [],
-    customerMeta: {},
+    companyMeta: {},
     reminders: [],
     products: [],
+    categories: [],
     agents: [],
     currentUser: null,
     loaded: false,
@@ -62,6 +66,17 @@ export function custKey(company) {
     return Utils.normSpace(company).toLowerCase();
 }
 
+function categoryNameById(id) {
+    if (!id) return null;
+    const c = state.categories.find((x) => x.id === id);
+    return c ? c.name : null;
+}
+
+function hydrateAllCategoryNames() {
+    state.records = state.records.map((r) => ({...r, category: r.categoryId != null ? categoryNameById(r.categoryId) : (r.category ?? null)}));
+    state.products = state.products.map((p) => ({...p, category: p.categoryId != null ? categoryNameById(p.categoryId) : (p.category ?? null)}));
+}
+
 function persist(rollback, actionFn) {
     Promise.resolve()
         .then(actionFn)
@@ -70,7 +85,7 @@ function persist(rollback, actionFn) {
                 state.offline = true;
                 state.queueCount = res.queueCount || state.queueCount + 1;
                 emit();
-                toast('ذخیره آفلاین — بعد از اتصال همگام‌سازی می‌شود');
+                if (!toastShownRecently(600)) toast('ذخیره آفلاین — بعد از اتصال همگام‌سازی می‌شود');
             }
         })
         .catch((err) => {
@@ -88,9 +103,11 @@ export async function loadAll() {
         const res = await loadAllDataAction();
         if (res && res.unauthorized) return redirectToLogin();
         state.records = (res.data && res.data.records) || [];
-        state.customerMeta = (res.data && res.data.customerMeta) || {};
+        state.companyMeta = (res.data && res.data.companyMeta) || {};
         state.reminders = (res.data && res.data.reminders) || [];
         state.products = (res.data && res.data.products) || [];
+        state.categories = (res.data && res.data.categories) || [];
+        hydrateAllCategoryNames();
         state.agents = (res.data && res.data.agents) || [];
         setAgentDirectory(state.agents);
         state.currentUser = res.currentUser || null;
@@ -99,14 +116,14 @@ export async function loadAll() {
         state.loaded = true;
         if (state.currentUser) {
             initScopeForUser(state.currentUser.username);
-            initContactPrefsForUser(state.currentUser.username);
+            initLeadPrefsForUser(state.currentUser.username);
         }
         emit();
         if (state.offline) toast('حالت آفلاین — پایگاه داده در دسترس نیست');
     } catch (err) {
         if (isUnauthorized(err)) return redirectToLogin();
         state.records = [];
-        state.customerMeta = {};
+        state.companyMeta = {};
         state.reminders = [];
         state.offline = true;
         state.loaded = true;
@@ -123,16 +140,17 @@ export async function logout() {
     } catch {
     }
     state.records = [];
-    state.customerMeta = {};
+    state.companyMeta = {};
     state.reminders = [];
     state.products = [];
+    state.categories = [];
     state.agents = [];
     setAgentDirectory([]);
     state.currentUser = null;
     state.loaded = false;
     state.offline = false;
     state.queueCount = 0;
-    resetContactPrefs();
+    resetLeadPrefs();
     emit();
     redirectToLogin();
 }
@@ -147,9 +165,11 @@ export async function syncNow() {
             toast('همگام‌سازی ناموفق — دوباره تلاش کنید');
         } else {
             state.records = (res.data && res.data.records) || [];
-            state.customerMeta = (res.data && res.data.customerMeta) || {};
+            state.companyMeta = (res.data && res.data.companyMeta) || {};
             state.reminders = (res.data && res.data.reminders) || [];
             state.products = (res.data && res.data.products) || [];
+            state.categories = (res.data && res.data.categories) || [];
+            hydrateAllCategoryNames();
             state.agents = (res.data && res.data.agents) || [];
             setAgentDirectory(state.agents);
             state.offline = false;
@@ -177,7 +197,7 @@ export function resetToSeed() {
 
 export function addRecords(newRecords) {
     const prev = state.records;
-    state.records = newRecords.concat(prev);
+    state.records = newRecords.map((r) => ({...r, category: categoryNameById(r.categoryId)})).concat(prev);
     emit();
     persist(() => {
         state.records = prev;
@@ -186,11 +206,16 @@ export function addRecords(newRecords) {
 
 export function updateRecord(id, patch) {
     const prev = state.records;
-    state.records = prev.map((r) => (r.id === id ? {...r, ...patch} : r));
+    state.records = prev.map((r) => {
+        if (r.id !== id) return r;
+        const merged = {...r, ...patch};
+        if (patch.categoryId !== undefined) merged.category = categoryNameById(patch.categoryId);
+        return merged;
+    });
     emit();
     persist(() => {
         state.records = prev;
-    }, () => updateContactAction(id, patch));
+    }, () => updateLeadAction(id, patch));
 }
 
 export function deleteRecordById(id) {
@@ -199,13 +224,13 @@ export function deleteRecordById(id) {
     emit();
     persist(() => {
         state.records = prev;
-    }, () => deleteContactAction({id}));
+    }, () => deleteLeadAction({id}));
 }
 
 export function deleteRecordWithLog(record) {
     const k = custKey(record.company);
     const prevRecords = state.records;
-    const prevMeta = state.customerMeta;
+    const prevMeta = state.companyMeta;
     const existing = prevMeta[k] || {comments: [], changeLog: []};
     const ts = Date.now();
     const id = 'chg-' + ts + '-' + Math.random().toString(36).slice(2, 6);
@@ -213,14 +238,14 @@ export function deleteRecordWithLog(record) {
     const entry = {id, ts, text, author: null, type: 'change'};
     state.records = prevRecords.filter((r) => r.id !== record.id);
     // reassign to a NEW object: mutating the nested array in place leaves the ref unchanged and skips the update
-    state.customerMeta = {...prevMeta, [k]: {comments: existing.comments, changeLog: [...existing.changeLog, entry]}};
+    state.companyMeta = {...prevMeta, [k]: {comments: existing.comments, changeLog: [...existing.changeLog, entry]}};
     emit();
     persist(
         () => {
             state.records = prevRecords;
-            state.customerMeta = prevMeta;
+            state.companyMeta = prevMeta;
         },
-        () => deleteContactAction({
+        () => deleteLeadAction({
             id: record.id,
             changeLogEntry: {id, companyKey: k, type: 'change', ts, author: null, text}
         }),
@@ -229,7 +254,7 @@ export function deleteRecordWithLog(record) {
 
 export function addProduct(product) {
     const prev = state.products;
-    state.products = prev.concat([product]);
+    state.products = prev.concat([{...product, category: categoryNameById(product.categoryId)}]);
     emit();
     persist(() => {
         state.products = prev;
@@ -238,7 +263,12 @@ export function addProduct(product) {
 
 export function updateProduct(id, patch) {
     const prev = state.products;
-    state.products = prev.map((p) => (p.id === id ? {...p, ...patch} : p));
+    state.products = prev.map((p) => {
+        if (p.id !== id) return p;
+        const merged = {...p, ...patch};
+        if (patch.categoryId !== undefined) merged.category = categoryNameById(patch.categoryId);
+        return merged;
+    });
     emit();
     persist(() => {
         state.products = prev;
@@ -252,6 +282,38 @@ export function deleteProduct(id) {
     persist(() => {
         state.products = prev;
     }, () => deleteProductAction(id));
+}
+
+export function addCategory(category) {
+    const prev = state.categories;
+    state.categories = prev.concat([category]);
+    emit();
+    persist(() => {
+        state.categories = prev;
+    }, () => createCategoryAction(category));
+}
+
+export function updateCategory(id, patch) {
+    const prev = state.categories;
+    const prevRecords = state.records;
+    const prevProducts = state.products;
+    state.categories = prev.map((c) => (c.id === id ? {...c, ...patch} : c));
+    hydrateAllCategoryNames();
+    emit();
+    persist(() => {
+        state.categories = prev;
+        state.records = prevRecords;
+        state.products = prevProducts;
+    }, () => updateCategoryAction(id, patch));
+}
+
+export function deleteCategory(id) {
+    const prev = state.categories;
+    state.categories = prev.filter((c) => c.id !== id);
+    emit();
+    persist(() => {
+        state.categories = prev;
+    }, () => deleteCategoryAction(id));
 }
 
 export function announceQuotePrice(id, price, priceType, terms) {
@@ -279,47 +341,46 @@ export function resolveQuote(id, result, failReason) {
 }
 
 const EMPTY_META = Object.freeze({comments: [], changeLog: []});
-export function getCustomerMeta(key) {
-    return state.customerMeta[key] || EMPTY_META;
+export function getCompanyMeta(key) {
+    return state.companyMeta[key] || EMPTY_META;
 }
 
 export function addChangeLogEntry(key, text, author) {
-    const prevMeta = state.customerMeta;
+    const prevMeta = state.companyMeta;
     const existing = prevMeta[key] || {comments: [], changeLog: []};
     const ts = Date.now();
     const id = 'chg-' + ts + '-' + Math.random().toString(36).slice(2, 6);
     const entry = {id, ts, text, author: author || null, type: 'change'};
-    state.customerMeta = {...prevMeta, [key]: {comments: existing.comments, changeLog: [...existing.changeLog, entry]}};
+    state.companyMeta = {...prevMeta, [key]: {comments: existing.comments, changeLog: [...existing.changeLog, entry]}};
     emit();
     persist(
         () => {
-            state.customerMeta = prevMeta;
+            state.companyMeta = prevMeta;
         },
         () => addChangeLogAction({id, companyKey: key, type: 'change', ts, author: author || null, text}),
     );
 }
 
 export function addComment(key, text, author) {
-    const prevMeta = state.customerMeta;
+    const prevMeta = state.companyMeta;
     const existing = prevMeta[key] || {comments: [], changeLog: []};
     const ts = Date.now();
     const id = 'cmt-' + ts + '-' + Math.random().toString(36).slice(2, 6);
     const entry = {id, ts, text, author: author || null, type: 'comment'};
-    state.customerMeta = {...prevMeta, [key]: {comments: [...existing.comments, entry], changeLog: existing.changeLog}};
+    state.companyMeta = {...prevMeta, [key]: {comments: [...existing.comments, entry], changeLog: existing.changeLog}};
     emit();
     persist(
         () => {
-            state.customerMeta = prevMeta;
+            state.companyMeta = prevMeta;
         },
         () => addCommentAction({id, companyKey: key, type: 'comment', ts, author, text}),
     );
 }
 
-// no UI calls these yet — kept for a complete client CRUD surface matching the server actions
 export function updateComment(key, id, patch) {
-    const prevMeta = state.customerMeta;
+    const prevMeta = state.companyMeta;
     const existing = prevMeta[key] || {comments: [], changeLog: []};
-    state.customerMeta = {
+    state.companyMeta = {
         ...prevMeta,
         [key]: {
             comments: existing.comments.map((c) => (c.id === id ? {...c, ...patch} : c)),
@@ -328,25 +389,25 @@ export function updateComment(key, id, patch) {
     };
     emit();
     persist(() => {
-        state.customerMeta = prevMeta;
+        state.companyMeta = prevMeta;
     }, () => updateActivityAction(id, patch));
 }
 
 export function deleteComment(key, id) {
-    const prevMeta = state.customerMeta;
+    const prevMeta = state.companyMeta;
     const existing = prevMeta[key] || {comments: [], changeLog: []};
-    state.customerMeta = {
+    state.companyMeta = {
         ...prevMeta,
         [key]: {comments: existing.comments.filter((c) => c.id !== id), changeLog: existing.changeLog},
     };
     emit();
     persist(() => {
-        state.customerMeta = prevMeta;
+        state.companyMeta = prevMeta;
     }, () => deleteActivityAction(id));
 }
 
 export function getUnifiedFeed(key) {
-    const meta = getCustomerMeta(key);
+    const meta = getCompanyMeta(key);
     return meta.comments.concat(meta.changeLog).sort((a, b) => b.ts - a.ts);
 }
 
@@ -407,10 +468,10 @@ export function deleteReminder(id) {
     }, () => deleteReminderAction(id));
 }
 
-export function findLatestComment(customerMeta, records) {
+export function findLatestComment(companyMeta, records) {
     let latest = null, latestKey = null;
-    for (const key in customerMeta) {
-        for (const c of customerMeta[key].comments) {
+    for (const key in companyMeta) {
+        for (const c of companyMeta[key].comments) {
             if (!latest || c.ts > latest.ts) {
                 latest = c;
                 latestKey = key;
@@ -425,22 +486,22 @@ export function findLatestComment(customerMeta, records) {
 export function useScopedData() {
     const records = useStore((s) => s.records);
     const reminders = useStore((s) => s.reminders);
-    const customerMeta = useStore((s) => s.customerMeta);
+    const companyMeta = useStore((s) => s.companyMeta);
     const currentUser = useStore((s) => s.currentUser);
     const scope = useUiStore((u) => u.scope);
 
     return useMemo(() => {
         const agentCode = currentUser?.agentCode || null;
         if (scope !== 'mine' || !agentCode) {
-            return {records, reminders, customerMeta, scope, currentUser};
+            return {records, reminders, companyMeta, scope, currentUser};
         }
         const scopedRecords = records.filter((r) => r.coordinator === agentCode);
         const scopedReminders = reminders.filter((rm) => rm.forAgent === agentCode);
         const scopedMeta = {};
         for (const r of scopedRecords) {
             const k = custKey(r.company);
-            if (customerMeta[k] && !scopedMeta[k]) scopedMeta[k] = customerMeta[k];
+            if (companyMeta[k] && !scopedMeta[k]) scopedMeta[k] = companyMeta[k];
         }
-        return {records: scopedRecords, reminders: scopedReminders, customerMeta: scopedMeta, scope, currentUser};
-    }, [records, reminders, customerMeta, currentUser, scope]);
+        return {records: scopedRecords, reminders: scopedReminders, companyMeta: scopedMeta, scope, currentUser};
+    }, [records, reminders, companyMeta, currentUser, scope]);
 }

@@ -10,7 +10,7 @@ import SourceChart from '../../components/dashboard/SourceChart.jsx';
 import DashboardFilters, { emptyDashboardFilters } from '../../components/dashboard/DashboardFilters.jsx';
 import { useScopedData } from '../../lib/store.js';
 import { useTheme } from '../../lib/theme.js';
-import { applyCategoryFilter, applySourceFilter, applyMonthFilter, applyDayFilter } from '../../lib/uiStore.js';
+import { applyCategoryFilter, applySourceFilter, applyMonthFilter, applyDayFilter, applyKpiFilter } from '../../lib/uiStore.js';
 import Utils from '../../lib/utils.js';
 
 export default function DashboardPage() {
@@ -34,22 +34,22 @@ export default function DashboardPage() {
         });
     }, [records, filters]);
 
-    function goToContacts() {
-        router.push('/contacts');
+    function goToLeads() {
+        router.push('/leads');
     }
 
     return (
         <div className="crm-tab-panel" id="crmPanelDashboard">
             <DashboardFilters filters={filters} onChange={setFilters} records={records} />
-            <KpiCards records={filtered} />
+            <KpiCards records={filtered} onSelectKpi={(key, label) => { applyKpiFilter(key, label); goToLeads(); }} />
             <FunnelChart records={filtered} />
             <div className="crm-charts">
-                <TrendChart records={filtered} dark={dark} onSelectMonth={(y, m, label) => { applyMonthFilter(y, m, label); goToContacts(); }} />
-                <DailyAgentChart records={filtered} dark={dark} onSelectDay={(y, m, day, agent, label) => { applyDayFilter(y, m, day, agent, label); goToContacts(); }} />
+                <TrendChart records={filtered} dark={dark} onSelectMonth={(dateFrom, dateTo, label) => { applyMonthFilter(dateFrom, dateTo, label); goToLeads(); }} />
+                <DailyAgentChart records={filtered} dark={dark} onSelectDay={(date, agent, label) => { applyDayFilter(date, agent, label); goToLeads(); }} />
             </div>
             <div className="crm-charts">
-                <CategoryChart records={filtered} dark={dark} onSelectCategory={(cat) => { applyCategoryFilter(cat); goToContacts(); }} />
-                <SourceChart records={filtered} dark={dark} onSelectSource={(src, top) => { applySourceFilter(src, top); goToContacts(); }} />
+                <CategoryChart records={filtered} dark={dark} onSelectCategory={(cat) => { applyCategoryFilter(cat); goToLeads(); }} />
+                <SourceChart records={filtered} dark={dark} onSelectSource={(src, top) => { applySourceFilter(src, top); goToLeads(); }} />
             </div>
         </div>
     );

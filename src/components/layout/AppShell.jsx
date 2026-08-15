@@ -6,7 +6,7 @@ import Header from './Header.jsx';
 import Footer from './Footer.jsx';
 import BootLoader from './BootLoader.jsx';
 import { Toast } from '../ui/Toast.jsx';
-import CustomerProfileModal from '../customer/CustomerProfileModal.jsx';
+import LeadProfileModal from '../leads/LeadProfileModal.jsx';
 import AgentProfileModal from '../agents/AgentProfileModal.jsx';
 import ConfirmDialog from '../ui/ConfirmDialog.jsx';
 import { useStore, loadAll, syncNow } from '../../lib/store.js';
@@ -17,7 +17,7 @@ export default function AppShell({ children }) {
   const pathname = usePathname();
   const isAuth = pathname === '/login';
   const records = useStore((s) => s.records);
-  const customerMeta = useStore((s) => s.customerMeta);
+  const companyMeta = useStore((s) => s.companyMeta);
   const loaded = useStore((s) => s.loaded);
   const offline = useStore((s) => s.offline);
   const queueCount = useStore((s) => s.queueCount);
@@ -59,11 +59,11 @@ export default function AppShell({ children }) {
       </div>
 
       {profileId && (
-        <CustomerProfileModal
+        <LeadProfileModal
           key={profileId}
           recordId={profileId}
           records={records}
-          customerMeta={customerMeta}
+          companyMeta={companyMeta}
           onClose={closeProfile}
           onOpenRecord={(id) => openProfile(id)}
         />

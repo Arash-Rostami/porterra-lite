@@ -1,13 +1,14 @@
 'use client';
 import { useMemo } from 'react';
 import Dropdown from '../ui/Dropdown.jsx';
+import DateField from '../ui/DateField.jsx';
 import CompanySuggest from '../ui/CompanySuggest.jsx';
 import { TrashIcon } from '../ui/Icon.jsx';
 import { filterOptionsFrom, STATUS_OPTS } from '../../lib/filters.js';
 
 const emptyFilters = { q: '', coordinator: '', category: '', source: '', status: '', dateFrom: '', dateTo: '', showDeactivated: false };
 
-export default function ContactFilters({ records, filters, onChange, chartFilter, onClearChartFilter }) {
+export default function LeadFilters({ records, filters, onChange, chartFilter, onClearChartFilter }) {
   const opts = useMemo(() => filterOptionsFrom(records), [records]);
   const set = (k) => (v) => onChange({ ...filters, [k]: v });
   const setInput = (k) => (e) => onChange({ ...filters, [k]: e.target.value });
@@ -28,12 +29,12 @@ export default function ContactFilters({ records, filters, onChange, chartFilter
         />
         <Dropdown value={filters.coordinator} onChange={set('coordinator')} options={opts.coordinators} placeholder="همه کارشناسان" />
         <Dropdown value={filters.category} onChange={set('category')} options={opts.categories} placeholder="همه دسته‌ها" />
-        <Dropdown value={filters.source} onChange={set('source')} options={opts.sources} placeholder="همه منابع" />
+        <Dropdown value={filters.source} onChange={set('source')} options={opts.sources} placeholder="همه منابع سرنخ" />
         <Dropdown value={filters.status} onChange={set('status')} options={STATUS_OPTS} placeholder="همه وضعیت‌ها" />
         <div className="crm-date-range">
-          <input type="date" className="crm-input crm-mono" value={filters.dateFrom} onChange={setInput('dateFrom')} />
+          <DateField className="crm-input crm-mono" value={filters.dateFrom} onChange={set('dateFrom')} />
           <span>تا</span>
-          <input type="date" className="crm-input crm-mono" value={filters.dateTo} onChange={setInput('dateTo')} />
+          <DateField className="crm-input crm-mono" value={filters.dateTo} onChange={set('dateTo')} />
         </div>
         <button type="button" className="crm-suggest-clear-mini" title="پاک کردن" aria-label="پاک کردن" onClick={() => onChange(emptyFilters)}><TrashIcon /></button>
       </div>

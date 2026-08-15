@@ -30,11 +30,11 @@ function QuoteDetailModal({ rec, calendar, onClose, onOpenRecord }) {
   function submitPrice() {
     if (!price.trim()) { toast('قیمت الزامی است'); return; }
     announceQuotePrice(rec.id, price.trim(), priceType || null, terms.trim() || null);
-    toast('قیمت اعلام شد — در انتظار جواب مشتری');
+    toast('قیمت اعلام شد — در انتظار جواب سرنخ');
   }
   function submitSuccess() {
     resolveQuote(rec.id, 'موفق', null);
-    toast('استعلام «موفق» ثبت شد — تبدیل به مشتری شد');
+    toast('استعلام «موفق» ثبت شد — سرنخ تبدیل شد');
     onClose();
   }
   function submitFail() {

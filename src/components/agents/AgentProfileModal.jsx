@@ -7,6 +7,8 @@ import Utils from '../../lib/utils.js';
 import RingChart from '../ui/RingChart.jsx';
 import Modal from '../ui/Modal.jsx';
 import Dropdown from '../ui/Dropdown.jsx';
+import DateField from '../ui/DateField.jsx';
+import PhoneLink from '../ui/PhoneLink.jsx';
 import useCountUp from '../../lib/useCountUp.js';
 import { useUiStore } from '../../lib/uiStore.js';
 import { formatDisplayDate } from '../../lib/calendar.js';
@@ -94,9 +96,9 @@ export default function AgentProfileModal({ agent, records, onClose, onOpenRecor
     <Modal open onClose={onClose} title={`پروفایل کارشناس — ${coordLabel(agent)}`} width="4xl">
           <div className="crm-agent-profile-filter">
             <span>از تاریخ</span>
-            <input type="date" className="crm-input crm-mono" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            <DateField className="crm-input crm-mono" value={dateFrom} onChange={setDateFrom} />
             <span>تا تاریخ</span>
-            <input type="date" className="crm-input crm-mono" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            <DateField className="crm-input crm-mono" value={dateTo} onChange={setDateTo} />
             <button type="button" className="crm-btn-primary" onClick={applyFilter}><FilterIcon />اعمال فیلتر</button>
             <button type="button" className="crm-btn-ghost" title="پاک کردن فیلتر بازه" onClick={clearFilter}><TrashIcon />کل بازه</button>
           </div>
@@ -110,7 +112,11 @@ export default function AgentProfileModal({ agent, records, onClose, onOpenRecor
             ))}
             <div className="crm-agent-profile-stat crm-ring-stat">
               <RingChart percent={s.conversionRate} size={60} stroke={7} />
-              <div className="crm-agent-profile-stat-label">نرخ تبدیل</div>
+              <div className="crm-agent-profile-stat-label">نرخ تبدیل سرنخ</div>
+            </div>
+            <div className="crm-agent-profile-stat crm-ring-stat">
+              <RingChart percent={s.quoteToSaleRate} size={60} stroke={7} />
+              <div className="crm-agent-profile-stat-label">نرخ تبدیل استعلام به فروش</div>
             </div>
           </div>
 
@@ -130,11 +136,11 @@ export default function AgentProfileModal({ agent, records, onClose, onOpenRecor
                       {sugPageItems.map((item) => (
                         <div className="crm-suggest-item" key={item.r.id}>
                           <div className="crm-suggest-item-top">
-                            <span className="crm-suggest-company" title="ثبت تماس با این مشتری" onClick={() => openRecord(item.r.id)}>{item.r.company || '-'}</span>
+                            <span className="crm-suggest-company" title="ثبت تماس با این سرنخ" onClick={() => openRecord(item.r.id)}>{item.r.company || '-'}</span>
                             <span className="crm-suggest-days">{item.days.toLocaleString('en-US')} روز پیش</span>
                           </div>
                           <div className="crm-suggest-meta">
-                            {item.r.phone && <span className="crm-mono">{item.r.phone}</span>}
+                            {item.r.phone && <PhoneLink phone={item.r.phone} />}
                             {item.noStatus && <span className="crm-suggest-priority -high">بدون وضعیت</span>}
                             {item.isNoAnswer && <span className="crm-suggest-priority -high">تماس مجدد</span>}
                             {item.r.priority && <span className={`crm-suggest-priority ${priorityClass(item.r.priority)}`}>{item.r.priority}</span>}

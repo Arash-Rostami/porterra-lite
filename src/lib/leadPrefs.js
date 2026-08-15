@@ -1,8 +1,8 @@
 'use client';
 import { useSyncExternalStore } from 'react';
 
-const ORDER_KEY = (username) => `crm_contact_order_${username}`;
-const FLAGS_KEY = (username) => `crm_contact_flags_${username}`;
+const ORDER_KEY = (username) => `crm_lead_order_${username}`;
+const FLAGS_KEY = (username) => `crm_lead_flags_${username}`;
 
 let prefsUser = null;
 let prefs = { order: [], flags: [] };
@@ -17,7 +17,7 @@ function readArray(key) {
   } catch { return []; }
 }
 
-export function initContactPrefsForUser(username) {
+export function initLeadPrefsForUser(username) {
   prefsUser = username;
   prefs = {
     order: readArray(ORDER_KEY(username)),
@@ -26,13 +26,13 @@ export function initContactPrefsForUser(username) {
   emit();
 }
 
-export function resetContactPrefs() {
+export function resetLeadPrefs() {
   prefsUser = null;
   prefs = { order: [], flags: [] };
   emit();
 }
 
-export function useContactPrefs() {
+export function useLeadPrefs() {
   return useSyncExternalStore(
     (cb) => { listeners.add(cb); return () => listeners.delete(cb); },
     () => prefs,
