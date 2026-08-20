@@ -11,7 +11,7 @@ import DashboardFilters, { emptyDashboardFilters } from '../../components/dashbo
 import { useScopedData } from '../../lib/store.js';
 import { useTheme } from '../../lib/theme.js';
 import { applyCategoryFilter, applySourceFilter, applyMonthFilter, applyDayFilter, applyKpiFilter } from '../../lib/uiStore.js';
-import Utils from '../../lib/utils.js';
+import { getFiltered } from '../../lib/filters.js';
 
 export default function DashboardPage() {
     const { records } = useScopedData();
@@ -19,20 +19,7 @@ export default function DashboardPage() {
     const router = useRouter();
     const [filters, setFilters] = useState(emptyDashboardFilters);
 
-    const filtered = useMemo(() => {
-        const fromDt = filters.dateFrom ? Utils.parseDate(Utils.fromISODate(filters.dateFrom)) : null;
-        const toDt = filters.dateTo ? Utils.parseDate(Utils.fromISODate(filters.dateTo)) : null;
-        return records.filter((r) => {
-            if (filters.coordinator && r.coordinator !== filters.coordinator) return false;
-            if (fromDt || toDt) {
-                const dt = Utils.parseDate(r.date);
-                if (!dt) return false;
-                if (fromDt && dt < fromDt) return false;
-                if (toDt && dt > toDt) return false;
-            }
-            return true;
-        });
-    }, [records, filters]);
+    const filtered = useMemo(() => getFiltered(records, filters, null), [records, filters]);
 
     function goToLeads() {
         router.push('/leads');

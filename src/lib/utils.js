@@ -1,20 +1,6 @@
 import { gregorianToJalali, JALALI_MONTHS } from './calendar.js';
 
 export default class Utils {
-    static escapeHtml(s) {
-        return (s == null ? '' : String(s)).replace(/[&<>"']/g, m => ({
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#39;'
-        }[m]));
-    }
-
-    static escapeAttr(s) {
-        return Utils.escapeHtml(s);
-    }
-
     static normSpace(s) {
         return (s || '').toString().replace(/\s+/g, ' ').trim();
     }

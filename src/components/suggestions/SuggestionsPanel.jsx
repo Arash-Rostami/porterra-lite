@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Dropdown from '../ui/Dropdown.jsx';
+import { paginate } from '../ui/Pagination.jsx';
 import { filterAgentSuggestions, sortSuggestions, exportSuggestionsToExcel, SUGGESTION_SORT_MODES } from '../../lib/suggestions.js';
 import { agentColor } from '../../lib/analytics.js';
 import { coordLabel } from '../../lib/filters.js';
@@ -20,10 +21,7 @@ function AgentCard({ agent, pool, sortMode, categoryOpts, productOpts, onOpenPro
   const { filtered } = filterAgentSuggestions(pool, f);
   const sorted = sortSuggestions(filtered, sortMode);
 
-  const totalPages = Math.max(1, Math.ceil(sorted.length / perPage));
-  const safePage = Math.min(page, totalPages);
-  const startIdx = (safePage - 1) * perPage;
-  const pageItems = sorted.slice(startIdx, startIdx + perPage);
+  const { pageItems, totalPages, safePage } = paginate(sorted, page, perPage);
 
   function setFilter(next) {
     setF(next);

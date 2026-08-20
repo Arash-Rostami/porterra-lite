@@ -1,8 +1,7 @@
 'use client';
 import { useRef, useState } from 'react';
-import { downloadImportTemplate, parseImportFile, countDuplicates } from '../../lib/excel.js';
+import { downloadImportTemplate, parseImportFile, countDuplicates, resolveImportCategoryIds } from '../../lib/excel.js';
 import { useStore } from '../../lib/store.js';
-import Utils from '../../lib/utils.js';
 import { toast } from '../ui/Toast.jsx';
 import { UploadIcon, DownloadIcon } from '../ui/Icon.jsx';
 
@@ -19,13 +18,7 @@ export default function ImportExportBar({ records, onImport }) {
     try {
       const { imported, skipped, newRecords } = await parseImportFile(file);
       if (!imported) { toast('هیچ ردیف معتبری در فایل پیدا نشد'); return; }
-      const catIndex = new Map(categories.map((c) => [Utils.normSpace(c.name).toLowerCase(), c.id]));
-      const chemPolyId = catIndex.get('chemical/polymer');
-      if (chemPolyId) { catIndex.set('polymer', chemPolyId); catIndex.set('petrochemical', chemPolyId); catIndex.set('chemical', chemPolyId); }
-      const mapped = newRecords.map((r) => {
-        const { category, ...rest } = r;
-        return { ...rest, categoryId: catIndex.get(Utils.normSpace(category || '').toLowerCase()) || null };
-      });
+      const mapped = resolveImportCategoryIds(newRecords, categories);
       const dupCount = countDuplicates(records, mapped);
       onImport(mapped);
       let msg = `${imported.toLocaleString('en-US')} سرنخ وارد شد`;

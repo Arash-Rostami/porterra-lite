@@ -20,6 +20,9 @@ export default function UserFormModal({ open, user, currentUserId, isElevated, d
 
   useEffect(() => {
     if (!open) return;
+    // Must re-run every time the modal reopens (this component stays mounted between opens,
+    // per Modal.jsx's conditional-render pattern) to reset the form for a new/different user.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setF(user
       ? {
         username: user.username || '',

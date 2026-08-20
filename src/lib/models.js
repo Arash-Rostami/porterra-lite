@@ -1,4 +1,4 @@
-// Server-only Zod schemas — every Server Action validates with one of these before any SQL runs
+// Server-only Zod schemas — every API route handler validates with one of these before any SQL runs
 import {z} from 'zod';
 
 // '' / undefined -> null, so empty client strings become SQL NULL (not '').
@@ -161,19 +161,6 @@ export const ReminderUpdate = z.object({
 });
 
 export const UserRole = z.enum(['admin', 'agent', 'developer', 'manager']);
-
-export const User = z.object({
-    id: reqStr(40),
-    username: reqStr(64),
-    email: optStr(255),
-    displayName: optStr(255),
-    agentCode: optStr(32),
-    department: optStr(150),
-    role: UserRole,
-    active: boolField.default(true),
-    lastLogin: z.preprocess(emptyToNull, z.number().int().nullable()).optional(),
-    createdAt: z.number().int().nonnegative(),
-});
 
 export const UserCreate = z.object({
     id: reqStr(40),

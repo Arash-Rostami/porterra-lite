@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef } from 'react';
 
-export default function RingChart({ percent, size = 40, stroke = 5, color = 'var(--teal-deep)' }) {
+export default function RingChart({ percent, size = 40, stroke = 5, color = 'var(--accent)' }) {
   const circleRef = useRef(null);
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;

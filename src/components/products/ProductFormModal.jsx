@@ -17,6 +17,9 @@ export default function ProductFormModal({ open, product, onSubmit, onCancel }) 
 
   useEffect(() => {
     if (!open) return;
+    // Must re-run every time the modal reopens (this component stays mounted between opens,
+    // per Modal.jsx's conditional-render pattern) to reset the form for a new/different product.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setF(product ? { name: product.name || '', categoryId: product.categoryId || '' } : empty);
   }, [open, product]);
 

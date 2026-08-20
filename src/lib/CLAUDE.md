@@ -3,7 +3,12 @@
 Every function here is a direct port of a function in `public/panel_mostaqel_moshtarian.html`
 (the original prototype). When modifying anything in this folder, find the equivalent
 function in that file first and check the diff is intentional — diverging from it silently
-breaks documented business rules (plain-language rules in `public/handoff_spec.md` §4).
+breaks documented business rules. (The original handoff spec that wrote those rules out in
+plain language was a scratch doc removed before this repo was handed off — this file and the
+prototype HTML are now the two sources of truth for behavior.)
+
+See `../app/CLAUDE.md` for the route map and the UI/UX design-pattern contract (former
+`stylesPattern.md`, folded in there) — this file covers logic, that one covers routes + visuals.
 
 None of these functions should touch the DOM or React — they take plain data in, return
 plain data out. Components call them and render the result. Keep it that way.
@@ -18,8 +23,7 @@ canonical date format used everywhere in this app — never `Date` objects in st
 `formatTs` (toggle-aware `formatTs(ts, calendar)` — renders Gregorian `dd.mm.yyyy — HH:MM` or
 Jalali `DD <month> JYYY — HH:MM`, both Asia/Tehran-anchored via `Intl.DateTimeFormat` so
 login/comment timestamps stay stable across server/viewer TZs),
-`escapeHtml`/`escapeAttr` (unused now that React escapes by default, kept for parity —
-harmless to leave, safe to delete if you're cleaning up). `normalizePhone(s)` converts
+`normalizePhone(s)` converts
 Persian (`۰-۹`) and Arabic-Indic (`٠-٩`) digits to Latin, preserves a leading `+`, strips
 non-dial chars; `PhoneLink` (`src/components/ui/PhoneLink.jsx`) uses it to build `tel:`
 URIs for read-only phone displays (agent suggestions, suggestions panel, report preview
@@ -29,8 +33,10 @@ phone column) — phone edit inputs stay plain `<input>`.
 - Also holds the app's shared enum constants (`COORD_OPTS`, `RESULT_OPTS`, `STATUS_OPTS`,
   `PRIORITY_OPTS`, `PRICE_TYPE_OPTS`) — these used to be duplicated per-component; this file
   already owned `COORD_LABELS` so the rest of the label/option vocabulary lives beside it instead
-  of a separate constants module. `COMMENT_AUTHORS` was removed — replaced by `commentAuthors()`
-  (below). The hardcoded `AGENT_OPTS` 3-option dropdown in `UserFormModal` was also removed —
+  of a separate constants module. `COMMENT_AUTHORS` was removed; its replacement `commentAuthors()`
+  was later removed too once `LeadProfileModal` stopped using an author dropdown (the comment/
+  changelog author is now derived automatically from the logged-in user). The hardcoded `AGENT_OPTS`
+  3-option dropdown in `UserFormModal` was also removed —
   `agentCode` is now a free-text input (`.trim().toUpperCase()` on submit, both create and edit),
   which is what unblocks onboarding a 4th+ expert.
 - `COORD_LABELS`/`COORD_OPTS` are now a **fallback only**, not the source of truth — the real
@@ -53,14 +59,12 @@ phone column) — phone edit inputs stay plain `<input>`.
   called directly from a filter/picker component; use `scopedCoordOptions` instead.
   `coordClass(co)` still special-cases exactly `FARNAZ`/`PARDIS`/`ZOHREH` for their brand colors
   and falls back to `-other` for any other agent — same treatment as `agentColor()` in
-  `analytics.js`, intentionally not extended to a per-agent color table. `commentAuthors()`
-  returns the active agents' display names (`Object.values(AGENT_DIRECTORY).sort(...)`) and feeds
-  the two "تغییر توسط"/"از طرف" author dropdowns in `LeadProfileModal`. `coordCodeFromLabel(label)`
+  `analytics.js`, intentionally not extended to a per-agent color table. `coordCodeFromLabel(label)`
   is the reverse of `coordLabel` (display name → `agentCode`, or null); `excel.js`'s
   `normalizeImportCoordinator` tries it first so an imported display name (e.g. `'فرناز'`) for any
   active agent resolves to its code, then falls back to the legacy 3-name map, then raw passthrough.
   Onboarding a new expert = a `users` row with role `agent` + a unique `agentCode`; after
-  `loadAll`/`syncNow` it appears in `coordOptions()`, `commentAuthors()`, the agents panel (chips
+  `loadAll`/`syncNow` it appears in `coordOptions()`, the agents panel (chips
   derive from `r.coordinator`), and analytics (auto HSL color via `agentColor()`). `COORD_OPTS`/
   `COORD_LABELS`/`coordClass`/`AGENT_COLORS` remain as intentional legacy fallback/color logic —
   same precedent as `badgeClass`/`catColors` below — not dead code.
@@ -179,7 +183,11 @@ it's there on purpose.
 `parseImportFile` reads any `.xlsx`/`.xls`, matches columns via `IMPORT_ALIASES` (Persian
 or English header names, case-insensitive), and skips rows with no company name. It returns
 data only — the caller (`ImportExportBar.jsx`) decides how to merge/persist/toast, matching
-the original's separation of "read the file" from "what happens on import." The leads
+the original's separation of "read the file" from "what happens on import." `parseImportFile`
+deliberately doesn't resolve the raw `category` text to a `categoryId` itself (it has no
+access to the live `categories` list) — `resolveImportCategoryIds(records, categories)` does
+that afterward, applying the same chemical/polymer alias mapping as the categories migration
+(`Polymer`/`Petrochemical`/`Chemical` → the `Chemical/Polymer` category). The leads
 export (`src/app/leads/page.js` `handleExport`) passes
 `getFiltered(records, filters, chartFilter)` into `exportToExcel`, so export respects the
 active filter + chart drill-down, not the raw scoped set.
@@ -349,7 +357,7 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
 - **`customer_activity`**: `listActivity`, `getActivityById`, `createActivity` (upsert), `updateActivity`, `deleteActivity`.
 - **`reminders`**: `listReminders`, `getReminderById`, `createReminder` (upsert), `updateReminder`, `deleteReminder`.
 - **`users`**: `listUsers`/`listUsersRaw`, `getUserById`, `createUser`, `updateUser`, `deleteUser`, plus finders
-  (`findUserByUsername`, `findUserByEmail`) and partial setters (`updateUserLastLogin`, `setUserActive`, `upsertUser`).
+  (`findUserByUsername`, `findUserByEmail`) and partial setters (`updateUserLastLogin`, `setUserActive`).
   `role` is a 4-value ENUM: `admin`, `developer` (both "elevated" — see `isElevated()` in
   `auth.js`, they bypass all scoping and see/manage everything), `manager` (department-scoped
   view of leads/customers/reminders/activity and of the `users` list, but **no create/edit/delete

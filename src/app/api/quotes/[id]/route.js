@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { handle } from '@/lib/apiHandler.js';
 import { requireUser } from '@/lib/auth.js';
-import { tryOp } from '@/lib/serverOps.js';
+import { tryOp, checkLeadScope } from '@/lib/serverOps.js';
 import { getLeadById } from '@/lib/queries.js';
 import { parseOrThrow, Id, QuoteAnnouncePrice, QuoteResolve } from '@/lib/models.js';
 import Utils from '@/lib/utils.js';
@@ -13,12 +13,13 @@ function validationError(message) {
 }
 
 export const PATCH = handle(async (req, ctx) => {
-  await requireUser();
+  const user = await requireUser();
   const { id: rawId } = await ctx.params;
   const id = parseOrThrow(Id, rawId);
   const body = await req.json();
   const lead = await getLeadById(id);
   if (!lead) throw validationError('لید یافت نشد');
+  await checkLeadScope(user, lead, undefined);
   if (lead.result !== 'در حال استعلام') throw validationError('این لید در وضعیت استعلام نیست');
 
   if (body.action === 'announce-price') {

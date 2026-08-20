@@ -1,17 +1,9 @@
 import { NextResponse } from 'next/server';
 import { handle } from '@/lib/apiHandler.js';
-import { requireUser, isElevated } from '@/lib/auth.js';
-import { tryOp, resolveScope } from '@/lib/serverOps.js';
+import { requireUser } from '@/lib/auth.js';
+import { tryOp, checkLeadScope } from '@/lib/serverOps.js';
 import { getLeadById } from '@/lib/queries.js';
 import { parseOrThrow, LeadUpdate, Activity, Id } from '@/lib/models.js';
-
-async function checkLeadScope(user, existingLead, nextCoordinator) {
-  if (isElevated(user)) return;
-  const scope = await resolveScope(user);
-  const covers = (code) => (scope.type === 'own' ? code === scope.agentCode : scope.agentCodes.includes(code));
-  if (existingLead && !covers(existingLead.coordinator)) throw new Error('FORBIDDEN');
-  if (nextCoordinator !== undefined && !covers(nextCoordinator)) throw new Error('FORBIDDEN');
-}
 
 export const PATCH = handle(async (req, ctx) => {
   const user = await requireUser();

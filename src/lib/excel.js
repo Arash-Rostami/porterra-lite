@@ -112,6 +112,26 @@ function normalizeImportConverted(v) {
   return ['بله', 'true', 'yes', '1', 'y'].includes(s);
 }
 
+// Legacy/alias free-text category names (from older exports or external sources) that should
+// resolve to the same canonical category as 'Chemical/Polymer' — same mapping documented for
+// the categories migration (Polymer/Petrochemical/Chemical -> CAT-chempoly).
+const CATEGORY_ALIASES_OF_CHEMPOLY = ['polymer', 'petrochemical', 'chemical'];
+
+// Called by the import UI after parseImportFile, with the live `categories` list — kept
+// separate from parseImportFile itself (which returns data only, no store/categories access)
+// so "read the file" stays decoupled from "resolve against current app state".
+export function resolveImportCategoryIds(records, categories) {
+  const catIndex = new Map(categories.map((c) => [Utils.normSpace(c.name).toLowerCase(), c.id]));
+  const chemPolyId = catIndex.get('chemical/polymer');
+  if (chemPolyId) {
+    for (const alias of CATEGORY_ALIASES_OF_CHEMPOLY) catIndex.set(alias, chemPolyId);
+  }
+  return records.map((r) => {
+    const { category, ...rest } = r;
+    return { ...rest, categoryId: catIndex.get(Utils.normSpace(category || '').toLowerCase()) || null };
+  });
+}
+
 export async function parseImportFile(file) {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: 'array', cellDates: true });

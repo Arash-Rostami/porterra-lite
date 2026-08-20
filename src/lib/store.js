@@ -11,7 +11,6 @@ import {
     addReminder as addReminderAction,
     announceQuotePrice as announceQuotePriceAction,
     createProduct as createProductAction,
-    deleteActivity as deleteActivityAction,
     deleteLead as deleteLeadAction,
     deleteProductAction,
     createCategory as createCategoryAction,
@@ -24,7 +23,6 @@ import {
     resetToSeed as resetToSeedAction,
     resolveQuote as resolveQuoteAction,
     syncNow as syncNowAction,
-    updateActivity as updateActivityAction,
     updateLead as updateLeadAction,
     updateProductAction,
     updateReminder as updateReminderAction,
@@ -216,15 +214,6 @@ export function updateRecord(id, patch) {
     }, () => updateLeadAction(id, patch));
 }
 
-export function deleteRecordById(id) {
-    const prev = state.records;
-    state.records = prev.filter((r) => r.id !== id);
-    emit();
-    persist(() => {
-        state.records = prev;
-    }, () => deleteLeadAction({id}));
-}
-
 export function deleteRecordWithLog(record) {
     const k = custKey(record.company);
     const prevRecords = state.records;
@@ -373,35 +362,6 @@ export function addComment(key, text, author) {
         },
         () => addCommentAction({id, companyKey: key, type: 'comment', ts, author, text}),
     );
-}
-
-export function updateComment(key, id, patch) {
-    const prevMeta = state.companyMeta;
-    const existing = prevMeta[key] || {comments: [], changeLog: []};
-    state.companyMeta = {
-        ...prevMeta,
-        [key]: {
-            comments: existing.comments.map((c) => (c.id === id ? {...c, ...patch} : c)),
-            changeLog: existing.changeLog,
-        },
-    };
-    emit();
-    persist(() => {
-        state.companyMeta = prevMeta;
-    }, () => updateActivityAction(id, patch));
-}
-
-export function deleteComment(key, id) {
-    const prevMeta = state.companyMeta;
-    const existing = prevMeta[key] || {comments: [], changeLog: []};
-    state.companyMeta = {
-        ...prevMeta,
-        [key]: {comments: existing.comments.filter((c) => c.id !== id), changeLog: existing.changeLog},
-    };
-    emit();
-    persist(() => {
-        state.companyMeta = prevMeta;
-    }, () => deleteActivityAction(id));
 }
 
 export function getUnifiedFeed(key) {

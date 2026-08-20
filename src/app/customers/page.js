@@ -4,18 +4,16 @@ import AddLeadForm from '../../components/leads/AddLeadForm.jsx';
 import LeadFilters from '../../components/leads/LeadFilters.jsx';
 import LeadTable from '../../components/leads/LeadTable.jsx';
 import { addRecords, deleteRecordWithLog, useScopedData } from '../../lib/store.js';
-import { openProfile } from '../../lib/uiStore.js';
+import { openProfile, DEFAULT_FILTERS } from '../../lib/uiStore.js';
 import { exportToExcel } from '../../lib/excel.js';
 import { getFiltered } from '../../lib/filters.js';
 import { confirm } from '../../lib/confirm.js';
 import { toast } from '../../components/ui/Toast.jsx';
 
-const emptyFilters = { q: '', coordinator: '', category: '', source: '', product: '', status: '', dateFrom: '', dateTo: '' };
-
 export default function CustomersPage() {
     const { records: allRecords, currentUser } = useScopedData();
     const records = useMemo(() => allRecords.filter((r) => r.converted), [allRecords]);
-    const [filters, setFilters] = useState(emptyFilters);
+    const [filters, setFilters] = useState(DEFAULT_FILTERS);
     const [addFormOpen, setAddFormOpen] = useState(false);
 
     function handleExport() {

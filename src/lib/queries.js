@@ -52,7 +52,6 @@ const LEAD_UPDATE = [
     {k: 'quoteResultDate', col: 'quote_result_date'},
     {k: 'quoteFailReason', col: 'quote_fail_reason'},
 ];
-const USER_SET = USER_COLS.filter((c) => c !== 'id' && c !== 'username' && c !== 'created_at');
 
 const USER_SELECT = selectCols(USER_COLS);
 const USER_SAFE_SELECT = selectCols(USER_SAFE_COLS);
@@ -73,6 +72,15 @@ export async function getLeadById(id, conn) {
 export async function findLeadsByCompany(company, conn) {
     const rows = await exec(conn, `SELECT ${LEAD_SELECT} FROM \`contacts\` WHERE LOWER(\`company\`)=LOWER(?)`, [company]);
     return (rows || []).map(rowToLead);
+}
+export async function findLatestLeadByCompany(company, conn) {
+    const matches = await findLeadsByCompany(company, conn);
+    return matches.reduce((best, r) => {
+        if (!best) return r;
+        const dt = Utils.parseDate(r.date);
+        const bestDt = Utils.parseDate(best.date);
+        return dt && (!bestDt || dt > bestDt) ? r : best;
+    }, null);
 }
 export async function createLead(c, conn) {
     const row = leadToRow(c);
@@ -328,12 +336,6 @@ export async function findUserByEmail(email, conn) {
 }
 export async function createUser(row, conn) {
     const sql = `INSERT INTO \`users\` (\`${USER_COLS.join('`,`')}\`) VALUES (${ph(USER_COLS.length)})`;
-    await exec(conn, sql, USER_COLS.map((c) => row[c]));
-}
-export async function upsertUser(row, conn) {
-    const sql = `INSERT INTO \`users\` (\`${USER_COLS.join('`,`')}\`)
-                 VALUES (${ph(USER_COLS.length)})
-                 ON DUPLICATE KEY UPDATE ${USER_SET.map((x) => `\`${x}\`=VALUES(\`${x}\`)`).join(',')}`;
     await exec(conn, sql, USER_COLS.map((c) => row[c]));
 }
 export async function updateUserLastLogin(id, ts, conn) {

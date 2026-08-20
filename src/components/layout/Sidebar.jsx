@@ -51,6 +51,9 @@ export default function Sidebar({ dark }) {
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // SSR-safe: localStorage doesn't exist server-side, so initial state stays the server default
+  // (false) and the real pref is only read client-side here — a lazy initializer would mismatch SSR.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setCollapsed(readCollapsedPref()); }, []);
 
   const groups = LINK_GROUPS;

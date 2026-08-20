@@ -19,13 +19,15 @@ function readFontScalePref() {
   } catch { return FONT_SCALE_DEFAULT; }
 }
 
+export const DEFAULT_FILTERS = { q: '', coordinator: '', category: '', source: '', product: '', status: '', dateFrom: '', dateTo: '' };
+
 let ui = {
   profileId: null,
   quickCallOnOpen: false,
   agentProfile: null,
   addFormOpen: false,
   chartFilter: null,
-  filters: { q: '', coordinator: '', category: '', source: '', product: '', status: '', dateFrom: '', dateTo: '' },
+  filters: { ...DEFAULT_FILTERS },
   calendar: 'gregorian',
   fontScale: FONT_SCALE_DEFAULT,
 };

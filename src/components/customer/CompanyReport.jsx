@@ -64,6 +64,9 @@ export default function CompanyReport({ records, onOpenRecord, initialCompany = 
 
   useEffect(() => {
     if (!initialCompany) return;
+    // Must re-run whenever initialCompany changes post-mount (e.g. navigating between company
+    // report links without a full page reload), not just once at mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setInput(initialCompany);
     setQuery(initialCompany);
     setPage(1);

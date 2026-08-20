@@ -31,6 +31,16 @@ export async function resolveScope(user) {
     return { type: 'own', agentCode: user.agentCode || null };
 }
 
+// Shared by every route that patches a `contacts` row (leads PATCH/DELETE, quotes PATCH) —
+// a non-elevated user may only touch a lead whose coordinator is within their resolved scope.
+export async function checkLeadScope(user, existingLead, nextCoordinator) {
+    if (isElevated(user)) return;
+    const scope = await resolveScope(user);
+    const covers = (code) => (scope.type === 'own' ? code === scope.agentCode : scope.agentCodes.includes(code));
+    if (existingLead && !covers(existingLead.coordinator)) throw new Error('FORBIDDEN');
+    if (nextCoordinator !== undefined && !covers(nextCoordinator)) throw new Error('FORBIDDEN');
+}
+
 function scopeBootData(data, scope) {
     if (!scope || scope.type === 'all') return data;
     const matchAgent = scope.type === 'own'

@@ -2,6 +2,7 @@
   "name": "porterra-lite",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "engines": {
     "node": ">=20"
   },
@@ -9,7 +10,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:create-user": "node --env-file=.env.local scripts/create-user.mjs"
   },
   "dependencies": {
     "chart.js": "^4.4.0",

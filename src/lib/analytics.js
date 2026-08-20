@@ -66,15 +66,6 @@ export function computeAgentStats(records, agent, fromDt, toDt) {
     };
 }
 
-export function agentCounts(records) {
-    const counts = {};
-    for (const r of records) {
-        const a = Utils.normSpace(r.coordinator) || 'نامشخص';
-        counts[a] = (counts[a] || 0) + 1;
-    }
-    return Object.keys(counts).sort((a, b) => counts[b] - counts[a]).map((name) => ({name, count: counts[name]}));
-}
-
 export async function exportAgentReportToExcel(data) {
     if (!data.length) return false;
     const XLSX = await import('xlsx');
@@ -93,30 +84,22 @@ export async function exportAgentReportToExcel(data) {
 }
 
 export function computeKpis(records) {
-  let converted = 0, openQuotes = 0, deactivated = 0, followUp = 0, noAnswer = 0;
-  for (const r of records) {
-    if (r.converted) converted++;
-    if (r.result === 'در حال استعلام' && !r.quoteResult) openQuotes++;
-    if (r.result === 'غیرفعال') deactivated++;
-    if (r.result === 'در حال پیگیری') followUp++;
-    if (effectiveResult(r) === 'بی‌پاسخ') noAnswer++;
-  }
+  const t = tally(records);
   return [
     { key: 'total', label: 'تعداد کل سرنخ‌ها', value: records.length, cls: '' },
-    { key: 'converted', label: 'سرنخ تبدیل‌شده', value: converted, cls: '-teal' },
-    { key: 'quoteOpen', label: 'استعلام‌های در جریان', value: openQuotes, cls: '-amber' },
-    { key: 'deactivated', label: 'غیرفعال شده', value: deactivated, cls: '' },
-    { key: 'followUp', label: 'در حال پیگیری', value: followUp, cls: '' },
-    { key: 'noAnswer', label: 'بی‌پاسخ', value: noAnswer, cls: '' },
+    { key: 'converted', label: 'سرنخ تبدیل‌شده', value: t.converted, cls: '-teal' },
+    { key: 'quoteOpen', label: 'استعلام‌های در جریان', value: t.quoteOpen, cls: '-amber' },
+    { key: 'deactivated', label: 'غیرفعال شده', value: t.deactivated, cls: '' },
+    { key: 'followUp', label: 'در حال پیگیری', value: t.followUp, cls: '' },
+    { key: 'noAnswer', label: 'بی‌پاسخ', value: t.noAnswer, cls: '' },
   ];
 }
 
 export function computeFunnelStages(records) {
   const total = records.length;
-  const quotes = records.filter((r) => r.result === 'در حال استعلام');
-  const quotedCount = quotes.length;
-  const salesCount = quotes.filter((q) => q.quoteResult === 'موفق').length;
-  const convertedCount = records.filter((r) => r.converted).length;
+  const t = tally(records);
+  const quotedCount = t.quoteOpen + t.quoteWon + t.quoteLost;
+  const convertedCount = t.converted;
   const raw = [
     { label: 'کل سرنخ‌ها', value: total, color: '#64748b' },
     { label: 'در حال استعلام', value: quotedCount, color: '#ff6900' },
@@ -129,7 +112,7 @@ export function computeFunnelStages(records) {
   return {
     stages,
     leadConversionRate: total ? Math.round((convertedCount / total) * 100) : 0,
-    quoteToSaleRate: quotedCount ? Math.round((salesCount / quotedCount) * 100) : 0,
+    quoteToSaleRate: quoteToSaleRate(t),
   };
 }
 

@@ -25,6 +25,9 @@ export default function AddLeadForm({ open, records, defaultCoordinator, onSubmi
   const setInput = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }));
 
   useEffect(() => {
+    // Must re-run every time the form reopens (this component stays mounted between opens,
+    // per Modal.jsx's conditional-render pattern) without stomping an in-progress edit.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (open && defaultCoordinator) setF((s) => (s.coordinator ? s : { ...s, coordinator: defaultCoordinator }));
   }, [open, defaultCoordinator]);
 

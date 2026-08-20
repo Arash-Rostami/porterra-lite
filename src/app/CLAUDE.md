@@ -1,4 +1,42 @@
-# Porterra Lite — UI/UX Design Pattern
+# src/app — routes and UI/UX design pattern
+
+Two things live in this one file on purpose: the route map (so an agent
+knows which page owns which feature) and the full visual-design-system
+contract (so an agent doesn't invent a new color, radius, or shadow instead
+of reusing a token). Previously split across a page-map that didn't exist
+and a separately-named `stylesPattern.md` — folded into this one `CLAUDE.md`
+so a directory has exactly one orientation doc, matching `src/lib/CLAUDE.md`'s
+convention.
+
+## Route map
+
+All routes except `/login` require a session (`src/proxy.js` redirects
+unauthenticated requests there; it only checks *presence* of a valid session
+cookie — role/department scoping is enforced server-side per-route, see
+`../lib/CLAUDE.md`'s `auth.js`/`serverOps.js`/`queries.js` sections, not here).
+
+| Route | Renders | Notes |
+|---|---|---|
+| `/` | — | Redirects to `/dashboard`. |
+| `/login` | login form | No `Sidebar`/`Header` — `AppShell.jsx` early-returns for this path. |
+| `/dashboard` | `KpiCards`, `FunnelChart`, `TrendChart`, `DailyAgentChart`, … | KPI/analytics home; data via `computeKpis`/`computeFunnelStages`/etc. (`../lib/analytics.js`). |
+| `/leads` | `AddLeadForm`, `LeadFilters`, `LeadTable` | The main contacts/leads table — filters, search, manual order, import/export. |
+| `/customers` | `AddLeadForm`, `LeadFilters`, `LeadTable` | Same components as `/leads` — an in-progress rename of the "leads" concept to "customers" terminology; if you're asked to change one, check whether the other needs the same change before assuming it's dead. |
+| `/company-report` | company/customer profile report | Smart search + full stats + timeline + monthly chart, keyed by normalized company name (`custKey`, `../lib/store.js`). |
+| `/agents` | `AgentsPanel`, `AgentReport` | Per-agent chips + profile modal (`AgentProfileModal`) with full stat breakdown; `AgentReport` adds per-agent summary cards. |
+| `/inquiries` | `QuotesPanel` | Open-quotes workflow — the 3-stage quote lifecycle (`../lib/CLAUDE.md`'s `filters.js`/`store.js` sections document it in full). |
+| `/suggestions` | `ReminderBanner`, `CommentBanner`, `SuggestionsPanel`, `RemindersList` | "Who to call today" engine (`../lib/suggestions.js`) + reminders. |
+| `/report-builder` | `ReportBuilder` | Column-picker + filter + Excel export, custom report. |
+| `/products` | `ProductsPanel`, `ProductFormModal` | Product CRUD (admin/developer only for edit/delete — see `requireElevated` in `../lib/CLAUDE.md`). |
+| `/categories` | `CategoriesPanel`, `CategoryFormModal` | 1:1 structural clone of `/products` — same CRUD + card/table pattern. |
+| `/users` | `UsersPanel`, `UserFormModal` | User CRUD, `requireElevated`-gated (manager has no create/edit/delete rights over users). |
+
+`src/app/api/*` is documented separately in `src/app/api/CLAUDE.md` — route
+handlers there are thin; the actual server logic lives in `../lib/CLAUDE.md`.
+
+---
+
+## UI/UX Design Pattern
 
 **Read this fully before touching any CSS, any `className`, or any layout/branding code.**
 This app's entire visual system is a deliberate 1:1 sync with **BMS-CM**
@@ -10,7 +48,7 @@ If you're about to pick a color, a radius, or a shadow "that looks about right,"
 stop — go read the corresponding rule in BMS-CM first. Mismatched values here read
 as a different, disconnected product, which is the one thing this sync must not do.
 
-## The token bridge (`globals.css` `.crm-root { ... }`)
+### The token bridge (`globals.css` `.crm-root { ... }`)
 
 Same three-layer palette as BMS-CM, ported verbatim:
 - `--custom-first/second/third/fourth/neutral` + `-mid` (0.7 alpha) / `-light` (0.4 alpha) variants
@@ -48,7 +86,7 @@ buttons render with a fully transparent background. If a color looks unexpectedl
 (not wrong-colored, *absent*), open devtools → computed style → check the custom property
 actually has a value on `.crm-root`, don't assume the consuming rule is the bug.
 
-## Card tiers — `.crm-section` is NOT a plain div
+### Card tiers — `.crm-section` is NOT a plain div
 
 Three depth tiers, matching BMS's `lp-surface → lp-panel → lp-well` nesting exactly
 (see BMS `resources/css/landing-page.css` + its own `viewsPattern.md` §"sync mechanism"):
@@ -66,7 +104,7 @@ container on the page, or something nested inside one?) and use that tier's exac
 background token — don't reach for `var(--surface)` for a card, that's reserved for
 form controls and floating opaque elements.
 
-## Border radius — one value for every rectangular surface
+### Border radius — one value for every rectangular surface
 
 Every rectangular surface and control in the app uses `border-radius: 8px` — cards,
 tables, KPI/stat widgets, the modal, inputs, dropdowns, all buttons (primary, ghost,
@@ -84,7 +122,7 @@ rounding stops reading as a pill.
 Multi-corner radii follow the same `8px` (e.g. table thead `8px 0 0 0` /
 `0 8px 0 0`, pagination `0 0 8px 8px`, mobile sheet `8px 8px 0 0`).
 
-## Status badges (`.crm-status-badge`)
+### Status badges (`.crm-status-badge`)
 
 Maps directly to BMS's `.tb-badge` family: `-success`→`--good*` (emerald),
 `-fail`→`--rust*` (rose), `-progress`→`--info*` (blue, chosen for "in-flight/neutral"
@@ -92,12 +130,12 @@ per Filament convention), `-none`→`var(--muted)`. `border-radius:8px` (the app
 rectangular radius — see "Border radius" below), pale solid bg +
 saturated text + alpha border — never a plain colored pill.
 
-## Phone display
+### Phone display
 
 Read-only phone numbers render via `PhoneLink` (`<a href="tel:…" dir="ltr">` with
 `crm-mono`), not plain text; phone edit inputs remain plain `<input>`.
 
-## Fonts — self-hosted, never a CDN
+### Fonts — self-hosted, never a CDN
 
 `public/fonts/` holds the actual font files copied from
 `BMS-CM/resources/fonts/` (Roboto, Iranyekan, Baloo2-ExtraBold). `@font-face` blocks
@@ -109,7 +147,7 @@ font file is embedded at exactly weight 800 — requesting another weight trigge
 synthetic (fake) bolding, the exact gotcha BMS's own `stylesPattern.md` flags for its
 `.fi-login-brand`.
 
-## Sidebar (`Sidebar.jsx` + `.crm-sidebar*`)
+### Sidebar (`Sidebar.jsx` + `.crm-sidebar*`)
 
 - Background is **transparent** (`background: transparent`), matching Filament's own
   `.fi-sidebar` (BMS has no sidebar background override at all — it inherits the page's
@@ -135,7 +173,7 @@ synthetic (fake) bolding, the exact gotcha BMS's own `stylesPattern.md` flags fo
   unconditionally in JSX; hide them via CSS scoped to `@media (min-width:901px)
   .crm-sidebar.-collapsed`. This bit twice already — don't reintroduce it.
 
-## Global controls added beyond BMS's own feature set
+### Global controls added beyond BMS's own feature set
 
 These don't exist in BMS-CM (it has no CRM date data or font-scaling need) but follow
 its architectural conventions — plain functions in `src/lib/`, shared via a module-level
@@ -143,7 +181,7 @@ store + `useSyncExternalStore` (the `uiStore.js` pattern; `theme.js` was convert
 too once the login page needed to toggle theme, so AppShell + /login + /dashboard share one
 `dark` state instead of each holding a separate `useState`).
 
-- **Calendar toggle** (`src/lib/calendar.js`, `uiStore.js`'s `calendar`/`toggleCalendar`)
+- **Calendar toggle** (`../lib/calendar.js`, `uiStore.js`'s `calendar`/`toggleCalendar`)
   — Gregorian ⇄ Jalali *display only*. Records are always stored `dd.mm.yyyy`
   (Gregorian) — `formatDisplayDate(date, calendar)` is the only thing that changes.
   Chart month-bucket grouping (trend chart, company report monthly breakdown)
@@ -157,7 +195,7 @@ too once the login page needed to toggle theme, so AppShell + /login + /dashboar
   single existing rule. Don't refactor to `rem` casually — that's a real, large,
   deliberate migration, not a quick fix, and `zoom` already delivers the same result.
 
-## Auth & header identity (added with login + multi-user)
+### Auth & header identity (added with login + multi-user)
 
 These are new surfaces with no BMS-CM ancestor; they follow the same token/tier rules above.
 
@@ -165,7 +203,7 @@ These are new surfaces with no BMS-CM ancestor; they follow the same token/tier 
   (`.crm-auth-card`, `backdrop-filter: blur`) frosted over the app's normal ambient background
   — no Sidebar/Header (see `AppShell.jsx`'s `/login` early return). Inputs are `dir=ltr`
   (email + password), form driven by a controlled `onSubmit` → the `login` REST route
-  (`apiClient.js`). The logo is the **same theme-aware pair as the sidebar**
+  (`../lib/apiClient.js`). The logo is the **same theme-aware pair as the sidebar**
   (`logo-light.png`/`logo-dark.png`), the
   submit button uses `var(--accent)` (so it's #5C6AC4 light / #6750A4 dark like every other
   primary button, not a fixed gradient), and a `ThemeToggle` is floated in the top-start
@@ -196,10 +234,10 @@ These are new surfaces with no BMS-CM ancestor; they follow the same token/tier 
   (no card/shadow) — just `--ink-soft` text — so it reads as a quiet live caption, not a
   control. SSR-safe via `now=null` initial state set in `useEffect`.
 
-## Leads table — flagged rows & manual order
+### Leads table — flagged rows & manual order
 
 Two per-user view affordances (no business data, not a BMS port — but following its
-conventions). State lives in `src/lib/leadPrefs.js` (`localStorage` keyed per username),
+conventions). State lives in `../lib/leadPrefs.js` (`localStorage` keyed per username),
 wired into the table in `LeadTable.jsx`.
 
 - **Flagged-important row** (`tr.crm-row-flagged`): background `var(--accent-soft)` on the
@@ -221,7 +259,7 @@ wired into the table in `LeadTable.jsx`.
   bottom edge (a line indicator, not a filled surface). A `.crm-manual-hint` line shows under the
   title row. No new card tier is introduced — these are row-level states, not surfaces.
 
-## Modals — one shared component, never hand-rolled
+### Modals — one shared component, never hand-rolled
 
 `src/components/ui/Modal.jsx` is the *only* way a modal should be built. It owns the
 overlay, header (title + optional description + close button), body slot, and an
@@ -254,7 +292,7 @@ override in `globals.css` (`@media (max-width:640px) { .crm-modal { max-width:10
 an inline style, `!important` is the only way the mobile override still applies.
 Don't remove it thinking it's redundant.
 
-## Header notifications bell
+### Header notifications bell
 
 `src/components/layout/NotificationsBell.jsx` — an app-wide "needs attention" surface,
 mounted once in `Header.jsx` so it's visible on every tab. It deliberately reuses the
@@ -267,7 +305,7 @@ separate features. The badge count is `due.length` only — there's no "seen/uns
 state for the latest-comment line (no timestamp of last view exists anywhere in this
 app), so don't add it to the badge count without first adding that tracking.
 
-## Boot loader (`.loader-overlay` + `BootLoader.jsx`)
+### Boot loader (`.loader-overlay` + `BootLoader.jsx`)
 
 A full-screen boot animation ported **verbatim** from BMS-CM's landing-page loader
 (`resources/views/filament/landing-page/loader.blade.php` + `landing-page.css`
@@ -320,7 +358,7 @@ brand-moment language. If a Persian tagline is ever wanted, change only the text
 `BootLoader.jsx` — the `.ldr-slogan-hard` (red strike-through) / `.ldr-slogan-smart`
 (amber) spans are the styled parts.
 
-## In-modal horizontal tabs
+### In-modal horizontal tabs
 
 `AgentProfileModal` splits its two long lists (suggestions + call history) across
 Filament-style underline tabs — `.crm-modal-tabs` (a `role="tablist"` row with a
@@ -332,7 +370,7 @@ hover `var(--ink)`. No border-radius — these are underline tabs, not filled co
 its own `page`/`perPage` state so the two paginations stay independent; switching agent
 or date filter resets both lists to page 1.
 
-## Button icons
+### Button icons
 
 Every labeled action button carries one Heroicons-style outline icon from `src/components/ui/Icon.jsx`, placed immediately before its label with no whitespace (`<CheckIcon />ثبت`) — the button's `gap` does the spacing (8px on primary/ghost/danger/import/add/quickcall, 5px on the row edit/delete/done buttons). All those button classes are `display: inline-flex; align-items: center` so a text-only instance stays centered.
 
@@ -364,7 +402,7 @@ Intentionally icon-less (labels/toggles, not verbs — don't add an icon "for co
 
 When you add a new labeled action button, give it the icon for its verb from this list; if the verb is new, add the icon to `Icon.jsx` first and add a line here. Don't reach for an emoji or a raw text glyph.
 
-## Table/section widget action rows
+### Table/section widget action rows
 
 A widget's actions (export, import, create/add) live inside that widget's own
 `.crm-section-title-row` — never in a bar floating above or below the `.crm-section`.
@@ -392,18 +430,18 @@ row, and if it's the block's sole create action it must use the same primary-CTA
 to be a one-off neutral/bordered button for «ثبت تماس جدید» — it's now just
 `.crm-btn-primary`, matching every other single-action widget header in the app.)
 
-## /categories tab — mirrors /products
+### /categories tab — mirrors /products
 
 The `/categories` admin tab (sidebar "مدیریت" group) is a 1:1 structural clone of `/products`:
 same CRUD panel + form-modal pattern, same card/table/badge conventions. Its سفارشی/پایه
 (custom/base) type badge uses `crm-status-badge` (`-success` for سفارشی, `-none` for پایه)
-rather than `badgeClass` (`filters.js`) — `badgeClass` is category-**name**-specific color
+rather than `badgeClass` (`../lib/filters.js`) — `badgeClass` is category-**name**-specific color
 logic, meaningless for the custom/base flag. The form modal is the shared `Modal.jsx` shell
 with an inline create-category shortcut (Plus → modal → `addCategory` → auto-select) in
 `ProductField`/`ProductFormModal`, same inline-create pattern as the product add-on-the-fly
 widget.
 
-## Absolute anti-patterns (same spirit as BMS's own list, `stylesPattern.md`)
+### Absolute anti-patterns (same spirit as BMS's own list, `stylesPattern.md`)
 
 - ❌ Hardcode a hex/shadow/gradient that already has a token.
 - ❌ Give a card a border AND a shadow at the surface tier, or a shadow at the
@@ -417,14 +455,14 @@ widget.
 - ❌ Load a font from Google Fonts or any CDN — every font here is self-hosted from
   `public/fonts/`, copied from BMS-CM's own files, on purpose.
 
-## Before you change anything
+### Before you change anything
 
 1. Open `D:\DEV-ENV\BMS-CM\resources\css\fi-custom.css` and
    `D:\DEV-ENV\BMS-CM\resources\css\landing-page.css` and actually read the rule you're
    about to port or modify — don't approximate from memory of this file.
-2. Check `public/handoff_spec.md` §4 (plain-language business rules) and
-   `src/lib/CLAUDE.md` (per-file logic) for the business-logic side of this app — don't
-   let a UI change quietly break a business rule documented there.
+2. Check `../lib/CLAUDE.md` (per-file logic, and `public/panel_mostaqel_moshtarian.html`
+   for the original prototype behavior it ports) for the business-logic side of this app —
+   don't let a UI change quietly break a business rule documented there.
 3. If you add a new reusable visual pattern, add it to this file in the same table/list
    style — this document is meant to stay authoritative, not go stale the moment you
    ship something new.

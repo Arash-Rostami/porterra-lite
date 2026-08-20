@@ -6,6 +6,7 @@ import { listUsersAction, createUserAction, updateUserAction, setUserActiveActio
 import UsersPanel from '../../components/users/UsersPanel.jsx';
 import UserFormModal from '../../components/users/UserFormModal.jsx';
 import { toast } from '../../components/ui/Toast.jsx';
+import { confirm } from '../../lib/confirm.js';
 
 function isUnauthorized(err) {
   return err && (err.message === 'UNAUTHORIZED' || err.message === 'FORBIDDEN');
@@ -45,6 +46,8 @@ export default function UsersPage() {
     }
   }, [router]);
 
+  // Standard fetch-on-mount — no non-effect alternative for loading data from a REST API.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); loadDepartments(); }, [load, loadDepartments]);
 
   async function handleCreate(input) {
@@ -85,7 +88,12 @@ export default function UsersPage() {
   }
 
   async function handleDelete(user) {
-    if (!confirm(`کاربر «${user.displayName || user.username}» برای همیشه حذف بشه؟`)) return;
+    const ok = await confirm({
+      title: 'حذف کاربر',
+      message: `کاربر «${user.displayName || user.username}» برای همیشه حذف بشه؟`,
+      confirmText: 'حذف',
+    });
+    if (!ok) return;
     try {
       await deleteUserAction(user.id);
       toast('کاربر حذف شد');

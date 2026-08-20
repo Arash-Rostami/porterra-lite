@@ -45,6 +45,9 @@ export default function DateTime() {
   const calendar = useUiStore((u) => u.calendar);
   const [now, setNow] = useState(null);
   useEffect(() => {
+    // SSR-safe: server can't know the time, so initial state stays null (renders '—') and the
+    // real value is only set client-side here — a lazy useState initializer would mismatch SSR.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNow(new Date());
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);

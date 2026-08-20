@@ -27,7 +27,6 @@ export async function loadAllData() {
   }
 }
 
-export const getCurrentUser = () => req('GET', '/api/auth/me');
 export const login = (email, password) => req('POST', '/api/auth/login', { email, password });
 export const logout = () => req('POST', '/api/auth/logout');
 
@@ -39,8 +38,6 @@ export const findLeadByCompany = (company) => req('GET', `/api/leads/by-company?
 
 export const addChangeLog = (p) => req('POST', '/api/activity', { ...p, type: 'change' });
 export const addComment = (p) => req('POST', '/api/activity', { ...p, type: 'comment' });
-export const updateActivity = (id, patch) => req('PATCH', `/api/activity/${enc(id)}`, { patch });
-export const deleteActivity = (id) => req('DELETE', `/api/activity/${enc(id)}`);
 
 export const addReminder = (r) => req('POST', '/api/reminders', r);
 export const markReminderDone = (id) => req('POST', `/api/reminders/${enc(id)}/done`);

@@ -14,6 +14,9 @@ export default function BootLoader() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (sessionStorage.getItem(SESSION_KEY)) return;
+    // SSR-safe: server always renders null (showing=false); whether to show the loader depends
+    // on sessionStorage, which only exists client-side — must be decided here, not at init.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowing(true);
     const exit = setTimeout(() => setLeaving(true), DURATION);
     const unmount = setTimeout(() => {
