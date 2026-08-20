@@ -41,6 +41,16 @@ phone column) — phone edit inputs stay plain `<input>`.
   registry, falling back to the hardcoded `COORD_OPTS` only when the registry is empty (before
   boot load completes, or genuinely offline with no cached snapshot yet — `products`/`agents` are
   both part of the cached `snapshot.json`, so a normal offline session still has real data).
+  `scopedCoordOptions(currentUser)` is the role-aware wrapper every coordinator-picker Dropdown in
+  the app actually uses (`LeadFilters`, `DashboardFilters`, `ReportBuilder`, `AddLeadForm`,
+  `LeadProfileModal`'s 4 coordinator/for-agent pickers) — admin/developer get the full
+  `coordOptions()` list, a `manager` gets only agents whose `department` (via the parallel
+  `AGENT_DEPARTMENTS` map, populated alongside `AGENT_DIRECTORY` in `setAgentDirectory`) matches
+  their own, and a plain `agent` gets a single-item list of just themselves. This is a UI
+  convenience layered on top of the real server-side scoping (see `auth.js`/`serverOps.js`
+  below) — picking an out-of-scope value isn't possible from these dropdowns, and would also be
+  rejected server-side if forced via a direct API call. Raw `coordOptions()` should no longer be
+  called directly from a filter/picker component; use `scopedCoordOptions` instead.
   `coordClass(co)` still special-cases exactly `FARNAZ`/`PARDIS`/`ZOHREH` for their brand colors
   and falls back to `-other` for any other agent — same treatment as `agentColor()` in
   `analytics.js`, intentionally not extended to a per-agent color table. `commentAuthors()`
@@ -87,9 +97,10 @@ phone column) — phone edit inputs stay plain `<input>`.
 - `statusBadgeInfo(r)` — `r.converted || r.quoteResult === 'موفق'` → success badge;
   `r.quoteResult === 'ناموفق'` → fail badge; `'غیرفعال'` → fail-styled; else falls through to
   `effectiveResult(r)`.
-- `getFiltered` hides `result === 'غیرفعال'` rows by default — pass `filters.showDeactivated: true`
-  or `filters.status === 'غیرفعال'` to include them (mirrors the prototype's "نمایش غیرفعال‌ها"
-  checkbox).
+- `getFiltered` no longer special-cases `result === 'غیرفعال'` — deactivated leads show under
+  "همه وضعیت‌ها" (no status filter) exactly like any other status; the old always-hide-unless-
+  checkbox behavior (`filters.showDeactivated`) was removed, and the "نمایش غیرفعال‌ها" checkbox
+  in `LeadFilters` is gone. Filter to only deactivated leads via `filters.status === 'غیرفعال'`.
 - `smartSearch(records, query)` — multi-token, scored, OR-across-fields search (company,
   name, phone, notes, product, category, source, coordinator-label). Not a filter — returns
   every record with `score >= 1` sorted by score. This is intentionally permissive (feels
@@ -97,6 +108,19 @@ phone column) — phone edit inputs stay plain `<input>`.
 - `getFiltered(records, filters, chartFilter, sort)` — the single function the contacts
   table's row-list comes from. Order of operations matters and mirrors the original exactly:
   dropdown filters → date range → chart drill-down (`chartFilter`) → smart search → sort.
+  `sort` defaults to `{key:'date', dir:-1}` (newest-first) in every consumer that renders a table
+  of records — `LeadTable.jsx`'s `sort` state and `ReportBuilder.jsx`'s call both start there, not
+  `null`. Every `<table>` with a date/timestamp column follows the same click-to-sort convention:
+  a plain `<th onClick={...}>` (no special class needed — `.crm-table th` is already
+  `cursor:pointer`) toggling a local `{key, dir}` state, rendering `▲`/`▼` when active or
+  `ArrowsUpDownIcon` (`crm-sort-hint-icon`) otherwise — see `LeadTable.jsx`'s `SORT_COLUMNS` for
+  the multi-column version, or `UsersPanel.jsx`/`CategoriesPanel.jsx`/`ProductsPanel.jsx` for the
+  single-date-column version (their own local `sort`/`toggleSort`, not routed through
+  `getFiltered` since they don't operate on leads). List-based feeds (not `<table>`s — company
+  report, agent/lead profile history/changelog/correspondence tabs) are fixed newest-first with no
+  toggle, which is intentional there. `RemindersList.jsx` (oldest-due-first) and
+  `SuggestionsPanel.jsx`'s `'days'` sort mode (oldest-contact-first) are deliberately **not**
+  newest-first — the whole point of both is surfacing stale/overdue items first.
 - `chartFilter` shapes: `{type:'month', dateFrom, dateTo}` (Gregorian dd.mm.yyyy bounds —
   a date range, not a `{y,m}` pair, so it works whether the chart bucketed by Gregorian or
   Jalali month), `{type:'day', date, agent}` (single Gregorian dd.mm.yyyy), `{type:'otherSource',
@@ -201,12 +225,22 @@ layer is gone too (replaced wholesale by the API). `loadAll()` calls `loadAllDat
 optimistically and rolls back on failure, redirecting to `/login` on `UNAUTHORIZED`/`FORBIDDEN`.
 `logout()` clears state and redirects. `custKey` (company normalization) lives here rather than
 `filters.js` only because it's needed to key `companyMeta`/reminders — anything else needing a
-company key should import it from here. `useScopedData` (folded in from a separate
-`useScopedData.js`) is the read hook every top-level page uses instead of `useStore((s) =>
-s.records)`: it returns `{records, reminders, companyMeta}` filtered by the current user's
-`agentCode` when `uiStore.scope` is `'mine'` (the default), unfiltered when `'all'` (or for
-admins, who have no `agentCode` so `'mine'` is a no-op) — the default view is per-user while
-the underlying data stays shared. `resetToSeed()` mirrors the prototype's "بازگشت به داده
+company key should import it from here. **The real access-control boundary is server-side now**
+(see `auth.js`/`serverOps.js`/`queries.js` below: `resolveScope(user)` + `scopeBootData()`, plus
+per-record checks in the leads API routes) — `GET /api/data`/`POST /api/sync` already return only
+the records/reminders/companyMeta a `department`/`agent`-scoped `role` is allowed to see.
+`useScopedData` (folded in from a separate `useScopedData.js`) is the read hook every top-level
+page uses instead of `useStore((s) => s.records)`; on top of the server-scoped data it already
+received, it applies one further client-side narrowing — filtering `{records, reminders,
+companyMeta}` down to the current user's own `agentCode` — but **only when `role === 'agent'`**
+(a `manager` sees their whole server-scoped department by default, not just their own records;
+admin/developer have no `agentCode` and see everything). This narrowing is a "default view"
+convenience on top of already-authorized data, not itself a security boundary — removing it would
+only change what an agent sees by default, not what they're allowed to fetch. There is no
+user-facing toggle to opt out of it; the removed "همه" (all) option in `UserMenu.jsx` predates
+real server-side scoping and was dropped as a false sense of control back when it was the only
+scoping that existed.
+`resetToSeed()` mirrors the prototype's "بازگشت به داده
 اولیه" footer button (admin-only server-side now). `src/data/seed.js` is legacy — seed data
 still uses the old `category` name shape, so a reset yields leads with `NULL` `category_id`.
 Acceptable because it's an admin-only "wipe to initial data" path, unused on the production DB.
@@ -231,8 +265,8 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
 - **`leadPrefs.js`** (new, also not a prototype port): per-user **view** preferences for the
   leads table — a manual row order (`order`: `string[]` of record ids) and a set of
   "important" flags (`flags`: `string[]`). Persisted in `localStorage` keyed per username
-  (`crm_lead_order_${username}` / `crm_lead_flags_${username}`), same convention as
-  `uiStore.js`'s `scope`. `initLeadPrefsForUser` runs from `store.loadAll`; `resetLeadPrefs`
+  (`crm_lead_order_${username}` / `crm_lead_flags_${username}`), same per-username-key convention
+  as `uiStore.js`'s `calendar`/`fontScale` prefs. `initLeadPrefsForUser` runs from `store.loadAll`; `resetLeadPrefs`
   from `store.logout`. **Manual ordering is applied in `LeadTable.jsx` *after* `getFiltered`
   returns (passing `sort=null` in manual mode) — never inside `filters.js`**, whose order of
   operations mirrors the prototype and must stay pure. Records absent from `order` sort after
@@ -242,8 +276,15 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
   and **re-validates the user against the DB on every call** (React `cache` memoizes
   per-request) — `proxy.js` is not a security boundary, so this is the real check. Falls back
   to the token payload only when the DB is unreachable (`isConnError`), so offline mode still
-  works. `requireUser()`/`requireAdmin()` throw `UNAUTHORIZED`/`FORBIDDEN`; **every API route
-  handler calls one at the top** (via `apiHandler.handle`).
+  works — the offline-fallback payload also carries `department` (from the session token) so
+  scoping keeps working while offline. `requireUser()`/`requireAdmin()` throw
+  `UNAUTHORIZED`/`FORBIDDEN`; **every API route handler calls one at the top** (via
+  `apiHandler.handle`). `isElevated(user)` (`role === 'admin' || 'developer'`) is the one helper
+  every department-scoping check in `serverOps.js`/`queries.js`/the leads & users API routes
+  branches on first — elevated always bypasses scoping entirely. `requireElevated()` is the
+  route-guard wrapper (`requireUser()` + `isElevated()` check) gating all `users` table CRUD
+  (`POST /api/users`, `PATCH`/`DELETE /api/users/[id]`, `PATCH /api/users/[id]/active`) —
+  `manager` does not get an exception here, by design (see `serverOps.js` below).
 - **`crypto.js`** (server-only): AES-256-GCM `encryptString`/`decryptString` + session-token
   pack/unpack, keyed by `ENCRYPTION_KEY` (env, never committed). Powers BOTH password storage
   (reversible by the user's explicit request — weaker than hashing, acceptable only for this
@@ -269,6 +310,16 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
   orchestration moved verbatim out of `actions.js`: `tryOp`, `loadBootData` (MySQL→snapshot
   fallback + writeSnapshot), `syncData` (replay queue in one transaction → `loadAllFromDb` →
   snapshot), `importLeads` (per-record queue on DB-down), `resetData`, `authenticateUser`.
+  `loadBootData(user)`/`syncData(user)` additionally resolve `resolveScope(user)` (`{type:'all'}`
+  for elevated, `{type:'department', agentCodes}` for a manager via `listAgentCodesByDepartment`,
+  `{type:'own', agentCode}` for an agent — fails closed to an empty set on a lookup error) and run
+  the response through `scopeBootData(data, scope)`, a pure in-memory filter over
+  `records`/`reminders`/`companyMeta` (products/categories are never scoped — see `filters.js`
+  above). **Critically, `loadAllFromDb()` itself — and the `snapshot.json` it writes — stays
+  always unscoped**; scoping is applied as a post-filter on top of either the live query or the
+  snapshot read, never baked into the snapshot-writing query. Scoping a snapshot at write time
+  would let one user's restricted view become the shared offline-fallback file, potentially
+  serving a different, less-privileged user's session someone else's data during a DB outage.
   It also inlines the offline queue/snapshot mechanics (append-only `queue.json`, atomic
   `snapshot.json` under `/.porterra/`) that were a separate `offline.js`.
   `apiHandler.js` exports `handle(fn)`, the one error→status mapper every route uses:
@@ -299,6 +350,21 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
 - **`reminders`**: `listReminders`, `getReminderById`, `createReminder` (upsert), `updateReminder`, `deleteReminder`.
 - **`users`**: `listUsers`/`listUsersRaw`, `getUserById`, `createUser`, `updateUser`, `deleteUser`, plus finders
   (`findUserByUsername`, `findUserByEmail`) and partial setters (`updateUserLastLogin`, `setUserActive`, `upsertUser`).
+  `role` is a 4-value ENUM: `admin`, `developer` (both "elevated" — see `isElevated()` in
+  `auth.js`, they bypass all scoping and see/manage everything), `manager` (department-scoped
+  view of leads/customers/reminders/activity and of the `users` list, but **no create/edit/delete
+  rights over other users** — those stay elevated-only, same as before this role existed), and
+  `agent` (own-records-only scope). `department` (`users.department VARCHAR(150) NULL`) is a
+  plain free-text column — same "no lookup table" trade-off as `source`/`agentCode` (see below),
+  not a separate `departments` table/FK. The distinct-values list for its UI datalist comes from
+  `listDepartmentNames()` (`SELECT DISTINCT department ...`); `findDepartmentByNormalizedName(name)`
+  does the duplicate-prevention canonicalization (trim + lowercase compare) so `POST`/`PATCH
+  /api/users[/id]` never create a near-duplicate department from a casing/whitespace typo;
+  `listAgentCodesByDepartment(department)` resolves a manager's own department to the `agentCode`
+  set used for scoping. `GET /api/departments` (`requireUser`) exposes `listDepartmentNames()` to
+  the client for the `UserFormModal.jsx` department field, which is a free `<input list>` +
+  `<datalist>` — the same UI pattern as `source`, not a constrained Dropdown — with the strict
+  duplicate rejection enforced server-side instead.
 - **`products`**: `listProducts`, `getProductById`, `createProduct` (plain insert — `name` is
   `UNIQUE`, a duplicate throws `ER_DUP_ENTRY`, translated to a 400 by both `POST /api/products`
   and `PATCH /api/products/[id]`), `updateProduct`, `deleteProduct`. Diverges from the prototype
@@ -309,8 +375,10 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
   `loadAllFromDb`/`loadBootData` alongside contacts/activity/reminders; the `/products` page
   reads/writes this same `store.js` `products` state (via `addProduct`/`updateProduct`/
   `deleteProduct`) rather than fetching independently like `/users` does. The legacy free-text
-  `category` column on `products`/`contacts` is intentionally retained as dormant legacy/audit —
-  the app uses `category_id` exclusively.
+  `category` column on `products`/`contacts` is retained for external/legacy consumers that still
+  read it directly from the DB — `createProduct`/`updateProduct`/`createLead`/`updateLead`/
+  `upsertLeads` write-sync it from `categoryId` on every save (via `CATEGORY_NAME_SUBQUERY` in
+  `queries.js`), so it's never stale even though app code itself reads `category_id` exclusively.
 - **`categories`**: `listCategories`, `getCategoryById`, `createCategory`, `updateCategory`,
   `deleteCategory` + `CATEGORY_COLS`/`CATEGORY_UPDATE` — same CRUD shape as the other tables.
   `rowToCategory`/`categoryToRow` in `mappers.js`; `CategoryCreate`/`CategoryUpdate` Zod schemas
@@ -356,11 +424,7 @@ in place, so clicking a chart bar after any prior filter was active could AND th
 and show zero rows). If you add a new chart click-to-filter interaction, copy the pattern
 from an existing `applyXFilter`, including the reset of unrelated fields — don't just call
 `setFilters`/`setChartFilter` directly from a component.
-`scope` (`'mine'`|`'all'`) is persisted in `localStorage` keyed per-username
-(`initScopeForUser` runs on login); it's a **default view, not access control** — any agent
-can toggle to `'all'` by design, and admins have no `agentCode` so `'mine'` is a no-op for
-them.
-`calendar` and `fontScale` are also localStorage-persisted but follow `theme.js`'s SSR-safe
+`calendar` and `fontScale` are localStorage-persisted, following `theme.js`'s SSR-safe
 pattern: `ui` starts at server defaults (`'gregorian'`/`FONT_SCALE_DEFAULT`) and reads
 localStorage only lazily in `subscribe` (`hydrateUi`), and `getServerSnapshot` returns a
 frozen `SERVER_UI` snapshot — not the live `ui`. Reading these prefs at module load would

@@ -60,6 +60,8 @@ export const importRecords = (records) => req('POST', '/api/leads/import', { rec
 export const syncNow = () => req('POST', '/api/sync');
 export const resetToSeed = () => req('POST', '/api/admin/reset');
 
+export const listDepartmentsAction = () => req('GET', '/api/departments');
+
 export const listUsersAction = () => req('GET', '/api/users');
 export const listUsersWithPasswords = () => req('GET', '/api/users?raw=1');
 export const createUserAction = (input) => req('POST', '/api/users', input);

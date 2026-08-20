@@ -16,6 +16,7 @@ const LINK_GROUPS = [
     label: 'سرنخ‌ها و فروش',
     links: [
       { href: '/leads', label: 'سرنخ‌ها', icon: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18M8 4v16" /></> },
+      { href: '/customers', label: 'مشتریان', icon: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="m22 21-3-3 3-3" /><path d="M15 18h7" /></> },
       { href: '/inquiries', label: 'استعلام‌ها', icon: <><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" /><circle cx="7.5" cy="7.5" r="0.75" fill="currentColor" /></> },
       { href: '/suggestions', label: 'پیگیری‌ها', icon: <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></> },
     ],

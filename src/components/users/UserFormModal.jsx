@@ -6,12 +6,12 @@ import { toast } from '../ui/Toast.jsx';
 import { CheckIcon, PlusIcon, XCircleIcon } from '../ui/Icon.jsx';
 import { coordLabel } from '../../lib/filters.js';
 
-const ROLE_OPTS = [{ value: 'admin', label: 'مدیر' }, { value: 'developer', label: 'توسعه‌دهنده' }, { value: 'agent', label: 'کارشناس' }];
+const ROLE_OPTS = [{ value: 'admin', label: 'مدیر' }, { value: 'developer', label: 'توسعه‌دهنده' }, { value: 'manager', label: 'سرپرست بخش' }, { value: 'agent', label: 'کارشناس' }];
 
-const empty = { username: '', displayName: '', email: '', agentCode: '', role: 'agent', password: '', active: true };
+const empty = { username: '', displayName: '', email: '', agentCode: '', department: '', role: 'agent', password: '', active: true };
 
 // create and edit share the same <Modal> chrome for UI consistency (same pattern as AddLeadForm)
-export default function UserFormModal({ open, user, currentUserId, isElevated, onSubmit, onCancel }) {
+export default function UserFormModal({ open, user, currentUserId, isElevated, departments = [], onSubmit, onCancel }) {
   const [f, setF] = useState(empty);
   const isEdit = !!user;
   const isSelf = isEdit && user?.id === currentUserId;
@@ -26,6 +26,7 @@ export default function UserFormModal({ open, user, currentUserId, isElevated, o
         displayName: user.displayName || '',
         email: user.email || '',
         agentCode: user.agentCode || '',
+        department: user.department || '',
         role: user.role || 'agent',
         password: '',
         active: user.active !== false,
@@ -46,6 +47,7 @@ export default function UserFormModal({ open, user, currentUserId, isElevated, o
           displayName: f.displayName.trim(),
           email: f.email.trim(),
           agentCode: f.agentCode.trim().toUpperCase(),
+          department: f.department.trim(),
           ...(isSelf ? {} : { role: f.role, active: f.active }),
         };
       if (f.password) patch.password = f.password;
@@ -57,6 +59,7 @@ export default function UserFormModal({ open, user, currentUserId, isElevated, o
         email: f.email.trim(),
         displayName: f.displayName.trim(),
         agentCode: f.agentCode.trim().toUpperCase(),
+        department: f.department.trim(),
         role: f.role,
         password: f.password,
         active: f.active,
@@ -97,6 +100,17 @@ export default function UserFormModal({ open, user, currentUserId, isElevated, o
             <input className="crm-input" value={f.agentCode ? coordLabel(f.agentCode) : 'بدون کارشناس'} disabled title="این فیلد قابل تغییر نیست" />
           ) : (
             <input className="crm-input" value={f.agentCode} onChange={setInput('agentCode')} placeholder="مثلاً ALI" />
+          )}
+        </div>
+        <div className="crm-field">
+          <label>بخش</label>
+          {fieldsLocked ? (
+            <input className="crm-input" value={f.department || 'بدون بخش'} disabled title="این فیلد قابل تغییر نیست" />
+          ) : (
+            <>
+              <input className="crm-input" list="crm-dept-form" value={f.department} onChange={setInput('department')} maxLength={150} placeholder="مثلاً: فروش" />
+              <datalist id="crm-dept-form">{departments.map((d) => <option key={d} value={d} />)}</datalist>
+            </>
           )}
         </div>
         <div className="crm-field">

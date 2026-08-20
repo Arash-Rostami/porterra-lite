@@ -5,6 +5,6 @@ import { loadBootData } from '@/lib/serverOps.js';
 
 export const GET = handle(async () => {
   const user = await requireUser();
-  const boot = await loadBootData();
+  const boot = await loadBootData(user);
   return NextResponse.json({ ...boot, currentUser: user });
 });

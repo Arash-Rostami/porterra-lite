@@ -1,15 +1,16 @@
 'use client';
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { getFiltered, coordLabel, coordClass, badgeClass, statusBadgeInfo } from '../../lib/filters.js';
 import Utils from '../../lib/utils.js';
-import Dropdown from '../ui/Dropdown.jsx';
 import { PencilIcon, TrashIcon, DownloadIcon, PlusIcon, FlagIcon, ArrowsUpDownIcon } from '../ui/Icon.jsx';
-import { useUiStore } from '../../lib/uiStore.js';
+import { useUiStore, setFilters as setUiFilters } from '../../lib/uiStore.js';
 import { useLeadPrefs, toggleFlag, setManualOrder, getOrderIndex } from '../../lib/leadPrefs.js';
 import { formatDisplayDate } from '../../lib/calendar.js';
 import ImportExportBar from './ImportExportBar.jsx';
+import CompanySuggest from '../ui/CompanySuggest.jsx';
+import Pagination, { paginate } from '../ui/Pagination.jsx';
 
-const PAGE_SIZE_OPTS = ['10', '20', '50', '100'];
 const SORT_COLUMNS = [
   { key: 'coordinator', label: 'کارشناس' },
   { key: 'company', label: 'شرکت' },
@@ -26,12 +27,13 @@ function StatusBadge({ r }) {
   return <span className={`crm-status-badge ${className}`}>{text}</span>;
 }
 
-export default function LeadTable({ records, filters, chartFilter, onEdit, onDelete, onImport, onToggleAdd, addOpen, onExport }) {
+export default function LeadTable({ records, filters, chartFilter, onEdit, onDelete, onImport, onToggleAdd, addOpen, onExport, onSearchChange, title = 'سرنخ‌ها', recordNoun = 'سرنخ', addLabel = 'افزودن سرنخ جدید' }) {
+  const router = useRouter();
   const calendar = useUiStore((u) => u.calendar);
   const { order, flags } = useLeadPrefs();
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
-  const [sort, setSort] = useState(null);
+  const [sort, setSort] = useState({ key: 'date', dir: -1 });
   const [sortMode, setSortMode] = useState(null);
   const [dragId, setDragId] = useState(null);
   const [dragOver, setDragOver] = useState(null);
@@ -49,16 +51,14 @@ export default function LeadTable({ records, filters, chartFilter, onEdit, onDel
     return ranked.concat(unranked);
   }, [records, filters, chartFilter, sort, sortMode, order]);
 
-  const totalPages = Math.max(1, Math.ceil(list.length / perPage));
-  const safePage = Math.min(page, totalPages);
-  const startIdx = (safePage - 1) * perPage;
-  const pageItems = list.slice(startIdx, startIdx + perPage);
+  const { pageItems, totalPages, safePage } = paginate(list, page, perPage);
 
   function toggleSort(key) {
     setSort((s) => (s && s.key === key ? { key, dir: s.dir * -1 } : { key, dir: 1 }));
+    setPage(1);
   }
   function changePerPage(v) {
-    setPerPage(parseInt(v, 10) || 20);
+    setPerPage(v);
     setPage(1);
   }
   function enterManual() {
@@ -117,10 +117,23 @@ export default function LeadTable({ records, filters, chartFilter, onEdit, onDel
   return (
     <div className="crm-section">
       <div className="crm-section-title-row">
-        <div className="crm-section-title">سرنخ‌ها</div>
+        <div className="crm-section-title">{title}</div>
         <div className="crm-result-count" id="crmResultCount">
-          {list.length.toLocaleString('en-US')} نتیجه از {records.length.toLocaleString('en-US')}
+          {list.length === records.length
+            ? `${records.length.toLocaleString('en-US')} ${recordNoun}`
+            : `${list.length.toLocaleString('en-US')} نتیجه از ${records.length.toLocaleString('en-US')}`}
         </div>
+      </div>
+      <div className="crm-toolbar">
+        <CompanySuggest
+          records={records}
+          className="crm-input"
+          id="crmSearch"
+          autoComplete="off"
+          value={filters.q}
+          onChange={(v) => (onSearchChange || setUiFilters)({ ...filters, q: v })}
+          placeholder="جست‌وجو در نام شرکت، مخاطب، تلفن، محصول و یادداشت..."
+        />
         <div className="crm-table-actions">
           <button type="button" className={`crm-manual-toggle${manual ? ' -on' : ''}`}
                   title={manual ? 'پایان ترتیب دستی' : 'ترتیب دستی'} onClick={manual ? exitManual : enterManual}>
@@ -130,7 +143,7 @@ export default function LeadTable({ records, filters, chartFilter, onEdit, onDel
           <span className="crm-header-divider"/>
           <button type="button" className="crm-export-btn" onClick={onExport}><DownloadIcon/>خروجی اکسل</button>
           <button type="button" className="crm-add-btn" onClick={onToggleAdd}>
-            <PlusIcon/>{addOpen ? 'بستن فرم' : 'افزودن سرنخ جدید'}</button>
+            <PlusIcon/>{addOpen ? 'بستن فرم' : addLabel}</button>
         </div>
       </div>
       {manual && <div className="crm-manual-hint">ترتیب دستی فعال — ردیف‌ها را با کشیدن مرتب کنید</div>}
@@ -140,7 +153,10 @@ export default function LeadTable({ records, filters, chartFilter, onEdit, onDel
             <tr>
               {SORT_COLUMNS.map((c) => (
                 <th key={c.key} onClick={manual ? undefined : () => toggleSort(c.key)}>
-                  {c.label}{!manual && sort?.key === c.key ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}
+                  {c.label}
+                  {!manual && (sort?.key === c.key
+                    ? (sort.dir === 1 ? ' ▲' : ' ▼')
+                    : <ArrowsUpDownIcon width={11} height={11} className="crm-sort-hint-icon" />)}
                 </th>
               ))}
               <th></th>
@@ -160,8 +176,15 @@ export default function LeadTable({ records, filters, chartFilter, onEdit, onDel
                 >
                   <td><span className={`crm-coord-tag ${coordClass(r.coordinator)}`}>{r.coordinator ? coordLabel(r.coordinator) : '-'}</span></td>
                   <td>
-                    {r.converted && <span className="crm-lead-badge">سرنخ تبدیل‌شده</span>}
-                    <span className="crm-company-text">{r.company || '-'}</span>
+                    {r.company ? (
+                      <span
+                        className="crm-company-text crm-company-link"
+                        title="مشاهده گزارش این شرکت"
+                        onClick={(e) => { e.stopPropagation(); router.push(`/company-report?company=${encodeURIComponent(r.company)}`); }}
+                      >{r.company}</span>
+                    ) : (
+                      <span className="crm-company-text">-</span>
+                    )}
                   </td>
                   <td className="crm-product-text">{r.product || '-'}</td>
                   <td><span className={`crm-badge ${badgeClass(r.category)}`}>{r.category || 'نامشخص'}</span></td>
@@ -182,17 +205,7 @@ export default function LeadTable({ records, filters, chartFilter, onEdit, onDel
           </tbody>
         </table>
       </div>
-      <div className="crm-pagination-row">
-        <div className="crm-page-size">
-          <span>تعداد نمایش در صفحه:</span>
-          <Dropdown value={String(perPage)} onChange={changePerPage} options={PAGE_SIZE_OPTS} placeholder="20" />
-        </div>
-        <div className="crm-pagination" id="crmPagination">
-          <button className="crm-page-btn" disabled={safePage <= 1} onClick={() => setPage((p) => p - 1)}>قبلی</button>
-          <span className="crm-page-info">صفحه {safePage} از {totalPages}</span>
-          <button className="crm-page-btn" disabled={safePage >= totalPages} onClick={() => setPage((p) => p + 1)}>بعدی</button>
-        </div>
-      </div>
+      <Pagination safePage={safePage} totalPages={totalPages} onPage={setPage} perPage={perPage} onPerPage={changePerPage} />
     </div>
   );
 }

@@ -9,6 +9,9 @@ import { formatDisplayDate } from '../../lib/calendar.js';
 import { useUiStore } from '../../lib/uiStore.js';
 import { toast } from '../ui/Toast.jsx';
 import { CheckIcon, XCircleIcon } from '../ui/Icon.jsx';
+import Pagination, { paginate } from '../ui/Pagination.jsx';
+
+const PER_PAGE = 6;
 
 function quoteDuration(rec) {
   const priceDt = Utils.parseDate(rec.quotePriceDate) || Utils.parseDate(rec.date);
@@ -98,13 +101,37 @@ export default function QuotesPanel({ records, onOpenRecord }) {
   const calendar = useUiStore((u) => u.calendar);
   const [filter, setFilter] = useState('open');
   const [activeId, setActiveId] = useState(null);
+  const [page, setPage] = useState(1);
+  const [q, setQ] = useState('');
+
+  function changeFilter(f) {
+    setFilter(f);
+    setPage(1);
+  }
+  function changeQuery(v) {
+    setQ(v);
+    setPage(1);
+  }
 
   const quotes = useMemo(() => records.filter((r) => r.result === 'در حال استعلام'), [records]);
   const open = useMemo(() => quotes.filter((q) => !q.quoteResult), [quotes]);
   const won = useMemo(() => quotes.filter((q) => q.quoteResult === 'موفق'), [quotes]);
   const lost = useMemo(() => quotes.filter((q) => q.quoteResult === 'ناموفق'), [quotes]);
 
-  const list = useMemo(() => {
+  const companyBadges = useMemo(() => {
+    const seen = new Set();
+    for (const r of quotes) {
+      const name = Utils.normSpace(r.company);
+      if (name) seen.add(name);
+    }
+    return Array.from(seen).sort((a, b) => a.localeCompare(b));
+  }, [quotes]);
+
+  function toggleCompanyBadge(name) {
+    changeQuery(Utils.normSpace(q) === name ? '' : name);
+  }
+
+  const sorted = useMemo(() => {
     const pool = filter === 'open' ? open : filter === 'won' ? won : lost;
     return pool.slice().sort((a, b) => {
       if (!a.quoteResult && b.quoteResult) return -1;
@@ -113,30 +140,57 @@ export default function QuotesPanel({ records, onOpenRecord }) {
     });
   }, [filter, open, won, lost]);
 
+  const list = useMemo(() => {
+    const query = Utils.normSpace(q).toLowerCase();
+    if (!query) return sorted;
+    return sorted.filter((r) => [r.company, r.product, coordLabel(r.coordinator)].some((v) => (v || '').toLowerCase().includes(query)));
+  }, [sorted, q]);
+
   const active = activeId ? records.find((r) => r.id === activeId) : null;
+  const { pageItems, totalPages, safePage } = paginate(list, page, PER_PAGE);
 
   return (
     <>
       <div className="crm-kpis" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-        <div className={`crm-kpi${filter === 'open' ? ' -selected' : ''}`} style={{ cursor: 'pointer' }} onClick={() => setFilter('open')}>
+        <div className={`crm-kpi${filter === 'open' ? ' -selected' : ''}`} style={{ cursor: 'pointer' }} onClick={() => changeFilter('open')}>
           <div className="crm-kpi-label">باز</div>
           <div className="crm-kpi-value">{open.length.toLocaleString('en-US')}</div>
         </div>
-        <div className={`crm-kpi${filter === 'won' ? ' -selected' : ''}`} style={{ cursor: 'pointer' }} onClick={() => setFilter('won')}>
+        <div className={`crm-kpi${filter === 'won' ? ' -selected' : ''}`} style={{ cursor: 'pointer' }} onClick={() => changeFilter('won')}>
           <div className="crm-kpi-label">موفق</div>
           <div className="crm-kpi-value">{won.length.toLocaleString('en-US')}</div>
         </div>
-        <div className={`crm-kpi${filter === 'lost' ? ' -selected' : ''}`} style={{ cursor: 'pointer' }} onClick={() => setFilter('lost')}>
+        <div className={`crm-kpi${filter === 'lost' ? ' -selected' : ''}`} style={{ cursor: 'pointer' }} onClick={() => changeFilter('lost')}>
           <div className="crm-kpi-label">ناموفق</div>
           <div className="crm-kpi-value">{lost.length.toLocaleString('en-US')}</div>
         </div>
       </div>
 
       <div className="crm-section">
-        <div className="crm-section-title">لیست استعلام‌ها <span style={{ color: 'var(--muted)', fontWeight: 400 }}>({list.length.toLocaleString('en-US')})</span></div>
+        <div className="crm-section-title">
+          لیست استعلام‌ها <span style={{ color: 'var(--muted)', fontWeight: 400 }}>
+            ({list.length === sorted.length
+              ? sorted.length.toLocaleString('en-US')
+              : `${list.length.toLocaleString('en-US')} نتیجه از ${sorted.length.toLocaleString('en-US')}`})
+          </span>
+        </div>
+        <div className="crm-toolbar">
+          <input className="crm-input crm-search-input -compact" value={q} onChange={(e) => changeQuery(e.target.value)} placeholder="جست‌وجوی شرکت، محصول یا کارشناس..." />
+        </div>
+        {companyBadges.length > 0 && (
+          <div className="crm-badge-row">
+            {companyBadges.map((name) => (
+              <span
+                key={name}
+                className={`crm-badge -clickable${Utils.normSpace(q) === name ? ' -active' : ''}`}
+                onClick={() => toggleCompanyBadge(name)}
+              >{name}</span>
+            ))}
+          </div>
+        )}
         <div className="crm-history-list" style={{ maxHeight: 'none' }}>
           {!list.length && <div className="crm-feed-empty">استعلامی در این دسته یافت نشد</div>}
-          {list.map((r) => {
+          {pageItems.map((r) => {
             const duration = quoteDuration(r);
             return (
               <div className="crm-history-item" key={r.id} onClick={() => setActiveId(r.id)}>
@@ -152,6 +206,7 @@ export default function QuotesPanel({ records, onOpenRecord }) {
             );
           })}
         </div>
+        <Pagination safePage={safePage} totalPages={totalPages} onPage={setPage} />
       </div>
 
       {active && <QuoteDetailModal rec={active} calendar={calendar} onClose={() => setActiveId(null)} onOpenRecord={onOpenRecord} />}

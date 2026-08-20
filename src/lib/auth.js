@@ -26,6 +26,7 @@ export async function getSessionUser() {
         email: null,
         displayName: payload.displayName,
         agentCode: payload.agentCode ?? null,
+        department: payload.department ?? null,
         role: payload.role,
       };
     }
@@ -47,8 +48,12 @@ export async function requireAdmin() {
 
 export async function requireElevated() {
   const user = await requireUser();
-  if (user.role !== 'admin' && user.role !== 'developer') throw new Error('FORBIDDEN');
+  if (!isElevated(user)) throw new Error('FORBIDDEN');
   return user;
+}
+
+export function isElevated(user) {
+  return user?.role === 'admin' || user?.role === 'developer';
 }
 
 export async function createSession(user) {

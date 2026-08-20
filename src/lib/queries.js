@@ -1,4 +1,5 @@
 import {query, withTransaction} from './db.js';
+import Utils from './utils.js';
 import {
     ACTIVITY_COLS,
     activityToRow,
@@ -24,6 +25,7 @@ import {
 const ph = (n) => Array(n).fill('?').join(',');
 const exec = async (conn, sql, params) => (conn ? (await conn.query(sql, params))[0] : query(sql, params));
 const selectCols = (cols) => cols.map((c) => `\`${c}\``).join(',');
+const CATEGORY_NAME_SUBQUERY = '(SELECT `name` FROM `categories` WHERE `id`=?)';
 
 const LEAD_SET = LEAD_COLS.filter((c) => c !== 'id');
 const REMINDER_SET = REMINDER_COLS.filter((c) => c !== 'id');
@@ -74,18 +76,18 @@ export async function findLeadsByCompany(company, conn) {
 }
 export async function createLead(c, conn) {
     const row = leadToRow(c);
-    const sql = `INSERT INTO \`contacts\` (\`${LEAD_COLS.join('`,`')}\`)
-                 VALUES (${ph(LEAD_COLS.length)})
-                 ON DUPLICATE KEY UPDATE ${LEAD_SET.map((x) => `\`${x}\`=VALUES(\`${x}\`)`).join(',')}`;
-    await exec(conn, sql, LEAD_COLS.map((c2) => row[c2]));
+    const sql = `INSERT INTO \`contacts\` (\`${LEAD_COLS.join('`,`')}\`,\`category\`)
+                 VALUES (${ph(LEAD_COLS.length)}, ${CATEGORY_NAME_SUBQUERY})
+                 ON DUPLICATE KEY UPDATE ${LEAD_SET.map((x) => `\`${x}\`=VALUES(\`${x}\`)`).join(',')},\`category\`=VALUES(\`category\`)`;
+    await exec(conn, sql, [...LEAD_COLS.map((c2) => row[c2]), row.category_id]);
 }
 async function upsertLeads(records, conn) {
-    const onDup = LEAD_SET.map((x) => `\`${x}\`=VALUES(\`${x}\`)`).join(',');
+    const onDup = LEAD_SET.map((x) => `\`${x}\`=VALUES(\`${x}\`)`).join(',') + ',`category`=VALUES(`category`)';
     for (let i = 0; i < records.length; i += 250) {
         const rows = records.slice(i, i + 250).map(leadToRow);
-        const sql = `INSERT INTO \`contacts\` (\`${LEAD_COLS.join('`,`')}\`)
-                     VALUES ` + rows.map((r) => `(${ph(LEAD_COLS.length)})`).join(',') + ` ON DUPLICATE KEY UPDATE ${onDup}`;
-        await exec(conn, sql, rows.flatMap((r) => LEAD_COLS.map((c) => r[c])));
+        const sql = `INSERT INTO \`contacts\` (\`${LEAD_COLS.join('`,`')}\`,\`category\`)
+                     VALUES ` + rows.map(() => `(${ph(LEAD_COLS.length)}, ${CATEGORY_NAME_SUBQUERY})`).join(',') + ` ON DUPLICATE KEY UPDATE ${onDup}`;
+        await exec(conn, sql, rows.flatMap((r) => [...LEAD_COLS.map((c) => r[c]), r.category_id]));
     }
 }
 export async function updateLead(id, patch, conn) {
@@ -95,6 +97,10 @@ export async function updateLead(id, patch, conn) {
         if (patch[k] === undefined) continue;
         sets.push(`\`${col}\`=?`);
         params.push(k === 'converted' ? (patch[k] ? 1 : 0) : (patch[k] === '' ? null : patch[k]));
+    }
+    if (patch.categoryId !== undefined) {
+        sets.push(`\`category\`=${CATEGORY_NAME_SUBQUERY}`);
+        params.push(patch.categoryId);
     }
     if (!sets.length) return;
     params.push(id);
@@ -206,8 +212,8 @@ export async function loadAllFromDb() {
 }
 
 export async function listActiveAgents(conn) {
-    const rows = await exec(conn, 'SELECT `agent_code`,`display_name` FROM `users` WHERE `agent_code` IS NOT NULL AND `active`=1 ORDER BY `display_name`');
-    return (rows || []).map((r) => ({agentCode: r.agent_code, displayName: r.display_name}));
+    const rows = await exec(conn, 'SELECT `agent_code`,`display_name`,`department` FROM `users` WHERE `agent_code` IS NOT NULL AND `active`=1 ORDER BY `display_name`');
+    return (rows || []).map((r) => ({agentCode: r.agent_code, displayName: r.display_name, department: r.department || null}));
 }
 
 export async function listProducts(conn) {
@@ -220,8 +226,9 @@ export async function getProductById(id, conn) {
 }
 export async function createProduct(p, conn) {
     const row = productToRow(p);
-    const sql = `INSERT INTO \`products\` (\`${PRODUCT_COLS.join('`,`')}\`) VALUES (${ph(PRODUCT_COLS.length)})`;
-    await exec(conn, sql, PRODUCT_COLS.map((c) => row[c]));
+    const sql = `INSERT INTO \`products\` (\`${PRODUCT_COLS.join('`,`')}\`,\`category\`)
+                 VALUES (${ph(PRODUCT_COLS.length)}, ${CATEGORY_NAME_SUBQUERY})`;
+    await exec(conn, sql, [...PRODUCT_COLS.map((c) => row[c]), row.category_id]);
 }
 const PRODUCT_UPDATE = [
     {k: 'name', col: 'name'},
@@ -234,6 +241,10 @@ export async function updateProduct(id, patch, conn) {
         if (patch[k] === undefined) continue;
         sets.push(`\`${col}\`=?`);
         params.push(patch[k]);
+    }
+    if (patch.categoryId !== undefined) {
+        sets.push(`\`category\`=${CATEGORY_NAME_SUBQUERY}`);
+        params.push(patch.categoryId);
     }
     if (!sets.length) return;
     params.push(id);
@@ -269,8 +280,14 @@ export async function updateCategory(id, patch, conn) {
         params.push(k === 'isCustom' ? (patch[k] ? 1 : 0) : patch[k]);
     }
     if (!sets.length) return;
-    params.push(id);
-    await exec(conn, `UPDATE \`categories\` SET ${sets.join(',')} WHERE \`id\`=?`, params);
+    const run = async (c) => {
+        await exec(c, `UPDATE \`categories\` SET ${sets.join(',')} WHERE \`id\`=?`, [...params, id]);
+        if (patch.name !== undefined) {
+            await exec(c, 'UPDATE `contacts` SET `category`=? WHERE `category_id`=?', [patch.name, id]);
+            await exec(c, 'UPDATE `products` SET `category`=? WHERE `category_id`=?', [patch.name, id]);
+        }
+    };
+    return conn ? run(conn) : withTransaction(run);
 }
 export async function deleteCategory(id, conn) {
     await exec(conn, 'DELETE FROM `categories` WHERE `id`=?', [id]);
@@ -329,6 +346,7 @@ const USER_UPDATE = [
     {k: 'displayName', col: 'display_name'},
     {k: 'email', col: 'email'},
     {k: 'agentCode', col: 'agent_code'},
+    {k: 'department', col: 'department'},
     {k: 'role', col: 'role'},
     {k: 'passwordCipher', col: 'password_cipher'},
     {k: 'active', col: 'active'},
@@ -344,6 +362,22 @@ export async function updateUser(id, patch, conn) {
     if (!sets.length) return;
     params.push(id);
     await exec(conn, `UPDATE \`users\` SET ${sets.join(',')} WHERE \`id\`=?`, params);
+}
+export async function listDepartmentNames(conn) {
+    const rows = await exec(conn, 'SELECT DISTINCT `department` FROM `users` WHERE `department` IS NOT NULL ORDER BY `department`');
+    return (rows || []).map((r) => r.department);
+}
+export async function findDepartmentByNormalizedName(name, conn) {
+    if (!name) return null;
+    const rows = await exec(conn, 'SELECT DISTINCT `department` FROM `users` WHERE `department` IS NOT NULL');
+    const norm = Utils.normSpace(name).toLowerCase();
+    const match = (rows || []).find((r) => Utils.normSpace(r.department).toLowerCase() === norm);
+    return match ? match.department : null;
+}
+export async function listAgentCodesByDepartment(department, conn) {
+    if (!department) return [];
+    const rows = await exec(conn, 'SELECT `agent_code` FROM `users` WHERE `department`=? AND `agent_code` IS NOT NULL', [department]);
+    return (rows || []).map((r) => r.agent_code);
 }
 export async function deleteUser(id, conn) {
     await exec(conn, 'DELETE FROM `users` WHERE `id`=?', [id]);

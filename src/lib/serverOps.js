@@ -6,6 +6,7 @@ import {
   findUserByEmail,
   createUser,
   updateUserLastLogin,
+  listAgentCodesByDepartment,
 } from './queries.js';
 import {mkdir, readdir, readFile, rename, unlink, writeFile} from 'fs/promises';
 import path from 'path';
@@ -13,6 +14,37 @@ import { SEED_DATA } from '../data/seed.js';
 import { parseOrThrow, LeadCreate, LoginInput } from './models.js';
 import { encryptString, decryptString } from './crypto.js';
 import { rowToUser } from './mappers.js';
+import { isElevated } from './auth.js';
+import Utils from './utils.js';
+
+export async function resolveScope(user) {
+    if (isElevated(user)) return { type: 'all' };
+    if (user.role === 'manager') {
+        if (!user.department) return { type: 'department', agentCodes: [] };
+        try {
+            const agentCodes = await listAgentCodesByDepartment(user.department);
+            return { type: 'department', agentCodes };
+        } catch {
+            return { type: 'department', agentCodes: [] };
+        }
+    }
+    return { type: 'own', agentCode: user.agentCode || null };
+}
+
+function scopeBootData(data, scope) {
+    if (!scope || scope.type === 'all') return data;
+    const matchAgent = scope.type === 'own'
+        ? (code) => code === scope.agentCode
+        : (code) => scope.agentCodes.includes(code);
+    const records = data.records.filter((r) => matchAgent(r.coordinator));
+    const reminders = data.reminders.filter((rm) => matchAgent(rm.forAgent));
+    const companyKeys = new Set(records.map((r) => Utils.normSpace(r.company).toLowerCase()).filter(Boolean));
+    const companyMeta = {};
+    for (const key of Object.keys(data.companyMeta || {})) {
+        if (companyKeys.has(key)) companyMeta[key] = data.companyMeta[key];
+    }
+    return { ...data, records, reminders, companyMeta };
+}
 
 const OFFLINE_DIR = path.join(process.cwd(), '.porterra');
 const QUEUE_FILE = path.join(OFFLINE_DIR, 'queue.json');
@@ -86,19 +118,21 @@ export async function tryOp(op, payload) {
   }
 }
 
-export async function loadBootData() {
+export async function loadBootData(user) {
+  const scope = await resolveScope(user);
   let data;
   try {
     data = await loadAllFromDb();
   } catch {
     const snap = await readSnapshot();
-    return { data: snap || { records: [], companyMeta: {}, reminders: [], products: [], agents: [], categories: [] }, offline: true, queueCount: await getQueueCount() };
+    const fallback = snap || { records: [], companyMeta: {}, reminders: [], products: [], agents: [], categories: [] };
+    return { data: scopeBootData(fallback, scope), offline: true, queueCount: await getQueueCount() };
   }
   await writeSnapshot(data).catch(() => {});
-  return { data, offline: false, queueCount: await getQueueCount() };
+  return { data: scopeBootData(data, scope), offline: false, queueCount: await getQueueCount() };
 }
 
-export async function syncData() {
+export async function syncData(user) {
   const queue = await readQueue();
   try {
     if (queue.length > 0) {
@@ -109,7 +143,8 @@ export async function syncData() {
     const data = await loadAllFromDb();
     await writeSnapshot(data);
     if (queue.length > 0) await clearQueue();
-    return { data, synced: queue.length, remaining: 0 };
+    const scope = await resolveScope(user);
+    return { data: scopeBootData(data, scope), synced: queue.length, remaining: 0 };
   } catch (err) {
     return { error: 'sync-failed', message: err && err.message ? err.message : 'sync failed', remaining: await getQueueCount() };
   }

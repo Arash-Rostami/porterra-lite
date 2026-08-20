@@ -1,22 +1,35 @@
 import { NextResponse } from 'next/server';
 import { handle } from '@/lib/apiHandler.js';
-import { requireUser } from '@/lib/auth.js';
-import { tryOp } from '@/lib/serverOps.js';
+import { requireUser, isElevated } from '@/lib/auth.js';
+import { tryOp, resolveScope } from '@/lib/serverOps.js';
+import { getLeadById } from '@/lib/queries.js';
 import { parseOrThrow, LeadUpdate, Activity, Id } from '@/lib/models.js';
 
+async function checkLeadScope(user, existingLead, nextCoordinator) {
+  if (isElevated(user)) return;
+  const scope = await resolveScope(user);
+  const covers = (code) => (scope.type === 'own' ? code === scope.agentCode : scope.agentCodes.includes(code));
+  if (existingLead && !covers(existingLead.coordinator)) throw new Error('FORBIDDEN');
+  if (nextCoordinator !== undefined && !covers(nextCoordinator)) throw new Error('FORBIDDEN');
+}
+
 export const PATCH = handle(async (req, ctx) => {
-  await requireUser();
+  const user = await requireUser();
   const { id: rawId } = await ctx.params;
   const id = parseOrThrow(Id, rawId);
   const body = await req.json();
   const patch = parseOrThrow(LeadUpdate, body.patch);
+  const existing = await getLeadById(id);
+  await checkLeadScope(user, existing, patch.coordinator);
   return NextResponse.json(await tryOp('updateLead', { id, patch }));
 });
 
 export const DELETE = handle(async (req, ctx) => {
-  await requireUser();
+  const user = await requireUser();
   const { id: rawId } = await ctx.params;
   const id = parseOrThrow(Id, rawId);
+  const existing = await getLeadById(id);
+  await checkLeadScope(user, existing, undefined);
   const body = await req.json().catch(() => ({}));
   const changeLogEntry = body.changeLogEntry
     ? parseOrThrow(Activity, { ...body.changeLogEntry, type: 'change' })

@@ -160,7 +160,7 @@ export const ReminderUpdate = z.object({
     done: boolField.optional(),
 });
 
-export const UserRole = z.enum(['admin', 'agent', 'developer']);
+export const UserRole = z.enum(['admin', 'agent', 'developer', 'manager']);
 
 export const User = z.object({
     id: reqStr(40),
@@ -168,6 +168,7 @@ export const User = z.object({
     email: optStr(255),
     displayName: optStr(255),
     agentCode: optStr(32),
+    department: optStr(150),
     role: UserRole,
     active: boolField.default(true),
     lastLogin: z.preprocess(emptyToNull, z.number().int().nullable()).optional(),
@@ -180,6 +181,7 @@ export const UserCreate = z.object({
     email: optStr(255),
     displayName: optStr(255),
     agentCode: optStr(32),
+    department: optStr(150),
     role: UserRole.default('agent'),
     password: reqStr(256),
     active: boolField.default(true),
@@ -189,6 +191,7 @@ export const UserUpdate = z.object({
     displayName: optStr(255).optional(),
     email: optStr(255).optional(),
     agentCode: optStr(32).optional(),
+    department: optStr(150).optional(),
     role: UserRole.optional(),
     active: boolField.optional(),
     password: optStr(256).optional(),

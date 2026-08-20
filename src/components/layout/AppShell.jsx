@@ -53,7 +53,7 @@ export default function AppShell({ children }) {
             حالت آفلاین — {queueCount.toLocaleString('en-US')} تغییر در صف محلی — به‌محض برقراری اتصال، خودکار همگام‌سازی می‌شود
           </div>
         )}
-        <Header recordCount={records.length} dark={dark} onToggleTheme={toggleTheme} />
+        <Header leadCount={records.filter((r) => !r.converted).length} customerCount={records.filter((r) => r.converted).length} dark={dark} onToggleTheme={toggleTheme} />
         {loaded && children}
         {loaded && <Footer />}
       </div>

@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server';
 import { handle } from '@/lib/apiHandler.js';
-import { requireUser, requireElevated } from '@/lib/auth.js';
+import { requireUser, requireElevated, isElevated } from '@/lib/auth.js';
 import { parseOrThrow, UserUpdate, Id } from '@/lib/models.js';
-import { findUserByEmail, updateUser, deleteUser } from '@/lib/queries.js';
+import { findUserByEmail, updateUser, deleteUser, findDepartmentByNormalizedName } from '@/lib/queries.js';
 import { encryptString } from '@/lib/crypto.js';
 
 export const PATCH = handle(async (req, ctx) => {
   const actor = await requireUser();
   const { id: rawId } = await ctx.params;
   const targetId = parseOrThrow(Id, rawId);
-  const elevated = actor.role === 'admin' || actor.role === 'developer';
+  const elevated = isElevated(actor);
   const isSelf = actor.id === targetId;
   if (!elevated && !isSelf) throw new Error('FORBIDDEN');
 
@@ -23,10 +23,15 @@ export const PATCH = handle(async (req, ctx) => {
     const existing = await findUserByEmail(u.email);
     if (existing && existing.id !== targetId) throw new Error('VALIDATION: این ایمیل قبلاً ثبت شده');
   }
+  if (u.department) {
+    const canonical = await findDepartmentByNormalizedName(u.department);
+    u.department = canonical || u.department;
+  }
   const queryPatch = {};
   if (u.displayName !== undefined) queryPatch.displayName = u.displayName;
   if (u.email !== undefined) queryPatch.email = u.email;
   if (u.agentCode !== undefined) queryPatch.agentCode = u.agentCode;
+  if (u.department !== undefined) queryPatch.department = u.department;
   if (u.role !== undefined) queryPatch.role = u.role;
   if (u.active !== undefined) queryPatch.active = u.active;
   if (u.password) queryPatch.passwordCipher = encryptString(u.password);

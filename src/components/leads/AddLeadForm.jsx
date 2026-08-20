@@ -6,7 +6,7 @@ import DateField from '../ui/DateField.jsx';
 import ProductField from './ProductField.jsx';
 import Utils from '../../lib/utils.js';
 import { findDuplicateCompany, findDuplicatePhone } from '../../lib/duplicates.js';
-import { coordOptions, RESULT_OPTS, PRIORITY_OPTS, sourceSuggestions } from '../../lib/filters.js';
+import { scopedCoordOptions, coordLabel, RESULT_OPTS, PRIORITY_OPTS, sourceSuggestions } from '../../lib/filters.js';
 import { findLeadByCompany } from '../../lib/apiClient.js';
 import { useStore } from '../../lib/store.js';
 import { toast } from '../ui/Toast.jsx';
@@ -17,6 +17,7 @@ const empty = { coordinator: '', company: '', name: '', phone: '', product: '', 
 // create and edit share the same <Modal> chrome for UI consistency
 export default function AddLeadForm({ open, records, defaultCoordinator, onSubmit, onCancel }) {
   const [f, setF] = useState(empty);
+  const currentUser = useStore((s) => s.currentUser);
   const categories = useStore((s) => s.categories);
   const categoryOptions = useMemo(() => categories.map((c) => ({ value: c.id, label: c.name })), [categories]);
   const sourceOpts = useMemo(() => sourceSuggestions(records), [records]);
@@ -98,7 +99,11 @@ export default function AddLeadForm({ open, records, defaultCoordinator, onSubmi
       <div className="crm-form-grid">
         <div className="crm-field">
           <label>کارشناس *</label>
-          <Dropdown value={f.coordinator} onChange={set('coordinator')} options={coordOptions()} placeholder="انتخاب کنید" />
+          {currentUser?.role === 'agent' ? (
+            <input className="crm-input" value={coordLabel(f.coordinator)} disabled title="این فیلد قابل تغییر نیست" />
+          ) : (
+            <Dropdown value={f.coordinator} onChange={set('coordinator')} options={scopedCoordOptions(currentUser)} placeholder="انتخاب کنید" />
+          )}
         </div>
         <div className="crm-field -span2">
           <label>نام شرکت *</label>

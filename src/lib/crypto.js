@@ -51,6 +51,7 @@ export function createSessionToken(user) {
       username: user.username,
       displayName: user.displayName,
       agentCode: user.agentCode ?? null,
+      department: user.department ?? null,
       role: user.role,
       expiresAt,
     })),

@@ -1,9 +1,10 @@
 'use client';
 import { useState } from 'react';
 import Dropdown from '../ui/Dropdown.jsx';
-import { filterAgentSuggestions, sortSuggestions, suggestionCategoryOptions, suggestionProductOptions, exportSuggestionsToExcel, SUGGESTION_SORT_MODES } from '../../lib/suggestions.js';
+import { filterAgentSuggestions, sortSuggestions, exportSuggestionsToExcel, SUGGESTION_SORT_MODES } from '../../lib/suggestions.js';
 import { agentColor } from '../../lib/analytics.js';
 import { coordLabel } from '../../lib/filters.js';
+import { useStore } from '../../lib/store.js';
 import { toast } from '../ui/Toast.jsx';
 import PhoneLink from '../ui/PhoneLink.jsx';
 import { DownloadIcon, TrashIcon, InfoIcon } from '../ui/Icon.jsx';
@@ -12,14 +13,12 @@ const priorityClass = (p) => (p === 'بالا' ? '-high' : p === 'متوسط' ? 
 const emptyAgentFilter = { category: '', product: '', search: '' };
 const PAGE_SIZE_OPTS = ['6', '10', '20', '50'];
 
-function AgentCard({ agent, pool, sortMode, onOpenProfile }) {
+function AgentCard({ agent, pool, sortMode, categoryOpts, productOpts, onOpenProfile }) {
   const [f, setF] = useState(emptyAgentFilter);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(6);
   const { filtered } = filterAgentSuggestions(pool, f);
   const sorted = sortSuggestions(filtered, sortMode);
-  const cats = suggestionCategoryOptions(pool);
-  const prods = suggestionProductOptions(pool);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / perPage));
   const safePage = Math.min(page, totalPages);
@@ -48,8 +47,8 @@ function AgentCard({ agent, pool, sortMode, onOpenProfile }) {
         <input className="crm-input" autoComplete="off" value={f.search} onChange={(e) => setFilter({ ...f, search: e.target.value })} placeholder="جست‌وجو در پیشنهادهای این کارشناس..." />
       </div>
       <div className="crm-suggest-card-filter">
-        <Dropdown value={f.category} onChange={(v) => setFilter({ ...f, category: v })} options={cats} placeholder="همه دسته‌ها" />
-        <Dropdown value={f.product} onChange={(v) => setFilter({ ...f, product: v })} options={prods} placeholder="همه محصولات" />
+        <Dropdown value={f.category} onChange={(v) => setFilter({ ...f, category: v })} options={categoryOpts} placeholder="همه دسته‌ها" />
+        <Dropdown value={f.product} onChange={(v) => setFilter({ ...f, product: v })} options={productOpts} placeholder="همه محصولات" />
         <button type="button" className="crm-suggest-clear-mini" title="پاک کردن" aria-label="پاک کردن" onClick={() => setFilter(emptyAgentFilter)}><TrashIcon /></button>
       </div>
       <div className="crm-suggest-list">
@@ -90,6 +89,10 @@ function AgentCard({ agent, pool, sortMode, onOpenProfile }) {
 
 export default function SuggestionsPanel({ byAgent, onOpenProfile }) {
   const agents = Object.keys(byAgent).sort((a, b) => byAgent[b].length - byAgent[a].length);
+  const categories = useStore((s) => s.categories);
+  const products = useStore((s) => s.products);
+  const categoryOpts = categories.map((c) => c.name).sort((a, b) => a.localeCompare(b));
+  const productOpts = products.map((p) => p.name).sort((a, b) => a.localeCompare(b));
   const [sortMode, setSortMode] = useState('smart');
   const [legendOpen, setLegendOpen] = useState(false);
 
@@ -125,7 +128,7 @@ export default function SuggestionsPanel({ byAgent, onOpenProfile }) {
         <div className="crm-suggest-empty">فعلاً پیشنهاد تماسی نیست — همه پیگیری‌ها به‌روزن 🎉</div>
       ) : (
         <div className="crm-suggest-grid">
-          {agents.map((agent) => <AgentCard key={agent} agent={agent} pool={byAgent[agent]} sortMode={sortMode} onOpenProfile={onOpenProfile} />)}
+          {agents.map((agent) => <AgentCard key={agent} agent={agent} pool={byAgent[agent]} sortMode={sortMode} categoryOpts={categoryOpts} productOpts={productOpts} onOpenProfile={onOpenProfile} />)}
         </div>
       )}
     </div>

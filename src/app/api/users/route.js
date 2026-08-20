@@ -8,6 +8,7 @@ import {
   createUser,
   findUserByUsername,
   findUserByEmail,
+  findDepartmentByNormalizedName,
 } from '@/lib/queries.js';
 import { encryptString, decryptString } from '@/lib/crypto.js';
 import { rowToUser } from '@/lib/mappers.js';
@@ -18,14 +19,20 @@ export const GET = handle(async (req) => {
     const rows = await listUsersRaw();
     return NextResponse.json({ users: rows.map((r) => ({ ...rowToUser(r), password: decryptString(r.password_cipher) })) });
   }
-  await requireUser();
-  return NextResponse.json({ users: await listUsers() });
+  const actor = await requireUser();
+  const all = await listUsers();
+  const users = actor.role === 'manager' ? all.filter((u) => u.department === actor.department) : all;
+  return NextResponse.json({ users });
 });
 
 export const POST = handle(async (req) => {
   await requireElevated();
   const body = await req.json();
   const u = parseOrThrow(UserCreate, body);
+  if (u.department) {
+    const canonical = await findDepartmentByNormalizedName(u.department);
+    u.department = canonical || u.department;
+  }
   if (await findUserByUsername(u.username)) throw new Error('VALIDATION: username already exists');
   if (u.email && (await findUserByEmail(u.email))) throw new Error('VALIDATION: email already exists');
   const row = {
@@ -34,6 +41,7 @@ export const POST = handle(async (req) => {
     email: u.email ?? null,
     display_name: u.displayName,
     agent_code: u.agentCode,
+    department: u.department ?? null,
     password_cipher: encryptString(u.password),
     role: u.role,
     active: u.active ? 1 : 0,

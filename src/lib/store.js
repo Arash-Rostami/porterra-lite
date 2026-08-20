@@ -3,7 +3,6 @@ import {useSyncExternalStore, useMemo} from 'react';
 import Utils from './utils.js';
 import {SEED_DATA} from '../data/seed.js';
 import {toast, toastShownRecently} from '../components/ui/Toast.jsx';
-import {initScopeForUser, useUiStore} from './uiStore.js';
 import {setAgentDirectory} from './filters.js';
 import {initLeadPrefsForUser, resetLeadPrefs} from './leadPrefs.js';
 import {
@@ -115,7 +114,6 @@ export async function loadAll() {
         state.queueCount = res.queueCount || 0;
         state.loaded = true;
         if (state.currentUser) {
-            initScopeForUser(state.currentUser.username);
             initLeadPrefsForUser(state.currentUser.username);
         }
         emit();
@@ -425,11 +423,12 @@ export function useStore(selector) {
 export function getDueReminders(reminders) {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
+    const parseDue = (rm) => Utils.parseDate(Utils.fromISODate(rm.dueDate));
     return reminders.filter((rm) => {
         if (rm.done) return false;
-        const dt = Utils.parseDate(rm.dueDate);
+        const dt = parseDue(rm);
         return dt && dt <= now;
-    }).sort((a, b) => Utils.parseDate(a.dueDate) - Utils.parseDate(b.dueDate));
+    }).sort((a, b) => parseDue(a) - parseDue(b));
 }
 
 export function markReminderDone(id) {
@@ -488,12 +487,11 @@ export function useScopedData() {
     const reminders = useStore((s) => s.reminders);
     const companyMeta = useStore((s) => s.companyMeta);
     const currentUser = useStore((s) => s.currentUser);
-    const scope = useUiStore((u) => u.scope);
 
     return useMemo(() => {
-        const agentCode = currentUser?.agentCode || null;
-        if (scope !== 'mine' || !agentCode) {
-            return {records, reminders, companyMeta, scope, currentUser};
+        const agentCode = currentUser?.role === 'agent' ? (currentUser?.agentCode || null) : null;
+        if (!agentCode) {
+            return {records, reminders, companyMeta, currentUser};
         }
         const scopedRecords = records.filter((r) => r.coordinator === agentCode);
         const scopedReminders = reminders.filter((rm) => rm.forAgent === agentCode);
@@ -502,6 +500,6 @@ export function useScopedData() {
             const k = custKey(r.company);
             if (companyMeta[k] && !scopedMeta[k]) scopedMeta[k] = companyMeta[k];
         }
-        return {records: scopedRecords, reminders: scopedReminders, companyMeta: scopedMeta, scope, currentUser};
-    }, [records, reminders, companyMeta, currentUser, scope]);
+        return {records: scopedRecords, reminders: scopedReminders, companyMeta: scopedMeta, currentUser};
+    }, [records, reminders, companyMeta, currentUser]);
 }

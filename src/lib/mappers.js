@@ -167,6 +167,7 @@ export function rowToUser(row) {
     email: row.email ?? null,
     displayName: row.display_name,
     agentCode: row.agent_code,
+    department: row.department ?? null,
     role: row.role,
     active: Boolean(row.active),
     lastLogin: row.last_login == null ? null : Number(row.last_login),
@@ -180,7 +181,7 @@ export const LEAD_COLS = [
 ];
 export const REMINDER_COLS = ['id', 'cust_key', 'company', 'due_date', 'due_time', 'for_agent', 'text', 'created_at', 'done'];
 export const ACTIVITY_COLS = ['id', 'company_key', 'type', 'ts', 'author', 'text'];
-export const USER_COLS = ['id', 'username', 'email', 'display_name', 'agent_code', 'password_cipher', 'role', 'active', 'last_login', 'created_at'];
-export const USER_SAFE_COLS = ['id', 'username', 'email', 'display_name', 'agent_code', 'role', 'active', 'last_login', 'created_at'];
+export const USER_COLS = ['id', 'username', 'email', 'display_name', 'agent_code', 'department', 'password_cipher', 'role', 'active', 'last_login', 'created_at'];
+export const USER_SAFE_COLS = ['id', 'username', 'email', 'display_name', 'agent_code', 'department', 'role', 'active', 'last_login', 'created_at'];
 export const PRODUCT_COLS = ['id', 'name', 'category_id', 'is_custom', 'created_at'];
 export const CATEGORY_COLS = ['id', 'name', 'is_custom', 'created_at'];

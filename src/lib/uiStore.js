@@ -25,10 +25,9 @@ let ui = {
   agentProfile: null,
   addFormOpen: false,
   chartFilter: null,
-  filters: { q: '', coordinator: '', category: '', source: '', status: '', dateFrom: '', dateTo: '', showDeactivated: false },
+  filters: { q: '', coordinator: '', category: '', source: '', product: '', status: '', dateFrom: '', dateTo: '' },
   calendar: 'gregorian',
   fontScale: FONT_SCALE_DEFAULT,
-  scope: 'mine',
 };
 const SERVER_UI = { ...ui };
 const listeners = new Set();
@@ -40,9 +39,6 @@ function hydrateUi() {
   uiHydrated = true;
   ui = { ...ui, calendar: readCalendarPref(), fontScale: readFontScalePref() };
 }
-
-const SCOPE_KEY = (username) => `crm_scope_${username}`;
-let scopeUser = null;
 
 export function useUiStore(selector) {
   return useSyncExternalStore(
@@ -60,21 +56,6 @@ export function setAddFormOpen(open) { ui = { ...ui, addFormOpen: open }; emit()
 export function setFilters(filters) { ui = { ...ui, filters }; emit(); }
 export function setChartFilter(chartFilter) { ui = { ...ui, chartFilter }; emit(); }
 export function clearChartFilter() { ui = { ...ui, chartFilter: null }; emit(); }
-export function initScopeForUser(username) {
-  scopeUser = username;
-  let s = 'mine';
-  try {
-    const v = localStorage.getItem(SCOPE_KEY(username));
-    if (v === 'mine' || v === 'all') s = v;
-  } catch {}
-  ui = { ...ui, scope: s };
-  emit();
-}
-export function setScope(scope) {
-  if (scopeUser) { try { localStorage.setItem(SCOPE_KEY(scopeUser), scope); } catch {} }
-  ui = { ...ui, scope };
-  emit();
-}
 export function toggleCalendar() {
   const next = ui.calendar === 'jalali' ? 'gregorian' : 'jalali';
   try { localStorage.setItem(CALENDAR_KEY, next); } catch {}
@@ -94,29 +75,29 @@ export function decreaseFontScale() { setFontScale(ui.fontScale - 0.05); }
 // a chart drill-down owns exactly one filter dimension — each must clear the others or a stale filter silently ANDs with the new one and zeros the result set
 export function applyCategoryFilter(category) {
   setChartFilter(null);
-  setFilters({ ...ui.filters, coordinator: '', category, source: '', dateFrom: '', dateTo: '' });
+  setFilters({ ...ui.filters, coordinator: '', category, source: '', product: '', dateFrom: '', dateTo: '' });
 }
 export function applySourceFilter(source, top) {
   if (source === 'سایر') {
     const topSet = new Set(top.filter((t) => t[0] !== 'سایر').map((t) => t[0]));
     setChartFilter({ type: 'otherSource', label: `منبع سرنخ: سایر منابع (غیر از ${topSet.size} مورد پرتکرار)`, topSet });
-    setFilters({ ...ui.filters, coordinator: '', category: '', source: '', dateFrom: '', dateTo: '' });
+    setFilters({ ...ui.filters, coordinator: '', category: '', source: '', product: '', dateFrom: '', dateTo: '' });
   } else {
     setChartFilter(null);
-    setFilters({ ...ui.filters, coordinator: '', category: '', source, dateFrom: '', dateTo: '' });
+    setFilters({ ...ui.filters, coordinator: '', category: '', source, product: '', dateFrom: '', dateTo: '' });
   }
 }
 export function applyMonthFilter(dateFrom, dateTo, label) {
   setChartFilter({ type: 'month', dateFrom, dateTo, label: `ماه: ${label}` });
-  setFilters({ ...ui.filters, coordinator: '', category: '', source: '', dateFrom: '', dateTo: '' });
+  setFilters({ ...ui.filters, coordinator: '', category: '', source: '', product: '', dateFrom: '', dateTo: '' });
 }
 export function applyDayFilter(date, agent, label) {
   setChartFilter({ type: 'day', date, agent, label });
-  setFilters({ ...ui.filters, coordinator: '', category: '', source: '', dateFrom: '', dateTo: '' });
+  setFilters({ ...ui.filters, coordinator: '', category: '', source: '', product: '', dateFrom: '', dateTo: '' });
 }
 export function applyKpiFilter(key, label) {
   setChartFilter({ type: 'kpi', key, label });
-  setFilters({ ...ui.filters, coordinator: '', category: '', source: '', status: '', dateFrom: '', dateTo: '', showDeactivated: true });
+  setFilters({ ...ui.filters, coordinator: '', category: '', source: '', product: '', status: '', dateFrom: '', dateTo: '' });
 }
 export function setCoordinatorFilter(coordinator) {
   setFilters({ ...ui.filters, coordinator });

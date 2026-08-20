@@ -176,11 +176,6 @@ These are new surfaces with no BMS-CM ancestor; they follow the same token/tier 
 - **Header greeting chip** (`.crm-header-greeting`): a brand-gradient pill showing
   «سلام، {displayName} 👋» at the start of the subtitle row, left of the records-count chip.
   Brand gradient only — no card tier (it's inline text, not a surface).
-- **Scope toggle** (`.crm-scope-toggle` + `.crm-scope-btn`, in `UserMenu.jsx`): a segmented
-  «اطلاعات من / همه» control shown only to users with an `agentCode` (admins are always
-  all-data, so the toggle is hidden for them). Active segment uses `--accent`; inactive uses
-  `--surface`/`--line` — same control styling as `.crm-theme-toggle`, pill-shaped (the round
-  exception, not `8px`).
 - **Header divider** (`.crm-header-divider`): a 1px vertical `--line` rule that separates the
   logout button from the rest of the header action cluster. Only exists because logout is
   icon-only (see below) and would otherwise read as just another control.

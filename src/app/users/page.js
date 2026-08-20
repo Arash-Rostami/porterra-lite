@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '../../lib/store.js';
-import { listUsersAction, createUserAction, updateUserAction, setUserActiveAction, deleteUserAction } from '../../lib/apiClient.js';
+import { listUsersAction, createUserAction, updateUserAction, setUserActiveAction, deleteUserAction, listDepartmentsAction } from '../../lib/apiClient.js';
 import UsersPanel from '../../components/users/UsersPanel.jsx';
 import UserFormModal from '../../components/users/UserFormModal.jsx';
 import { toast } from '../../components/ui/Toast.jsx';
@@ -20,9 +20,18 @@ export default function UsersPage() {
   const currentUser = useStore((s) => s.currentUser);
   const isElevated = currentUser?.role === 'admin' || currentUser?.role === 'developer';
   const [users, setUsers] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+
+  const loadDepartments = useCallback(async () => {
+    try {
+      const res = await listDepartmentsAction();
+      setDepartments(res.departments || []);
+    } catch {
+    }
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -36,7 +45,7 @@ export default function UsersPage() {
     }
   }, [router]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); loadDepartments(); }, [load, loadDepartments]);
 
   async function handleCreate(input) {
     try {
@@ -44,6 +53,7 @@ export default function UsersPage() {
       toast('کاربر جدید ثبت شد');
       setModalOpen(false);
       load();
+      loadDepartments();
     } catch (err) {
       if (isUnauthorized(err)) { router.push('/login'); return; }
       toast(cleanErr(err, 'ثبت ناموفق بود'));
@@ -56,6 +66,7 @@ export default function UsersPage() {
       toast('کاربر به‌روز شد');
       setModalOpen(false);
       load();
+      loadDepartments();
     } catch (err) {
       if (isUnauthorized(err)) { router.push('/login'); return; }
       toast(cleanErr(err, 'به‌روزرسانی ناموفق بود'));
@@ -105,6 +116,7 @@ export default function UsersPage() {
         user={editing}
         currentUserId={currentUser?.id}
         isElevated={isElevated}
+        departments={departments}
         onSubmit={(payload) => (editing ? handleUpdate(editing.id, payload) : handleCreate(payload))}
         onCancel={() => setModalOpen(false)}
       />

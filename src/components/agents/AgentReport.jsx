@@ -1,9 +1,14 @@
 'use client';
+import { useMemo, useState } from 'react';
 import { computeAgentReport, exportAgentReportToExcel, agentColor } from '../../lib/analytics.js';
 import { coordLabel } from '../../lib/filters.js';
+import Utils from '../../lib/utils.js';
 import RingChart from '../ui/RingChart.jsx';
 import { toast } from '../ui/Toast.jsx';
 import { DownloadIcon } from '../ui/Icon.jsx';
+import Pagination, { paginate } from '../ui/Pagination.jsx';
+
+const PER_PAGE = 6;
 
 function Bar({ val, total, color }) {
   const pct = total ? Math.max(Math.round((val / total) * 100), val > 0 ? 4 : 0) : 0;
@@ -31,7 +36,20 @@ function AgentReportCard({ d }) {
 }
 
 export default function AgentReport({ records }) {
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
   const data = computeAgentReport(records);
+  const filtered = useMemo(() => {
+    const query = Utils.normSpace(q).toLowerCase();
+    if (!query) return data;
+    return data.filter((d) => coordLabel(d.agent).toLowerCase().includes(query));
+  }, [data, q]);
+  const { pageItems, totalPages, safePage } = paginate(filtered, page, PER_PAGE);
+
+  function changeQuery(v) {
+    setQ(v);
+    setPage(1);
+  }
 
   async function handleExport() {
     const ok = await exportAgentReportToExcel(data);
@@ -40,13 +58,24 @@ export default function AgentReport({ records }) {
 
   return (
     <div className="crm-section">
-      <div className="crm-section-title-row crm-agent-report-head-row">
+      <div className="crm-section-title-row">
         <div className="crm-section-title">گزارش عملکرد کارشناسان</div>
-        <button type="button" className="crm-export-btn" onClick={handleExport}><DownloadIcon />خروجی اکسل</button>
+        <span className="crm-result-count">
+          {filtered.length === data.length
+            ? `${data.length.toLocaleString('en-US')} کارشناس`
+            : `${filtered.length.toLocaleString('en-US')} نتیجه از ${data.length.toLocaleString('en-US')}`}
+        </span>
+      </div>
+      <div className="crm-toolbar">
+        <input className="crm-input crm-search-input -compact" value={q} onChange={(e) => changeQuery(e.target.value)} placeholder="جست‌وجوی کارشناس..." />
+        <div className="crm-table-actions">
+          <button type="button" className="crm-export-btn" onClick={handleExport}><DownloadIcon />خروجی اکسل</button>
+        </div>
       </div>
       <div className="crm-agent-report-grid" id="crmAgentReport">
-        {!data.length ? <div className="crm-empty">داده‌ای نیست</div> : data.map((d) => <AgentReportCard key={d.agent} d={d} />)}
+        {!filtered.length ? <div className="crm-empty">داده‌ای نیست</div> : pageItems.map((d) => <AgentReportCard key={d.agent} d={d} />)}
       </div>
+      <Pagination safePage={safePage} totalPages={totalPages} onPage={setPage} />
     </div>
   );
 }

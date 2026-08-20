@@ -5,13 +5,14 @@ import Dropdown from '../ui/Dropdown.jsx';
 import DateField from '../ui/DateField.jsx';
 import ProductField from './ProductField.jsx';
 import Utils from '../../lib/utils.js';
-import { coordLabel, coordClass, statusBadgeInfo, coordOptions, RESULT_OPTS, PRIORITY_OPTS, sourceSuggestions, commentAuthors } from '../../lib/filters.js';
+import { coordLabel, coordClass, statusBadgeInfo, scopedCoordOptions, RESULT_OPTS, PRIORITY_OPTS, sourceSuggestions } from '../../lib/filters.js';
 import { useStore, custKey, updateRecord, deleteRecordWithLog, addRecords, addChangeLogEntry, addComment, addReminder, getUnifiedFeed } from '../../lib/store.js';
 import { confirm } from '../../lib/confirm.js';
 import { toast } from '../ui/Toast.jsx';
 import { CheckIcon, XCircleIcon, PlusIcon, TrashIcon } from '../ui/Icon.jsx';
 import { useUiStore } from '../../lib/uiStore.js';
 import { formatDisplayDate } from '../../lib/calendar.js';
+import Pagination, { paginate } from '../ui/Pagination.jsx';
 
 const FIELD_LABELS = { coordinator: 'کارشناس', company: 'شرکت', name: 'مخاطب', phone: 'تلفن', product: 'محصول', categoryId: 'دسته محصول', source: 'منبع سرنخ', date: 'تاریخ تماس', price: 'قیمت', result: 'نتیجه', priority: 'اولویت', notes: 'یادداشت', converted: 'سرنخ تبدیل‌شده', deactivateReason: 'دلیل غیرفعال شدن' };
 
@@ -25,6 +26,8 @@ function formFromRecord(rec) {
 }
 const emptyReminder = { date: '', time: '', for: '', text: '' };
 const emptyQuickCall = { coordinator: '', name: '', phone: '', product: '', categoryId: '', source: '', date: '', price: '', result: '', priority: '', notes: '', deactivateReason: '' };
+const TAB_PAGE_SIZE = 6;
+const pageOf = (items, page) => paginate(items, page, TAB_PAGE_SIZE);
 
 function StatusBadge({ r }) {
   const { text, className } = statusBadgeInfo(r);
@@ -34,17 +37,22 @@ function StatusBadge({ r }) {
 export default function LeadProfileModal({ recordId, records, companyMeta, onClose, onOpenRecord }) {
   const calendar = useUiStore((u) => u.calendar);
   const categories = useStore((s) => s.categories);
+  const currentUser = useStore((s) => s.currentUser);
+  const currentUserName = currentUser?.displayName || currentUser?.username || null;
   const categoryOptions = useMemo(() => categories.map((c) => ({ value: c.id, label: c.name })), [categories]);
   const sourceOpts = useMemo(() => sourceSuggestions(records), [records]);
   const rec = records.find((r) => r.id === recordId);
   const [form, setForm] = useState(() => (rec ? formFromRecord(rec) : null));
-  const [editor, setEditor] = useState('');
+  const [errors, setErrors] = useState({});
   const [reminder, setReminder] = useState(emptyReminder);
   const [quickOpen, setQuickOpen] = useState(false);
   const [quick, setQuick] = useState(() => ({ ...emptyQuickCall, coordinator: rec?.coordinator || '' }));
   const [quickReminder, setQuickReminder] = useState(emptyReminder);
-  const [commentAuthor, setCommentAuthor] = useState('');
   const [commentText, setCommentText] = useState('');
+  const [mainTab, setMainTab] = useState('form');
+  const [historyPage, setHistoryPage] = useState(1);
+  const [changelogPage, setChangelogPage] = useState(1);
+  const [correspondencePage, setCorrespondencePage] = useState(1);
 
   const key = rec ? custKey(rec.company) : null;
   const history = useMemo(() => {
@@ -56,44 +64,69 @@ export default function LeadProfileModal({ recordId, records, companyMeta, onClo
   }, [records, key]);
 
   const feed = key ? getUnifiedFeed(key) : [];
+  const changelogItems = feed.filter((i) => i.type === 'change');
+  const correspondenceItems = feed.filter((i) => i.type === 'comment');
+  const historyPaged = pageOf(history, historyPage);
+  const changelogPaged = pageOf(changelogItems, changelogPage);
+  const correspondencePaged = pageOf(correspondenceItems, correspondencePage);
 
   if (!rec || !form) return null;
-  const set = (k) => (v) => setForm((s) => ({ ...s, [k]: v }));
-  const setInput = (k) => (e) => setForm((s) => ({ ...s, [k]: e.target.value }));
+  const set = (k) => (v) => { setForm((s) => ({ ...s, [k]: v })); setErrors((s) => (s[k] ? { ...s, [k]: null } : s)); };
+  const setInput = (k) => (e) => { const v = e.target.value; setForm((s) => ({ ...s, [k]: v })); setErrors((s) => (s[k] ? { ...s, [k]: null } : s)); };
+
+  function validateForm(f) {
+    const errs = {};
+    if (!f.company.trim()) errs.company = 'نام شرکت الزامی است';
+    if (f.result === 'غیرفعال' && !f.deactivateReason.trim()) errs.deactivateReason = 'برای غیرفعال کردن، دلیل الزامی است';
+    return errs;
+  }
 
   function handleSave() {
-    if (form.result === 'غیرفعال' && !form.deactivateReason.trim()) { toast('برای غیرفعال کردن، دلیل الزامی است'); return; }
-    const before = { ...rec };
-    const next = {
-      coordinator: form.coordinator || null, company: form.company.trim() || null, name: form.name.trim() || null,
-      phone: form.phone.trim() || null, product: form.product.trim() || null, categoryId: form.categoryId || null,
-      source: form.source.trim() || null, date: Utils.fromISODate(form.date) || null, price: form.price.trim() || null,
-      result: form.result || null, priority: form.priority || null, notes: form.notes.trim() || null, converted: form.converted,
-      deactivateReason: form.result === 'غیرفعال' ? form.deactivateReason.trim() : null,
-    };
-    updateRecord(rec.id, next);
+    try {
+      const errs = validateForm(form);
+      if (Object.keys(errs).some((k) => errs[k])) {
+        setErrors(errs);
+        setMainTab('form');
+        toast('لطفاً خطاهای فرم را برطرف کنید');
+        return;
+      }
+      setErrors({});
+      const before = { ...rec };
+      const next = {
+        coordinator: form.coordinator || null, company: form.company.trim() || null, name: form.name.trim() || null,
+        phone: form.phone.trim() || null, product: form.product.trim() || null, categoryId: form.categoryId || null,
+        source: form.source.trim() || null, date: Utils.fromISODate(form.date) || null, price: form.price.trim() || null,
+        result: form.result || null, priority: form.priority || null, notes: form.notes.trim() || null, converted: form.converted,
+        deactivateReason: form.result === 'غیرفعال' ? form.deactivateReason.trim() : null,
+      };
+      updateRecord(rec.id, next);
 
-    const changes = [];
-    const catName = (id) => (id ? (categories.find((c) => c.id === id)?.name || id) : '');
-    for (const f in FIELD_LABELS) {
-      let oldV = before[f], newV = next[f];
-      if (f === 'categoryId') { oldV = catName(before.categoryId); newV = catName(next.categoryId); }
-      if (String(oldV || '') !== String(newV || '')) changes.push(`${FIELD_LABELS[f]}: «${oldV || '-'}» → «${newV || '-'}»`);
-    }
-    const k = custKey(next.company || before.company);
-    if (changes.length) addChangeLogEntry(k, changes.join(' | '), editor || null);
+      const changes = [];
+      const catName = (id) => (id ? (categories.find((c) => c.id === id)?.name || id) : '');
+      for (const f in FIELD_LABELS) {
+        let oldV = before[f], newV = next[f];
+        if (f === 'categoryId') { oldV = catName(before.categoryId); newV = catName(next.categoryId); }
+        if (String(oldV || '') !== String(newV || '')) changes.push(`${FIELD_LABELS[f]}: «${oldV || '-'}» → «${newV || '-'}»`);
+      }
+      const k = custKey(next.company || before.company);
+      if (changes.length) addChangeLogEntry(k, changes.join(' | '), currentUserName);
 
-    let reminderCreated = false;
-    if (next.result === 'در حال پیگیری' && reminder.date) {
-      addReminder({
-        id: 'REM-' + Date.now() + '-' + Math.floor(Math.random() * 10000),
-        custKey: k, company: next.company, dueDate: reminder.date, dueTime: reminder.time || null,
-        forAgent: reminder.for || next.coordinator || null, text: reminder.text.trim() || null, createdAt: Date.now(), done: false,
-      });
-      addChangeLogEntry(k, `یادآوری برای ${reminder.date}${reminder.time ? ' ساعت ' + reminder.time : ''} ثبت شد`, editor || null);
-      reminderCreated = true;
+      let reminderCreated = false;
+      if (next.result === 'در حال پیگیری' && reminder.date) {
+        addReminder({
+          id: 'REM-' + Date.now() + '-' + Math.floor(Math.random() * 10000),
+          custKey: k, company: next.company, dueDate: reminder.date, dueTime: reminder.time || null,
+          forAgent: reminder.for || next.coordinator || null, text: reminder.text.trim() || null, createdAt: Date.now(), done: false,
+        });
+        addChangeLogEntry(k, `یادآوری برای ${reminder.date}${reminder.time ? ' ساعت ' + reminder.time : ''} ثبت شد`, currentUserName);
+        reminderCreated = true;
+      }
+      toast(changes.length || reminderCreated ? 'تغییرات ذخیره شد' + (reminderCreated ? ' — یادآوری ثبت شد' : '') : 'چیزی تغییر نکرده بود');
+      onClose();
+    } catch (err) {
+      console.error('[handleSave] threw:', err);
+      toast('خطا در ذخیره: ' + (err && err.message ? err.message : 'خطای غیرمنتظره'));
     }
-    toast(changes.length || reminderCreated ? 'تغییرات ذخیره شد' + (reminderCreated ? ' — یادآوری ثبت شد' : '') : 'چیزی تغییر نکرده بود');
   }
 
   async function handleDelete(id) {
@@ -149,11 +182,9 @@ export default function LeadProfileModal({ recordId, records, companyMeta, onClo
   }
 
   function submitComment() {
-    if (!commentAuthor) { toast('اول انتخاب کن این نظر از طرف کیه'); return; }
     if (!commentText.trim()) { toast('متن نظر خالیه'); return; }
-    addComment(key, commentText.trim(), commentAuthor);
+    addComment(key, commentText.trim(), currentUserName);
     setCommentText('');
-    setCommentAuthor('');
     toast('نظر ثبت شد');
   }
 
@@ -168,21 +199,30 @@ export default function LeadProfileModal({ recordId, records, companyMeta, onClo
         <button type="button" className="crm-btn-ghost" onClick={onClose}><XCircleIcon />انصراف</button>
       </>}
     >
+          <div className="crm-modal-tabs">
+            <button type="button" className={`crm-modal-tab${mainTab === 'form' ? ' -active' : ''}`} onClick={() => setMainTab('form')}>فرم</button>
+            <button type="button" className={`crm-modal-tab${mainTab === 'history' ? ' -active' : ''}`} onClick={() => setMainTab('history')}>تاریخچه تماس‌ها <span>({history.length.toLocaleString('en-US')})</span></button>
+            <button type="button" className={`crm-modal-tab${mainTab === 'changelog' ? ' -active' : ''}`} onClick={() => setMainTab('changelog')}>تاریخچه تغییرات <span>({feed.filter((i) => i.type === 'change').length.toLocaleString('en-US')})</span></button>
+            <button type="button" className={`crm-modal-tab${mainTab === 'correspondence' ? ' -active' : ''}`} onClick={() => setMainTab('correspondence')}>مکاتبات <span>({feed.filter((i) => i.type === 'comment').length.toLocaleString('en-US')})</span></button>
+          </div>
+
+          <div className="crm-profile-tab-content">
+          {mainTab === 'form' && (
           <div className="crm-form-grid">
-            <div className="crm-field"><label>کارشناس</label><Dropdown value={form.coordinator} onChange={set('coordinator')} options={coordOptions()} placeholder="انتخاب کنید" /></div>
-            <div className="crm-field -span2"><label>نام شرکت</label><input className="crm-input" value={form.company} onChange={setInput('company')} /></div>
-            <div className="crm-field"><label>نام مخاطب</label><input className="crm-input" value={form.name} onChange={setInput('name')} /></div>
-            <div className="crm-field"><label>تلفن</label><input className="crm-input crm-mono" value={form.phone} onChange={setInput('phone')} /></div>
+            <div className="crm-field"><label>کارشناس</label><Dropdown value={form.coordinator} onChange={set('coordinator')} options={scopedCoordOptions(currentUser)} placeholder="انتخاب کنید" /></div>
+            <div className="crm-field -span2"><label>نام شرکت</label><input className="crm-input" value={form.company} onChange={setInput('company')} maxLength={255} />{errors.company && <span className="crm-field-error">{errors.company}</span>}</div>
+            <div className="crm-field"><label>نام مخاطب</label><input className="crm-input" value={form.name} onChange={setInput('name')} maxLength={255} /></div>
+            <div className="crm-field"><label>تلفن</label><input className="crm-input crm-mono" value={form.phone} onChange={setInput('phone')} maxLength={128} /></div>
             <div className="crm-field"><label>محصول</label><ProductField value={form.product} onChange={set('product')} onCategorySelect={(cid) => setForm((s) => (s.categoryId ? s : { ...s, categoryId: cid }))} /></div>
             <div className="crm-field"><label>دسته محصول</label><Dropdown value={form.categoryId} onChange={set('categoryId')} options={categoryOptions} placeholder="انتخاب کنید" /></div>
             <div className="crm-field"><label>منبع سرنخ</label><input className="crm-input" list="crm-src-edit" value={form.source} onChange={setInput('source')} maxLength={64} placeholder="منبع سرنخ" /><datalist id="crm-src-edit">{sourceOpts.map((s) => <option key={s} value={s} />)}</datalist></div>
             <div className="crm-field"><label>تاریخ تماس</label><DateField className="crm-input crm-mono" value={form.date} onChange={set('date')} /></div>
-            <div className="crm-field"><label>آخرین قیمت اعلامی</label><input className="crm-input crm-mono" value={form.price} onChange={setInput('price')} /></div>
+            <div className="crm-field"><label>آخرین قیمت اعلامی</label><input className="crm-input crm-mono" value={form.price} onChange={setInput('price')} maxLength={64} /></div>
             <div className="crm-field"><label>نتیجه</label><Dropdown value={form.result} onChange={set('result')} options={RESULT_OPTS} placeholder="انتخاب کنید" /></div>
             <div className="crm-field"><label>اولویت</label><Dropdown value={form.priority} onChange={set('priority')} options={PRIORITY_OPTS} placeholder="انتخاب کنید" /></div>
-            <div className="crm-field -span3"><label>یادداشت</label><textarea className="crm-textarea" rows={3} value={form.notes} onChange={setInput('notes')} /></div>
+            <div className="crm-field -span3"><label>یادداشت</label><textarea className="crm-textarea" rows={3} value={form.notes} onChange={setInput('notes')} maxLength={10000} /></div>
             {form.result === 'غیرفعال' && (
-              <div className="crm-field -span3"><label>دلیل غیرفعال شدن *</label><textarea className="crm-textarea" rows={2} value={form.deactivateReason} onChange={setInput('deactivateReason')} placeholder="چرا این سرنخ کنار گذاشته شد؟" /></div>
+              <div className="crm-field -span3"><label>دلیل غیرفعال شدن *</label><textarea className="crm-textarea" rows={2} value={form.deactivateReason} onChange={setInput('deactivateReason')} maxLength={500} placeholder="چرا این سرنخ کنار گذاشته شد؟" />{errors.deactivateReason && <span className="crm-field-error">{errors.deactivateReason}</span>}</div>
             )}
             <div className="crm-field -span3">
               <label className="crm-toggle-label">
@@ -190,29 +230,29 @@ export default function LeadProfileModal({ recordId, records, companyMeta, onClo
                 <span>این سرنخ تبدیل شده</span>
               </label>
             </div>
-            <div className="crm-field -span2"><label>تغییر توسط</label><Dropdown value={editor} onChange={setEditor} options={commentAuthors()} placeholder="انتخاب کنید" /></div>
             {form.result === 'در حال پیگیری' && (
               <div className="crm-field -span3 crm-reminder-block -visible">
                 <label>ایجاد یادآوری برای این پیگیری (اختیاری)</label>
                 <div className="crm-reminder-fields">
                   <DateField className="crm-input crm-mono" value={reminder.date} onChange={(v) => setReminder({ ...reminder, date: v })} />
                   <input type="time" className="crm-input crm-mono" value={reminder.time} onChange={(e) => setReminder({ ...reminder, time: e.target.value })} />
-                  <Dropdown value={reminder.for} onChange={(v) => setReminder({ ...reminder, for: v })} options={coordOptions()} placeholder="برای چه کسی" />
-                  <input className="crm-input" value={reminder.text} onChange={(e) => setReminder({ ...reminder, text: e.target.value })} placeholder="متن یادآوری (اختیاری)" />
+                  <Dropdown value={reminder.for} onChange={(v) => setReminder({ ...reminder, for: v })} options={scopedCoordOptions(currentUser)} placeholder="برای چه کسی" />
+                  <textarea className="crm-textarea crm-reminder-note" rows={2} value={reminder.text} onChange={(e) => setReminder({ ...reminder, text: e.target.value })} placeholder="متن یادآوری (اختیاری)" />
                 </div>
               </div>
             )}
           </div>
+          )}
 
-          <div className="crm-profile-block">
+          {mainTab === 'history' && (
+          <div className="crm-profile-block -notop">
             <div className="crm-profile-block-head">
-              <div className="crm-profile-block-title">تاریخچه تماس‌ها <span>({history.length.toLocaleString('en-US')} تماس)</span></div>
               <button type="button" className="crm-btn-primary" onClick={() => setQuickOpen((o) => !o)}><PlusIcon />ثبت تماس جدید با این سرنخ</button>
             </div>
             {quickOpen && (
               <div className="crm-quickcall-form -open">
                 <div className="crm-form-grid">
-                  <div className="crm-field"><label>کارشناس</label><Dropdown value={quick.coordinator} onChange={(v) => setQuick({ ...quick, coordinator: v })} options={coordOptions()} placeholder="انتخاب کنید" /></div>
+                  <div className="crm-field"><label>کارشناس</label><Dropdown value={quick.coordinator} onChange={(v) => setQuick({ ...quick, coordinator: v })} options={scopedCoordOptions(currentUser)} placeholder="انتخاب کنید" /></div>
                   <div className="crm-field"><label>نام مخاطب</label><input className="crm-input" value={quick.name} onChange={(e) => setQuick({ ...quick, name: e.target.value })} /></div>
                   <div className="crm-field"><label>تلفن</label><input className="crm-input crm-mono" value={quick.phone} onChange={(e) => setQuick({ ...quick, phone: e.target.value })} /></div>
                   <div className="crm-field"><label>محصول</label><ProductField value={quick.product} onChange={(v) => setQuick({ ...quick, product: v })} onCategorySelect={(cid) => setQuick((s) => (s.categoryId ? s : { ...s, categoryId: cid }))} /></div>
@@ -232,8 +272,8 @@ export default function LeadProfileModal({ recordId, records, companyMeta, onClo
                       <div className="crm-reminder-fields">
                         <DateField className="crm-input crm-mono" value={quickReminder.date} onChange={(v) => setQuickReminder({ ...quickReminder, date: v })} />
                         <input type="time" className="crm-input crm-mono" value={quickReminder.time} onChange={(e) => setQuickReminder({ ...quickReminder, time: e.target.value })} />
-                        <Dropdown value={quickReminder.for} onChange={(v) => setQuickReminder({ ...quickReminder, for: v })} options={coordOptions()} placeholder="برای چه کسی" />
-                        <input className="crm-input" value={quickReminder.text} onChange={(e) => setQuickReminder({ ...quickReminder, text: e.target.value })} placeholder="متن یادآوری (اختیاری)" />
+                        <Dropdown value={quickReminder.for} onChange={(v) => setQuickReminder({ ...quickReminder, for: v })} options={scopedCoordOptions(currentUser)} placeholder="برای چه کسی" />
+                        <textarea className="crm-textarea crm-reminder-note" rows={2} value={quickReminder.text} onChange={(e) => setQuickReminder({ ...quickReminder, text: e.target.value })} placeholder="متن یادآوری (اختیاری)" />
                       </div>
                     </div>
                   )}
@@ -245,7 +285,7 @@ export default function LeadProfileModal({ recordId, records, companyMeta, onClo
               </div>
             )}
             <div className="crm-history-list">
-              {history.map((r) => (
+              {!history.length ? <div className="crm-empty">تماسی ثبت نشده</div> : historyPaged.pageItems.map((r) => (
                 <div className={`crm-history-item${r.id === recordId ? ' -current' : ''}`} key={r.id} onClick={() => onOpenRecord(r.id)}>
                   <div className="crm-history-item-top">
                     <span><span className={`crm-coord-tag ${coordClass(r.coordinator)}`}>{r.coordinator ? coordLabel(r.coordinator) : '-'}</span> <b>{formatDisplayDate(r.date, calendar) || '-'}</b></span>
@@ -258,23 +298,41 @@ export default function LeadProfileModal({ recordId, records, companyMeta, onClo
                 </div>
               ))}
             </div>
+            <Pagination safePage={historyPaged.safePage} totalPages={historyPaged.totalPages} onPage={setHistoryPage} />
           </div>
+          )}
 
-          <div className="crm-profile-block">
-            <div className="crm-profile-block-title">مکاتبات</div>
+          {mainTab === 'changelog' && (
+          <div className="crm-profile-block -notop">
             <div className="crm-feed-list">
-              {!feed.length ? <div className="crm-feed-empty">هنوز مکاتبه‌ای برای این سرنخ ثبت نشده</div> : feed.map((item) => (
-                <div className={`crm-feed-item ${item.type === 'comment' ? '-comment' : '-change'}`} key={item.id}>
-                  <div className="crm-feed-item-head"><b>{item.type === 'comment' ? item.author : (item.author || 'سیستم')}</b><span>{Utils.formatTs(item.ts, calendar)}</span></div>
+              {!changelogItems.length ? <div className="crm-feed-empty">هنوز تغییری برای این سرنخ ثبت نشده</div> : changelogPaged.pageItems.map((item) => (
+                <div className="crm-feed-item -change" key={item.id}>
+                  <div className="crm-feed-item-head"><b>{item.author || 'سیستم'}</b><span>{Utils.formatTs(item.ts, calendar)}</span></div>
                   <div>{item.text}</div>
                 </div>
               ))}
             </div>
+            <Pagination safePage={changelogPaged.safePage} totalPages={changelogPaged.totalPages} onPage={setChangelogPage} />
+          </div>
+          )}
+
+          {mainTab === 'correspondence' && (
+          <div className="crm-profile-block -notop">
             <div className="crm-comment-form">
-              <Dropdown value={commentAuthor} onChange={setCommentAuthor} options={commentAuthors()} placeholder="از طرف" />
               <textarea className="crm-textarea" rows={2} value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="نظر یا یادداشت خودتو بنویس..." />
               <button type="button" className="crm-btn-primary" onClick={submitComment}><CheckIcon />ثبت نظر</button>
             </div>
+            <div className="crm-feed-list">
+              {!correspondenceItems.length ? <div className="crm-feed-empty">هنوز نظری برای این سرنخ ثبت نشده</div> : correspondencePaged.pageItems.map((item) => (
+                <div className="crm-feed-item -comment" key={item.id}>
+                  <div className="crm-feed-item-head"><b>{item.author}</b><span>{Utils.formatTs(item.ts, calendar)}</span></div>
+                  <div>{item.text}</div>
+                </div>
+              ))}
+            </div>
+            <Pagination safePage={correspondencePaged.safePage} totalPages={correspondencePaged.totalPages} onPage={setCorrespondencePage} />
+          </div>
+          )}
           </div>
     </Modal>
   );

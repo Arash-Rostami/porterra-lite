@@ -40,7 +40,7 @@ export default function DashboardPage() {
 
     return (
         <div className="crm-tab-panel" id="crmPanelDashboard">
-            <DashboardFilters filters={filters} onChange={setFilters} records={records} />
+            <DashboardFilters filters={filters} onChange={setFilters} />
             <KpiCards records={filtered} onSelectKpi={(key, label) => { applyKpiFilter(key, label); goToLeads(); }} />
             <FunnelChart records={filtered} />
             <div className="crm-charts">

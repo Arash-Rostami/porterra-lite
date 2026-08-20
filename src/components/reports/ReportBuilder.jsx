@@ -2,10 +2,14 @@
 import {useMemo, useState} from 'react';
 import Dropdown from '../ui/Dropdown.jsx';
 import DateField from '../ui/DateField.jsx';
-import {effectiveResult, filterOptionsFrom, getFiltered, STATUS_OPTS} from '../../lib/filters.js';
+import {effectiveResult, filterOptionsFrom, getFiltered, scopedCoordOptions, STATUS_OPTS} from '../../lib/filters.js';
 import {toast} from '../ui/Toast.jsx';
 import {DownloadIcon} from '../ui/Icon.jsx';
 import PhoneLink from '../ui/PhoneLink.jsx';
+import {useUiStore} from '../../lib/uiStore.js';
+import {useStore} from '../../lib/store.js';
+import {formatDisplayDate} from '../../lib/calendar.js';
+import Pagination, {paginate} from '../ui/Pagination.jsx';
 
 function ChevronIcon() {
     return (
@@ -30,7 +34,6 @@ const REPORT_COLUMNS = [
     {key: 'converted', label: 'سرنخ تبدیل‌شده'},
 ];
 const DEFAULT_COLS = ['coordinator', 'company', 'product', 'date', 'result'];
-const PREVIEW_CAP = 200;
 
 function cellValue(r, key) {
     if (key === 'converted') return r.converted ? 'بله' : 'خیر';
@@ -39,25 +42,39 @@ function cellValue(r, key) {
 }
 
 export default function ReportBuilder({records}) {
+    const calendar = useUiStore((u) => u.calendar);
+    const currentUser = useStore((s) => s.currentUser);
+    const categories = useStore((s) => s.categories);
+    const products = useStore((s) => s.products);
     const opts = useMemo(() => filterOptionsFrom(records), [records]);
+    const categoryOpts = useMemo(() => categories.map((c) => c.name).sort((a, b) => a.localeCompare(b)), [categories]);
+    const productOpts = useMemo(() => products.map((p) => p.name).sort((a, b) => a.localeCompare(b)), [products]);
     const [cols, setCols] = useState(DEFAULT_COLS);
     const [colsOpen, setColsOpen] = useState(false);
     const [filters, setFilters] = useState({
         coordinator: '',
         category: '',
+        product: '',
         source: '',
         status: '',
         dateFrom: '',
         dateTo: ''
     });
-    const set = (k) => (v) => setFilters((s) => ({...s, [k]: v}));
-    const setInput = (k) => (e) => setFilters((s) => ({...s, [k]: e.target.value}));
+    const [page, setPage] = useState(1);
+    const [perPage, setPerPage] = useState(20);
+    const set = (k) => (v) => { setFilters((s) => ({...s, [k]: v})); setPage(1); };
+    const setInput = (k) => (e) => { setFilters((s) => ({...s, [k]: e.target.value})); setPage(1); };
+    function changePerPage(v) {
+        setPerPage(v);
+        setPage(1);
+    }
 
     const result = useMemo(
-        () => getFiltered(records, {...filters, q: '', showDeactivated: true}, null, null),
+        () => getFiltered(records, {...filters, q: ''}, null, {key: 'date', dir: -1}),
         [records, filters],
     );
     const activeCols = REPORT_COLUMNS.filter((c) => cols.includes(c.key));
+    const {pageItems, totalPages, safePage} = paginate(result, page, perPage);
 
     function toggleCol(key) {
         setCols((s) => (s.includes(key) ? s.filter((k) => k !== key) : [...s, key]));
@@ -86,10 +103,12 @@ export default function ReportBuilder({records}) {
             <div className="crm-section">
                 <div className="crm-section-title">فیلترها</div>
                 <div className="crm-toolbar">
-                    <Dropdown value={filters.coordinator} onChange={set('coordinator')} options={opts.coordinators}
+                    <Dropdown value={filters.coordinator} onChange={set('coordinator')} options={scopedCoordOptions(currentUser)}
                               placeholder="همه کارشناسان"/>
-                    <Dropdown value={filters.category} onChange={set('category')} options={opts.categories}
+                    <Dropdown value={filters.category} onChange={set('category')} options={categoryOpts}
                               placeholder="همه دسته‌ها"/>
+                    <Dropdown value={filters.product} onChange={set('product')} options={productOpts}
+                              placeholder="همه محصولات"/>
                     <Dropdown value={filters.source} onChange={set('source')} options={opts.sources}
                               placeholder="همه منابع سرنخ"/>
                     <Dropdown value={filters.status} onChange={set('status')} options={STATUS_OPTS}
@@ -99,12 +118,13 @@ export default function ReportBuilder({records}) {
                         <span>تا</span>
                         <DateField className="crm-input crm-mono" value={filters.dateTo} onChange={set('dateTo')}/>
                     </div>
-
-                    <button type="button" className={`crm-cols-toggle${colsOpen ? ' -open' : ''}`} onClick={() => setColsOpen((s) => !s)}>
-                        <ChevronIcon />
-                        ستون‌های گزارش
-                        {cols.length !== REPORT_COLUMNS.length && <span className="crm-cols-toggle-count">{cols.length}</span>}
-                    </button>
+                    <div className="crm-table-actions">
+                        <button type="button" className={`crm-cols-toggle${colsOpen ? ' -open' : ''}`} onClick={() => setColsOpen((s) => !s)}>
+                            <ChevronIcon />
+                            ستون‌های گزارش
+                            {cols.length !== REPORT_COLUMNS.length && <span className="crm-cols-toggle-count">{cols.length}</span>}
+                        </button>
+                    </div>
                 </div>
 
                 <div className={`crm-quickcall-form${colsOpen ? ' -open' : ''}`}>
@@ -122,33 +142,30 @@ export default function ReportBuilder({records}) {
 
             <div className="crm-section">
                 <div className="crm-section-title-row">
-                    <div className="crm-section-title">نتیجه <span style={{
-                        color: 'var(--muted)',
-                        fontWeight: 400
-                    }}>({result.length.toLocaleString('en-US')} مورد)</span></div>
+                    <div className="crm-section-title">نتیجه</div>
+                    <span className="crm-result-count">{result.length.toLocaleString('en-US')} مورد</span>
+                </div>
+                <div className="crm-toolbar">
                     <div className="crm-table-actions">
                         <button type="button" className="crm-export-btn" onClick={exportExcel}><DownloadIcon/>خروجی اکسل
                         </button>
                     </div>
                 </div>
-                {result.length > PREVIEW_CAP && (
-                    <div style={{fontSize: 12, color: 'var(--muted)', margin: '6px 0'}}>
-                        فقط {PREVIEW_CAP.toLocaleString('en-US')} ردیف اول نمایش داده می‌شود — خروجی اکسل شامل
-                        همه‌ی {result.length.toLocaleString('en-US')} ردیف است.
-                    </div>
-                )}
                 <div className="crm-table-wrap">
                     <table className="crm-table">
                         <thead>
                         <tr>{activeCols.map((c) => <th key={c.key}>{c.label}</th>)}</tr>
                         </thead>
                         <tbody>
-                        {result.slice(0, PREVIEW_CAP).map((r) => (
-                            <tr key={r.id}>{activeCols.map((c) => <td key={c.key}>{c.key === 'phone' ? <PhoneLink phone={r.phone} /> : cellValue(r, c.key)}</td>)}</tr>
+                        {!result.length ? (
+                            <tr><td colSpan={activeCols.length}><div className="crm-empty">نتیجه‌ای پیدا نشد</div></td></tr>
+                        ) : pageItems.map((r) => (
+                            <tr key={r.id}>{activeCols.map((c) => <td key={c.key}>{c.key === 'phone' ? <PhoneLink phone={r.phone} /> : c.key === 'date' ? (formatDisplayDate(r.date, calendar) || '-') : cellValue(r, c.key)}</td>)}</tr>
                         ))}
                         </tbody>
                     </table>
                 </div>
+                <Pagination safePage={safePage} totalPages={totalPages} onPage={setPage} perPage={perPage} onPerPage={changePerPage} />
             </div>
         </>
     );

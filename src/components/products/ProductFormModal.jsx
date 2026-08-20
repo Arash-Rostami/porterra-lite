@@ -63,11 +63,11 @@ export default function ProductFormModal({ open, product, onSubmit, onCancel }) 
       </>}
     >
       <div className="crm-form-grid">
-        <div className="crm-field -span2">
+        <div className="crm-field -solo">
           <label>نام محصول *</label>
           <input className="crm-input" value={f.name} onChange={(e) => setF((s) => ({ ...s, name: e.target.value }))} placeholder="مثلاً: PET" />
         </div>
-        <div className="crm-field -span2">
+        <div className="crm-field -solo">
           <label>دسته‌بندی *</label>
           <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
             <Dropdown value={f.categoryId} onChange={(v) => setF((s) => ({ ...s, categoryId: v }))} options={catOptions} placeholder="انتخاب کنید" />

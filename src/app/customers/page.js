@@ -1,24 +1,25 @@
 'use client';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import AddLeadForm from '../../components/leads/AddLeadForm.jsx';
 import LeadFilters from '../../components/leads/LeadFilters.jsx';
 import LeadTable from '../../components/leads/LeadTable.jsx';
 import { addRecords, deleteRecordWithLog, useScopedData } from '../../lib/store.js';
-import { useUiStore, setFilters, setAddFormOpen, clearChartFilter, openProfile } from '../../lib/uiStore.js';
+import { openProfile } from '../../lib/uiStore.js';
 import { exportToExcel } from '../../lib/excel.js';
 import { getFiltered } from '../../lib/filters.js';
 import { confirm } from '../../lib/confirm.js';
 import { toast } from '../../components/ui/Toast.jsx';
 
-export default function LeadsPage() {
+const emptyFilters = { q: '', coordinator: '', category: '', source: '', product: '', status: '', dateFrom: '', dateTo: '' };
+
+export default function CustomersPage() {
     const { records: allRecords, currentUser } = useScopedData();
-    const records = useMemo(() => allRecords.filter((r) => !r.converted), [allRecords]);
-    const filters = useUiStore((u) => u.filters);
-    const chartFilter = useUiStore((u) => u.chartFilter);
-    const addFormOpen = useUiStore((u) => u.addFormOpen);
+    const records = useMemo(() => allRecords.filter((r) => r.converted), [allRecords]);
+    const [filters, setFilters] = useState(emptyFilters);
+    const [addFormOpen, setAddFormOpen] = useState(false);
 
     function handleExport() {
-        const res = exportToExcel(getFiltered(records, filters, chartFilter));
+        const res = exportToExcel(getFiltered(records, filters, null));
         toast(res.ok ? `${res.count.toLocaleString('en-US')} رکورد در فایل اکسل ذخیره شد` : 'رکوردی برای خروجی گرفتن نیست');
     }
 
@@ -42,20 +43,22 @@ export default function LeadsPage() {
     }
 
     return (
-        <div className="crm-tab-panel" id="crmPanelLeads">
+        <div className="crm-tab-panel" id="crmPanelCustomers">
             <AddLeadForm open={addFormOpen} records={allRecords} defaultCoordinator={currentUser?.agentCode || ''} onSubmit={handleAddSubmit} onCancel={() => setAddFormOpen(false)} />
-            <LeadFilters records={records} filters={filters} onChange={setFilters} chartFilter={chartFilter} onClearChartFilter={clearChartFilter} />
+            <LeadFilters records={records} filters={filters} onChange={setFilters} chartFilter={null} onClearChartFilter={() => {}} />
             <LeadTable
                 records={records}
                 filters={filters}
-                chartFilter={chartFilter}
+                chartFilter={null}
                 onEdit={(id) => openProfile(id)}
                 onDelete={handleDelete}
                 onImport={addRecords}
-                onToggleAdd={() => setAddFormOpen(!addFormOpen)}
+                onToggleAdd={() => setAddFormOpen((o) => !o)}
                 addOpen={addFormOpen}
                 onExport={handleExport}
                 onSearchChange={setFilters}
+                title="مشتریان"
+                recordNoun="مشتری"
             />
         </div>
     );

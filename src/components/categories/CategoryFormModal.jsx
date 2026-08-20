@@ -43,7 +43,7 @@ export default function CategoryFormModal({ open, category, onSubmit, onCancel }
       </>}
     >
       <div className="crm-form-grid">
-        <div className="crm-field -span2">
+        <div className="crm-field -solo">
           <label>نام دسته‌بندی *</label>
           <input className="crm-input" value={f.name} onChange={(e) => setF((s) => ({ ...s, name: e.target.value }))} placeholder="مثلاً: PET" />
         </div>

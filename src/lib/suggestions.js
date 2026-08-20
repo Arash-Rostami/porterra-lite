@@ -125,13 +125,6 @@ export function filterAgentSuggestions(pool, filters) {
   return { filtered };
 }
 
-export function suggestionCategoryOptions(pool) {
-  return Array.from(new Set(pool.map((i) => i.r.category || 'نامشخص'))).sort((a, b) => a.localeCompare(b));
-}
-export function suggestionProductOptions(pool) {
-  return Array.from(new Set(pool.map((i) => i.r.product).filter(Boolean))).sort((a, b) => a.localeCompare(b));
-}
-
 export async function exportSuggestionsToExcel(byAgent) {
   const XLSX = await import('xlsx');
   const agents = Object.keys(byAgent).sort((a, b) => byAgent[b].length - byAgent[a].length);

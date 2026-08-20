@@ -53,7 +53,8 @@ A `categories` lookup table (id VARCHAR(40) PK, name UNIQUE, is_custom TINYINT, 
 was added with 2 seeded base categories (CAT-chempoly = "Chemical/Polymer", CAT-solar = "Solar").
 `products.category_id` and `contacts.category_id` are FK → `categories(id)` `ON DELETE RESTRICT`.
 The migration (`docs/MIGRATION.md`) runs §1–§6 only — the legacy free-text `category` column on
-products/contacts is intentionally retained as dormant legacy/audit (§7 is documented but not run).
+products/contacts is retained (§7, dropping it, is documented but not run) and is write-synced
+from `category_id` on every save, for legacy/external consumers that still read it directly.
 
 ## CLI quick reference
 - `chabok login` — sign in

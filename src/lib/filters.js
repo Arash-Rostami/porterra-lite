@@ -13,9 +13,14 @@ export const PRICE_TYPE_OPTS = ['نقدی', 'اعتباری', 'پیش‌پردا
 const FAIL_NOTE_PATTERNS = ['یادم نمیاد', 'جواب نداد', 'پاسخ نداد', 'جواب نمی', 'پاسخ نمی'];
 
 let AGENT_DIRECTORY = {};
+let AGENT_DEPARTMENTS = {};
 export function setAgentDirectory(agents) {
   AGENT_DIRECTORY = {};
-  for (const a of agents) AGENT_DIRECTORY[a.agentCode] = a.displayName;
+  AGENT_DEPARTMENTS = {};
+  for (const a of agents) {
+    AGENT_DIRECTORY[a.agentCode] = a.displayName;
+    AGENT_DEPARTMENTS[a.agentCode] = a.department || null;
+  }
 }
 
 export function coordLabel(v) {
@@ -35,6 +40,17 @@ export function coordOptions() {
   const codes = Object.keys(AGENT_DIRECTORY);
   if (!codes.length) return COORD_OPTS;
   return codes.sort((a, b) => AGENT_DIRECTORY[a].localeCompare(AGENT_DIRECTORY[b])).map((value) => ({ value, label: AGENT_DIRECTORY[value] }));
+}
+
+export function scopedCoordOptions(currentUser) {
+  if (!currentUser || currentUser.role === 'admin' || currentUser.role === 'developer') return coordOptions();
+  if (currentUser.role === 'manager') {
+    const codes = Object.keys(AGENT_DIRECTORY).filter((code) => AGENT_DEPARTMENTS[code] === currentUser.department);
+    return codes.sort((a, b) => AGENT_DIRECTORY[a].localeCompare(AGENT_DIRECTORY[b])).map((value) => ({ value, label: AGENT_DIRECTORY[value] }));
+  }
+  const code = currentUser.agentCode;
+  if (!code) return [];
+  return [{ value: code, label: AGENT_DIRECTORY[code] || coordLabel(code) }];
 }
 
 export function coordClass(co) {
@@ -102,12 +118,12 @@ export function smartSearch(records, query) {
 
 export function getFiltered(records, filters, chartFilter, sort) {
   let base = records;
-  const { coordinator, category, source, status, dateFrom, dateTo, showDeactivated } = filters;
+  const { coordinator, category, source, product, status, dateFrom, dateTo } = filters;
   base = base.filter((r) => {
-    if (!showDeactivated && status !== 'غیرفعال' && r.result === 'غیرفعال') return false;
     if (coordinator && r.coordinator !== coordinator) return false;
     if (category && r.category !== category) return false;
     if (source && Utils.normSpace(r.source) !== source) return false;
+    if (product && r.product !== product) return false;
     if (status) {
       const eff = effectiveResult(r);
       if (status === 'بدون وضعیت') { if (eff) return false; }

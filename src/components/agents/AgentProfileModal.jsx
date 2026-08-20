@@ -6,15 +6,14 @@ import { coordLabel, statusBadgeInfo } from '../../lib/filters.js';
 import Utils from '../../lib/utils.js';
 import RingChart from '../ui/RingChart.jsx';
 import Modal from '../ui/Modal.jsx';
-import Dropdown from '../ui/Dropdown.jsx';
 import DateField from '../ui/DateField.jsx';
 import PhoneLink from '../ui/PhoneLink.jsx';
 import useCountUp from '../../lib/useCountUp.js';
 import { useUiStore } from '../../lib/uiStore.js';
 import { formatDisplayDate } from '../../lib/calendar.js';
 import { FilterIcon, TrashIcon } from '../ui/Icon.jsx';
+import Pagination, { paginate } from '../ui/Pagination.jsx';
 
-const PAGE_SIZE_OPTS = ['10', '20', '50', '100'];
 const priorityClass = (p) => (p === 'بالا' ? '-high' : p === 'متوسط' ? '-mid' : '-low');
 
 function StatValue({ target }) {
@@ -36,6 +35,7 @@ export default function AgentProfileModal({ agent, records, onClose, onOpenRecor
   const [sugPerPage, setSugPerPage] = useState(10);
   const [histPage, setHistPage] = useState(1);
   const [histPerPage, setHistPerPage] = useState(10);
+  const [histQuery, setHistQuery] = useState('');
   const [tab, setTab] = useState('suggestions');
 
   const s = useMemo(() => {
@@ -55,16 +55,13 @@ export default function AgentProfileModal({ agent, records, onClose, onOpenRecor
     const da = Utils.parseDate(a.date), db = Utils.parseDate(b.date);
     return (db || new Date(0)) - (da || new Date(0));
   });
+  const histQ = Utils.normSpace(histQuery).toLowerCase();
+  const filteredHistory = histQ
+    ? sortedHistory.filter((r) => [r.company, r.notes].some((v) => (v || '').toLowerCase().includes(histQ)))
+    : sortedHistory;
 
-  const sugTotalPages = Math.max(1, Math.ceil(suggestions.length / sugPerPage));
-  const sugSafePage = Math.min(sugPage, sugTotalPages);
-  const sugStartIdx = (sugSafePage - 1) * sugPerPage;
-  const sugPageItems = suggestions.slice(sugStartIdx, sugStartIdx + sugPerPage);
-
-  const histTotalPages = Math.max(1, Math.ceil(sortedHistory.length / histPerPage));
-  const histSafePage = Math.min(histPage, histTotalPages);
-  const histStartIdx = (histSafePage - 1) * histPerPage;
-  const histPageItems = sortedHistory.slice(histStartIdx, histStartIdx + histPerPage);
+  const { pageItems: sugPageItems, totalPages: sugTotalPages, safePage: sugSafePage } = paginate(suggestions, sugPage, sugPerPage);
+  const { pageItems: histPageItems, totalPages: histTotalPages, safePage: histSafePage } = paginate(filteredHistory, histPage, histPerPage);
 
   function applyFilter() {
     setApplied({
@@ -80,11 +77,15 @@ export default function AgentProfileModal({ agent, records, onClose, onOpenRecor
     setHistPage(1);
   }
   function changeSugPerPage(v) {
-    setSugPerPage(parseInt(v, 10) || 10);
+    setSugPerPage(v);
     setSugPage(1);
   }
   function changeHistPerPage(v) {
-    setHistPerPage(parseInt(v, 10) || 10);
+    setHistPerPage(v);
+    setHistPage(1);
+  }
+  function changeHistQuery(v) {
+    setHistQuery(v);
     setHistPage(1);
   }
   function openRecord(id) {
@@ -151,27 +152,20 @@ export default function AgentProfileModal({ agent, records, onClose, onOpenRecor
                   </div>
                 )}
               </div>
-              {suggestions.length > 0 && (
-                <div className="crm-pagination-row">
-                  <div className="crm-page-size">
-                    <span>تعداد نمایش در صفحه:</span>
-                    <Dropdown value={String(sugPerPage)} onChange={changeSugPerPage} options={PAGE_SIZE_OPTS} placeholder="10" />
-                  </div>
-                  <div className="crm-pagination">
-                    <button className="crm-page-btn" disabled={sugSafePage <= 1} onClick={() => setSugPage((p) => p - 1)}>قبلی</button>
-                    <span className="crm-page-info">صفحه {sugSafePage} از {sugTotalPages}</span>
-                    <button className="crm-page-btn" disabled={sugSafePage >= sugTotalPages} onClick={() => setSugPage((p) => p + 1)}>بعدی</button>
-                  </div>
-                </div>
-              )}
+              <Pagination safePage={sugSafePage} totalPages={sugTotalPages} onPage={setSugPage} perPage={sugPerPage} onPerPage={changeSugPerPage} />
             </>
           )}
 
           {tab === 'history' && (
             <>
+              <div className="crm-toolbar">
+                <input className="crm-input crm-search-input -compact" value={histQuery} onChange={(e) => changeHistQuery(e.target.value)} placeholder="جست‌وجوی شرکت یا یادداشت..." />
+              </div>
               <div className="crm-history-list" id="apHistoryList" style={{ maxHeight: 'none' }}>
                 {!sortedHistory.length ? (
                   <div className="crm-empty">تماسی در این بازه پیدا نشد</div>
+                ) : !filteredHistory.length ? (
+                  <div className="crm-empty">نتیجه‌ای پیدا نشد</div>
                 ) : histPageItems.map((r) => (
                   <div className="crm-history-item" key={r.id} onClick={() => openRecord(r.id)}>
                     <div className="crm-history-item-top">
@@ -182,19 +176,7 @@ export default function AgentProfileModal({ agent, records, onClose, onOpenRecor
                   </div>
                 ))}
               </div>
-              {sortedHistory.length > 0 && (
-                <div className="crm-pagination-row">
-                  <div className="crm-page-size">
-                    <span>تعداد نمایش در صفحه:</span>
-                    <Dropdown value={String(histPerPage)} onChange={changeHistPerPage} options={PAGE_SIZE_OPTS} placeholder="10" />
-                  </div>
-                  <div className="crm-pagination">
-                    <button className="crm-page-btn" disabled={histSafePage <= 1} onClick={() => setHistPage((p) => p - 1)}>قبلی</button>
-                    <span className="crm-page-info">صفحه {histSafePage} از {histTotalPages}</span>
-                    <button className="crm-page-btn" disabled={histSafePage >= histTotalPages} onClick={() => setHistPage((p) => p + 1)}>بعدی</button>
-                  </div>
-                </div>
-              )}
+              <Pagination safePage={histSafePage} totalPages={histTotalPages} onPage={setHistPage} perPage={histPerPage} onPerPage={changeHistPerPage} />
             </>
           )}
     </Modal>

@@ -9,7 +9,7 @@ import { CalendarIcon, PlusIcon, MinusIcon } from '../ui/Icon.jsx';
 import { useStore } from '../../lib/store.js';
 import { useUiStore, toggleCalendar, increaseFontScale, decreaseFontScale } from '../../lib/uiStore.js';
 
-export default function Header({ recordCount, dark, onToggleTheme }) {
+export default function Header({ leadCount, customerCount, dark, onToggleTheme }) {
   const calendar = useUiStore((u) => u.calendar);
   const currentUser = useStore((s) => s.currentUser);
 
@@ -20,7 +20,7 @@ export default function Header({ recordCount, dark, onToggleTheme }) {
           <div className="crm-title">پنل سرنخ‌ها</div>
           <div className="crm-subtitle">
             {currentUser && <span className="crm-header-greeting">سلام، {currentUser.displayName} 👋</span>}
-            <span className="crm-header-chip">{recordCount.toLocaleString('en-US')} رکورد</span>
+            <span className="crm-header-chip">{leadCount.toLocaleString('en-US')} سرنخ | {customerCount.toLocaleString('en-US')} مشتری</span>
             <LastUpdatedLabel className="crm-header-chip" />
           </div>
         </div>
