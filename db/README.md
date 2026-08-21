@@ -105,3 +105,18 @@ ALTER TABLE contacts DROP COLUMN category_id;
 
 - `../SERVER_CONFIG.md` — production DB is a separate Chabokan-hosted MySQL
   instance; this folder only concerns local/dev setup.
+
+## Running the integration test suite
+
+`npm run test:integration` runs `queries.js`'s CRUD functions against a real
+MySQL instance — the same Docker Compose database from the Quickest path
+section above. Steps:
+
+1. `docker compose up -d` (if not already running).
+2. `cp .env.test.example .env.test` and adjust credentials if your compose
+   setup differs from the defaults.
+3. `npm run test:integration`
+
+Every test file resets the database (via `src/lib/testSupport/testDb.js`)
+before each test — do not point `.env.test` at a database with data you
+care about.
