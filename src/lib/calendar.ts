@@ -1,9 +1,9 @@
-export const JALALI_MONTHS = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
-export const FA_MONTHS = ['ژانویه','فوریه','مارس','آوریل','مه','ژوئن','ژوئیه','اوت','سپتامبر','اکتبر','نوامبر','دسامبر'];
+export const JALALI_MONTHS: string[] = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
+export const FA_MONTHS: string[] = ['ژانویه','فوریه','مارس','آوریل','مه','ژوئن','ژوئیه','اوت','سپتامبر','اکتبر','نوامبر','دسامبر'];
 
-function div(a, b) { return Math.floor(a / b); }
+function div(a: number, b: number): number { return Math.floor(a / b); }
 
-export function gregorianToJalali(gy, gm, gd) {
+export function gregorianToJalali(gy: number, gm: number, gd: number): [number, number, number] {
   const g_d_m = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
   const gy2 = gm > 2 ? gy + 1 : gy;
   let days = 355666 + 365 * gy + div(gy2 + 3, 4) - div(gy2 + 99, 100) + div(gy2 + 399, 400) + gd + g_d_m[gm - 1];
@@ -15,7 +15,7 @@ export function gregorianToJalali(gy, gm, gd) {
     jy += div(days - 1, 365);
     days = (days - 1) % 365;
   }
-  let jm, jd;
+  let jm: number, jd: number;
   if (days < 186) {
     jm = 1 + div(days, 31);
     jd = 1 + (days % 31);
@@ -26,7 +26,7 @@ export function gregorianToJalali(gy, gm, gd) {
   return [jy, jm, jd];
 }
 
-export function jalaliToGregorian(jy, jm, jd) {
+export function jalaliToGregorian(jy: number, jm: number, jd: number): [number, number, number] {
   jy += 1595;
   let days = -355668 + 365 * jy + div(jy, 33) * 8 + div((jy % 33) + 3, 4) + jd + (jm < 7 ? (jm - 1) * 31 : (jm - 7) * 30 + 186);
   let gy = 400 * div(days, 146097);
@@ -55,7 +55,7 @@ export function jalaliToGregorian(jy, jm, jd) {
   return [gy, gm, gd];
 }
 
-export function jalaliMonthLength(jy, jm) {
+export function jalaliMonthLength(jy: number, jm: number): number {
   if (jm <= 6) return 31;
   if (jm <= 11) return 30;
   const [gy, gm, gd] = jalaliToGregorian(jy, 12, 30);
@@ -63,7 +63,7 @@ export function jalaliMonthLength(jy, jm) {
   return jy2 === jy && jm2 === 12 && jd2 === 30 ? 30 : 29;
 }
 
-export function formatDisplayDate(ddmmyyyy, calendar) {
+export function formatDisplayDate(ddmmyyyy: string | null | undefined, calendar?: string): string | null | undefined {
   if (!ddmmyyyy || calendar !== 'jalali') return ddmmyyyy;
   const parts = ddmmyyyy.split('.');
   if (parts.length !== 3) return ddmmyyyy;
