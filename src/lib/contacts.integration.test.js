@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterAll } from 'vitest';
-import { resetTestDb, closeTestDb } from './testSupport/testDb.js';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { resetTestDb } from './testSupport/testDb.js';
 import { withTransaction, getPool } from './db.js';
 import {
   listLeads, getLeadById, findLeadsByCompany, findLatestLeadByCompany,
@@ -7,7 +7,6 @@ import {
 } from './queries.js';
 
 beforeEach(async () => { await resetTestDb(); });
-afterAll(async () => { await closeTestDb(); });
 
 const baseLead = (overrides = {}) => ({
   id: 'LEAD-1', converted: false, company: 'Acme', coordinator: 'FARNAZ', name: 'Ali',
@@ -88,6 +87,22 @@ describe('contacts (leads) queries', () => {
     });
     const all = await listLeads();
     expect(all.map((r) => r.id).sort()).toEqual(['LEAD-1', 'LEAD-2']);
+  });
+
+  it('rolls back the whole transaction when a later op throws', async () => {
+    const run = withTransaction(async (conn) => {
+      await applyOp('createLead', { rec: baseLead({ id: 'LEAD-1' }) }, conn);
+      await applyOp('unknownOp', {}, conn);
+    });
+    await expect(run).rejects.toThrow('Unknown op: unknownOp');
+    const all = await listLeads();
+    expect(all).toHaveLength(0);
+  });
+
+  it('applyOp importRecords upserts a batch of leads outside a transaction', async () => {
+    await applyOp('importRecords', { records: [baseLead({ id: 'LEAD-A' }), baseLead({ id: 'LEAD-B', company: 'Beta' })] });
+    const all = await listLeads();
+    expect(all.map((r) => r.id).sort()).toEqual(['LEAD-A', 'LEAD-B']);
   });
 
   it('reseedLeads replaces all contacts inside one transaction', async () => {

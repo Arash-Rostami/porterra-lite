@@ -1,10 +1,9 @@
-import { describe, it, expect, beforeEach, afterAll } from 'vitest';
-import { resetTestDb, closeTestDb } from './testSupport/testDb.js';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { resetTestDb } from './testSupport/testDb.js';
 import { listCategories, getCategoryById, createCategory, updateCategory, deleteCategory, createProduct } from './queries.js';
 import { getPool } from './db.js';
 
 beforeEach(async () => { await resetTestDb(); });
-afterAll(async () => { await closeTestDb(); });
 
 describe('categories queries', () => {
   it('lists the two seeded base categories ordered by name', async () => {

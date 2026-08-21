@@ -1,9 +1,8 @@
-import { describe, it, expect, beforeEach, afterAll } from 'vitest';
-import { resetTestDb, closeTestDb } from './testSupport/testDb.js';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { resetTestDb } from './testSupport/testDb.js';
 import { listReminders, getReminderById, createReminder, updateReminder, deleteReminder } from './queries.js';
 
 beforeEach(async () => { await resetTestDb(); });
-afterAll(async () => { await closeTestDb(); });
 
 const baseReminder = (overrides = {}) => ({
   id: 'REM-1', custKey: 'acme', company: 'Acme', dueDate: '2026-09-01', dueTime: '10:00',

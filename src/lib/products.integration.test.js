@@ -1,9 +1,8 @@
-import { describe, it, expect, beforeEach, afterAll } from 'vitest';
-import { resetTestDb, closeTestDb } from './testSupport/testDb.js';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { resetTestDb } from './testSupport/testDb.js';
 import { listProducts, getProductById, createProduct, updateProduct, deleteProduct } from './queries.js';
 
 beforeEach(async () => { await resetTestDb(); });
-afterAll(async () => { await closeTestDb(); });
 
 describe('products queries', () => {
   it('creates a product linked to a category', async () => {

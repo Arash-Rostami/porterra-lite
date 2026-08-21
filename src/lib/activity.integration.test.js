@@ -1,9 +1,8 @@
-import { describe, it, expect, beforeEach, afterAll } from 'vitest';
-import { resetTestDb, closeTestDb } from './testSupport/testDb.js';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { resetTestDb } from './testSupport/testDb.js';
 import { listActivity, getActivityById, createActivity, updateActivity, deleteActivity } from './queries.js';
 
 beforeEach(async () => { await resetTestDb(); });
-afterAll(async () => { await closeTestDb(); });
 
 describe('customer_activity queries', () => {
   it('creates a comment and a change entry under the same company key', async () => {

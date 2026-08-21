@@ -120,3 +120,9 @@ section above. Steps:
 Every test file resets the database (via `src/lib/testSupport/testDb.js`)
 before each test — do not point `.env.test` at a database with data you
 care about.
+
+Note: `docker compose` itself reads a plain `.env` file (not `.env.test`) for
+`MYSQL_PASSWORD`/`MYSQL_PORT`. If you have a `.env` overriding those, the
+`.env.test.example` defaults (which assume `docker-compose.yml`'s own
+defaults) may not match — check `docker compose config` or your own `.env`
+if the integration suite can't connect.

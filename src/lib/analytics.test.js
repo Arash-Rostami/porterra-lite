@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { computeKpis, computeFunnelStages, computeAgentReport, computeDailyAgentData, agentColor } from './analytics.js';
+import { setAgentDirectory } from './filters.js';
+
+beforeEach(() => setAgentDirectory([]));
 
 const lead = (overrides = {}) => ({
   coordinator: 'FARNAZ', result: 'در حال پیگیری', quoteResult: null, converted: false, notes: '', ...overrides,
@@ -67,7 +70,7 @@ describe('computeDailyAgentData outlier cap', () => {
       ...Array.from({ length: 8 }, (_, i) => lead({ coordinator: 'PARDIS', date: ddmmyyyy(i + 2) })),
     ];
     const { datasets, cap, wasCapped } = computeDailyAgentData(records, 'gregorian');
-    const farnaz = datasets.find((d) => d.label === 'FARNAZ' || d.rawData[0] === 50);
+    const farnaz = datasets.find((d) => d.rawData[0] === 50);
     expect(wasCapped).toBe(true);
     expect(farnaz.rawData[0]).toBe(50);
     expect(farnaz.data[0]).toBe(cap);

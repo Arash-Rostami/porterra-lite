@@ -448,3 +448,15 @@ state is module-level (one global confirm), same external-store pattern as `uiSt
 ### `theme.js`, `useCountUp.js`
 Presentation-only helpers (dark mode persistence, animated count-up). No business logic to
 deviate on.
+
+### `testSupport/` — test-only, not shipped
+Consumed exclusively by `*.integration.test.js` files (run via `npm run test:integration`,
+a second Vitest project — see `vitest.integration.config.js` and `db/README.md`'s "Running
+the integration test suite" section), never by production code. `loadTestEnv.js` loads
+`.env.test` via Node's `process.loadEnvFile` before the suite runs, so the integration DB
+connection can differ from `.env.local`. `testDb.js`'s `resetTestDb()` truncates all 6 tables
+and re-seeds the two base categories before every test — every integration file starts from
+the same clean slate; there's no `closeTestDb`/pool-teardown step per file, since Vitest's
+default per-file isolation gives each file its own module registry (and thus its own
+`db.js` pool instance) and the process exit closes it — see the comment in
+`vitest.integration.config.js` before disabling isolation.

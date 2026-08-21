@@ -51,6 +51,7 @@ Two invariants that override any "looks about right" instinct:
 | `src/app/api/CLAUDE.md` | REST route table — method, auth level, purpose per endpoint. |
 | `src/components/CLAUDE.md` | Component folder organization + shared-component rules (`Modal.jsx`, `Icon.jsx`). |
 | `public/panel_mostaqel_moshtarian.html` | The original prototype — ground truth for business behavior, especially the quote workflow. |
+| `db/README.md`'s "Running the integration test suite" section | Unit tests (`npm test`) vs. the real-MySQL integration suite (`npm run test:integration`) — Docker Compose setup, `.env.test`, and the truncate-before-every-test caveat. |
 
 If you add a new top-level convention (a new shared pattern, a new table, a
 new route group), update the relevant doc in this map rather than leaving it

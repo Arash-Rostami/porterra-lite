@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterAll } from 'vitest';
-import { resetTestDb, closeTestDb } from './testSupport/testDb.js';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { resetTestDb } from './testSupport/testDb.js';
 import {
   listUsers, listUsersRaw, getUserById, findUserByUsername, findUserByEmail,
   createUser, updateUser, updateUserLastLogin, setUserActive, deleteUser,
@@ -7,7 +7,6 @@ import {
 } from './queries.js';
 
 beforeEach(async () => { await resetTestDb(); });
-afterAll(async () => { await closeTestDb(); });
 
 const baseUser = (overrides = {}) => ({
   id: 'USR-1', username: 'farnaz', email: 'farnaz@example.com', display_name: 'Farnaz',
