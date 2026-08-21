@@ -4,7 +4,7 @@ export type Calendar = 'gregorian' | 'jalali';
 
 export default class Utils {
   static normSpace(s: unknown): string {
-    return (s ?? '').toString().replace(/\s+/g, ' ').trim();
+    return (s || '').toString().replace(/\s+/g, ' ').trim();
   }
 
   static normalizePhone(s: string | null | undefined): string {
