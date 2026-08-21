@@ -1,17 +1,54 @@
 import Utils from './utils.js';
 
-export const COORD_LABELS = { FARNAZ: 'فرناز', PARDIS: 'پردیس', ZOHREH: 'زهره' };
-export const COORD_OPTS = [{ value: 'FARNAZ', label: 'فرناز' }, { value: 'PARDIS', label: 'پردیس' }, { value: 'ZOHREH', label: 'زهره' }];
-export const SOURCE_OPTS = ['ادمونت', 'اینترنت', 'نمایشگاه', 'مدیریت', 'ارتباطات', 'بازاریابی', 'همکاران', 'مشتری ورودی'];
-export const RESULT_OPTS = ['در حال پیگیری', 'در حال استعلام', 'بی‌پاسخ', 'غیرفعال'];
-export const STATUS_OPTS = ['در حال پیگیری', 'در حال استعلام', 'بی‌پاسخ', 'غیرفعال', 'بدون وضعیت'];
-export const PRIORITY_OPTS = ['بالا', 'متوسط', 'پایین'];
-export const PRICE_TYPE_OPTS = ['نقدی', 'اعتباری', 'پیش‌پرداخت'];
-const FAIL_NOTE_PATTERNS = ['یادم نمیاد', 'جواب نداد', 'پاسخ نداد', 'جواب نمی', 'پاسخ نمی'];
+export const COORD_LABELS: Record<string, string> = { FARNAZ: 'فرناز', PARDIS: 'پردیس', ZOHREH: 'زهره' };
+export const COORD_OPTS: { value: string; label: string }[] = [
+  { value: 'FARNAZ', label: 'فرناز' }, { value: 'PARDIS', label: 'پردیس' }, { value: 'ZOHREH', label: 'زهره' },
+];
+export const SOURCE_OPTS: string[] = ['ادمونت', 'اینترنت', 'نمایشگاه', 'مدیریت', 'ارتباطات', 'بازاریابی', 'همکاران', 'مشتری ورودی'];
+export const RESULT_OPTS: string[] = ['در حال پیگیری', 'در حال استعلام', 'بی‌پاسخ', 'غیرفعال'];
+export const STATUS_OPTS: string[] = ['در حال پیگیری', 'در حال استعلام', 'بی‌پاسخ', 'غیرفعال', 'بدون وضعیت'];
+export const PRIORITY_OPTS: string[] = ['بالا', 'متوسط', 'پایین'];
+export const PRICE_TYPE_OPTS: string[] = ['نقدی', 'اعتباری', 'پیش‌پرداخت'];
+const FAIL_NOTE_PATTERNS: string[] = ['یادم نمیاد', 'جواب نداد', 'پاسخ نداد', 'جواب نمی', 'پاسخ نمی'];
 
-let AGENT_DIRECTORY = {};
-let AGENT_DEPARTMENTS = {};
-export function setAgentDirectory(agents) {
+// Minimal structural shape of the fields the pure computation layer (this file,
+// duplicates.ts, analytics.ts, suggestions.ts) reads/writes on a lead record.
+// The canonical, fuller `Lead` type (with id, deactivateReason, quote* fields,
+// etc.) is defined in src/types/lead.ts once mappers.ts is converted (Task 8) —
+// this lighter type exists because those four files convert before mappers.ts
+// does, and each only ever needs a subset of Lead's fields.
+export interface LeadLike {
+  result?: string | null;
+  notes?: string | null;
+  quoteResult?: string | null;
+  converted?: boolean;
+  coordinator?: string | null;
+  category?: string | null;
+  source?: string | null;
+  product?: string | null;
+  company?: string | null;
+  name?: string | null;
+  phone?: string | null;
+  date?: string | null;
+  priority?: string | null;
+  price?: string | null;
+}
+
+export interface AgentInfo {
+  agentCode: string;
+  displayName: string;
+  department?: string | null;
+}
+
+export interface CurrentUser {
+  role: string;
+  department?: string | null;
+  agentCode?: string | null;
+}
+
+let AGENT_DIRECTORY: Record<string, string> = {};
+let AGENT_DEPARTMENTS: Record<string, string | null> = {};
+export function setAgentDirectory(agents: AgentInfo[]): void {
   AGENT_DIRECTORY = {};
   AGENT_DEPARTMENTS = {};
   for (const a of agents) {
@@ -20,11 +57,11 @@ export function setAgentDirectory(agents) {
   }
 }
 
-export function coordLabel(v) {
+export function coordLabel(v: string): string {
   return AGENT_DIRECTORY[v] || COORD_LABELS[v] || v;
 }
 
-export function coordCodeFromLabel(label) {
+export function coordCodeFromLabel(label: string | null | undefined): string | null {
   const s = Utils.normSpace(label || '');
   if (!s) return null;
   for (const code in AGENT_DIRECTORY) {
@@ -33,13 +70,13 @@ export function coordCodeFromLabel(label) {
   return null;
 }
 
-export function coordOptions() {
+export function coordOptions(): { value: string; label: string }[] {
   const codes = Object.keys(AGENT_DIRECTORY);
   if (!codes.length) return COORD_OPTS;
   return codes.sort((a, b) => AGENT_DIRECTORY[a].localeCompare(AGENT_DIRECTORY[b])).map((value) => ({ value, label: AGENT_DIRECTORY[value] }));
 }
 
-export function scopedCoordOptions(currentUser) {
+export function scopedCoordOptions(currentUser: CurrentUser | null | undefined): { value: string; label: string }[] {
   if (!currentUser || currentUser.role === 'admin' || currentUser.role === 'developer') return coordOptions();
   if (currentUser.role === 'manager') {
     const codes = Object.keys(AGENT_DIRECTORY).filter((code) => AGENT_DEPARTMENTS[code] === currentUser.department);
@@ -50,14 +87,14 @@ export function scopedCoordOptions(currentUser) {
   return [{ value: code, label: AGENT_DIRECTORY[code] || coordLabel(code) }];
 }
 
-export function coordClass(co) {
+export function coordClass(co: string | null | undefined): string {
   if (co === 'FARNAZ') return '-farnaz';
   if (co === 'PARDIS') return '-pardis';
   if (co === 'ZOHREH') return '-zohreh';
   return '-other';
 }
 
-export function badgeClass(cat) {
+export function badgeClass(cat: string | null | undefined): string {
   if (!cat) return '-other';
   if (cat === 'Solar') return '-solar';
   if (cat.indexOf('Polymer') > -1) return '-polymer';
@@ -68,22 +105,22 @@ export function badgeClass(cat) {
   return '-other';
 }
 
-export function noteIndicatesNoAnswer(notes) {
+export function noteIndicatesNoAnswer(notes: string | null | undefined): boolean {
   if (!notes) return false;
   return FAIL_NOTE_PATTERNS.some((p) => notes.indexOf(p) > -1);
 }
 
-export function effectiveResult(r) {
+export function effectiveResult(r: LeadLike): string | null {
   if (r.result) return r.result;
   if (noteIndicatesNoAnswer(r.notes)) return 'بی‌پاسخ';
   return null;
 }
 
-export function isQuoteOpen(r) {
+export function isQuoteOpen(r: LeadLike): boolean {
   return r.result === 'در حال استعلام' && !r.quoteResult;
 }
 
-export function statusBadgeInfo(r) {
+export function statusBadgeInfo(r: LeadLike): { text: string; className: string } {
   if (r.converted || r.quoteResult === 'موفق') return { text: 'موفق', className: '-success' };
   if (r.quoteResult === 'ناموفق') return { text: 'ناموفق', className: '-fail' };
   const effRes = effectiveResult(r);
@@ -92,11 +129,16 @@ export function statusBadgeInfo(r) {
   return { text: effRes, className: '-progress' };
 }
 
-export function smartSearch(records, query) {
+export interface ScoredRecord<T> {
+  r: T;
+  score: number;
+}
+
+export function smartSearch<T extends LeadLike & Record<string, unknown>>(records: T[], query: string | null | undefined): ScoredRecord<T>[] {
   if (!query || !query.trim()) return records.map((r) => ({ r, score: 1 }));
   const tokens = query.trim().toLowerCase().split(/\s+/);
   const fields = ['company', 'name', 'phone', 'notes', 'product', 'category', 'source', 'coordinator'];
-  const out = [];
+  const out: ScoredRecord<T>[] = [];
   for (const r of records) {
     let score = 0;
     for (const tok of tokens) {
@@ -113,8 +155,37 @@ export function smartSearch(records, query) {
   return out;
 }
 
-export function getFiltered(records, filters, chartFilter, sort) {
-  let base = records;
+export interface LeadFilters {
+  coordinator?: string | null;
+  category?: string | null;
+  source?: string | null;
+  product?: string | null;
+  status?: string | null;
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  q?: string | null;
+}
+
+export type ChartFilter =
+  | { type: 'month'; dateFrom?: string | null; dateTo?: string | null }
+  | { type: 'day'; date: string; agent?: string | null }
+  | { type: 'otherSource'; topSet: Set<string> }
+  | { type: 'kpi'; key: string }
+  | null
+  | undefined;
+
+export interface SortSpec {
+  key: string;
+  dir: 1 | -1;
+}
+
+export function getFiltered<T extends LeadLike & Record<string, unknown>>(
+  records: T[],
+  filters: LeadFilters,
+  chartFilter: ChartFilter,
+  sort: SortSpec | null | undefined
+): T[] {
+  let base: T[] = records;
   const { coordinator, category, source, product, status, dateFrom, dateTo } = filters;
   base = base.filter((r) => {
     if (coordinator && r.coordinator !== coordinator) return false;
@@ -175,20 +246,30 @@ export function getFiltered(records, filters, chartFilter, sort) {
   }
   let scored = smartSearch(base, filters.q);
   scored.sort((a, b) => b.score - a.score);
-  let list = scored.map((s) => s.r);
+  let list: T[] = scored.map((s) => s.r);
   if (sort && sort.key) {
     const k = sort.key;
     list = list.slice().sort((a, b) => {
-      let av = a[k] || '', bv = b[k] || '';
-      if (k === 'date') { av = Utils.parseDate(a.date) || new Date(0); bv = Utils.parseDate(b.date) || new Date(0); return (av - bv) * sort.dir; }
+      const av: unknown = a[k] || '', bv: unknown = b[k] || '';
+      if (k === 'date') {
+        const avd = Utils.parseDate(a.date) || new Date(0);
+        const bvd = Utils.parseDate(b.date) || new Date(0);
+        return (avd.getTime() - bvd.getTime()) * sort.dir;
+      }
       return String(av).localeCompare(String(bv)) * sort.dir;
     });
   }
   return list;
 }
 
-export function filterOptionsFrom(records) {
-  const coords = new Set(), cats = new Set(), sources = new Set();
+export interface FilterOptions {
+  coordinators: { value: string; label: string }[];
+  categories: string[];
+  sources: string[];
+}
+
+export function filterOptionsFrom<T extends LeadLike>(records: T[]): FilterOptions {
+  const coords = new Set<string>(), cats = new Set<string>(), sources = new Set<string>();
   for (const r of records) {
     if (r.coordinator) coords.add(r.coordinator);
     if (r.category) cats.add(r.category);
@@ -201,8 +282,8 @@ export function filterOptionsFrom(records) {
   };
 }
 
-export function sourceSuggestions(records) {
-  const set = new Set(SOURCE_OPTS);
+export function sourceSuggestions<T extends LeadLike>(records: T[]): string[] {
+  const set = new Set<string>(SOURCE_OPTS);
   for (const r of records) {
     const s = Utils.normSpace(r.source);
     if (s) set.add(s);
