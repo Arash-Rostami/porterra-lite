@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { handle } from '@/lib/apiHandler';
 import { requireUser } from '@/lib/auth';
 import { tryOp, checkLeadScope } from '@/lib/serverOps';
@@ -6,13 +6,17 @@ import { getLeadById } from '@/lib/queries';
 import { parseOrThrow, Id, QuoteAnnouncePrice, QuoteResolve } from '@/lib/models';
 import Utils from '@/lib/utils';
 
-function validationError(message) {
-  const err = new Error(message);
+interface RouteContext {
+  params: Promise<{ id: string }>;
+}
+
+function validationError(message: string): Error & { code?: string } {
+  const err = new Error(message) as Error & { code?: string };
   err.code = 'VALIDATION';
   return err;
 }
 
-export const PATCH = handle(async (req, ctx) => {
+export const PATCH = handle(async (req: NextRequest, ctx: RouteContext) => {
   const user = await requireUser();
   const { id: rawId } = await ctx.params;
   const id = parseOrThrow(Id, rawId);
