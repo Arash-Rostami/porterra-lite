@@ -2,11 +2,11 @@ import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 
-function key() {
-  return Buffer.from(process.env.ENCRYPTION_KEY, 'base64');
+function key(): Buffer {
+  return Buffer.from(process.env.ENCRYPTION_KEY as string, 'base64');
 }
 
-export function encryptString(text) {
+export function encryptString(text: string): string {
   const iv = randomBytes(16);
   const cipher = createCipheriv(ALGORITHM, key(), iv);
 
@@ -22,7 +22,7 @@ export function encryptString(text) {
   return Buffer.from(JSON.stringify(payload)).toString('base64');
 }
 
-export function decryptString(payload) {
+export function decryptString(payload: string): string | null {
   try {
     const parsed = JSON.parse(Buffer.from(payload, 'base64').toString('utf8'));
     const decipher = createDecipheriv(ALGORITHM, key(), Buffer.from(parsed.iv, 'hex'));
@@ -41,9 +41,29 @@ export function decryptString(payload) {
 const SESSION_COOKIE = 'crm_session';
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-export const SESSION_COOKIE_NAME = SESSION_COOKIE;
+export const SESSION_COOKIE_NAME: string = SESSION_COOKIE;
 
-export function createSessionToken(user) {
+export interface SessionUser {
+  id: string;
+  username: string;
+  email: string | null;
+  displayName: string | null;
+  agentCode?: string | null;
+  department?: string | null;
+  role: string;
+}
+
+export interface SessionTokenPayload {
+  userId: string;
+  username: string;
+  displayName: string | null;
+  agentCode: string | null;
+  department: string | null;
+  role: string;
+  expiresAt: number;
+}
+
+export function createSessionToken(user: SessionUser): { token: string; expiresAt: number } {
   const expiresAt = Date.now() + SESSION_TTL_MS;
   return {
     token: encryptString(JSON.stringify({
@@ -59,12 +79,12 @@ export function createSessionToken(user) {
   };
 }
 
-export function readSessionToken(token) {
+export function readSessionToken(token: string | null | undefined): SessionTokenPayload | null {
   if (!token) return null;
   const raw = decryptString(token);
   if (!raw) return null;
   try {
-    const payload = JSON.parse(raw);
+    const payload = JSON.parse(raw) as SessionTokenPayload;
     if (!payload || typeof payload.expiresAt !== 'number' || payload.expiresAt < Date.now()) return null;
     return payload;
   } catch {
