@@ -1,11 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { handle } from '@/lib/apiHandler';
 import { requireUser, requireElevated, isElevated } from '@/lib/auth';
 import { parseOrThrow, UserUpdate, Id } from '@/lib/models';
 import { findUserByEmail, updateUser, deleteUser, findDepartmentByNormalizedName } from '@/lib/queries';
+import type { UserPatch } from '@/lib/queries';
 import { encryptString } from '@/lib/crypto';
 
-export const PATCH = handle(async (req, ctx) => {
+interface RouteContext {
+  params: Promise<{ id: string }>;
+}
+
+export const PATCH = handle(async (req: NextRequest, ctx: RouteContext) => {
   const actor = await requireUser();
   const { id: rawId } = await ctx.params;
   const targetId = parseOrThrow(Id, rawId);
@@ -27,7 +32,7 @@ export const PATCH = handle(async (req, ctx) => {
     const canonical = await findDepartmentByNormalizedName(u.department);
     u.department = canonical || u.department;
   }
-  const queryPatch = {};
+  const queryPatch: UserPatch = {};
   if (u.displayName !== undefined) queryPatch.displayName = u.displayName;
   if (u.email !== undefined) queryPatch.email = u.email;
   if (u.agentCode !== undefined) queryPatch.agentCode = u.agentCode;
@@ -39,7 +44,7 @@ export const PATCH = handle(async (req, ctx) => {
   return NextResponse.json({ ok: true });
 });
 
-export const DELETE = handle(async (req, ctx) => {
+export const DELETE = handle(async (req: NextRequest, ctx: RouteContext) => {
   const admin = await requireElevated();
   const { id: rawId } = await ctx.params;
   const target = parseOrThrow(Id, rawId);

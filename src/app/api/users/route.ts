@@ -1,19 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { handle } from '@/lib/apiHandler';
 import { requireUser, requireAdmin, requireElevated } from '@/lib/auth';
 import { parseOrThrow, UserCreate } from '@/lib/models';
 import {
-  listUsers,
-  listUsersRaw,
-  createUser,
-  findUserByUsername,
-  findUserByEmail,
-  findDepartmentByNormalizedName,
+  listUsers, listUsersRaw, createUser, findUserByUsername, findUserByEmail, findDepartmentByNormalizedName,
 } from '@/lib/queries';
 import { encryptString, decryptString } from '@/lib/crypto';
 import { rowToUser } from '@/lib/mappers';
 
-export const GET = handle(async (req) => {
+export const GET = handle(async (req: NextRequest) => {
   if (req.nextUrl.searchParams.get('raw') === '1') {
     await requireAdmin();
     const rows = await listUsersRaw();
@@ -25,7 +20,7 @@ export const GET = handle(async (req) => {
   return NextResponse.json({ users });
 });
 
-export const POST = handle(async (req) => {
+export const POST = handle(async (req: NextRequest) => {
   await requireElevated();
   const body = await req.json();
   const u = parseOrThrow(UserCreate, body);
