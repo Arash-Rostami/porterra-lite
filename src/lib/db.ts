@@ -1,4 +1,5 @@
 import mysql from 'mysql2/promise';
+import type { Pool, PoolConnection } from 'mysql2/promise';
 
 const port = (() => {
   const p = Number(process.env.MYSQL_PORT);
@@ -19,18 +20,18 @@ const cfg = {
   enableKeepAlive: true,
 };
 
-let _pool = null;
-export function getPool() {
+let _pool: Pool | null = null;
+export function getPool(): Pool {
   if (!_pool) _pool = mysql.createPool(cfg);
   return _pool;
 }
 
-export async function query(sql, params = []) {
+export async function query<T = any>(sql: string, params: unknown[] = []): Promise<T[]> {
   const [rows] = await getPool().query(sql, params);
-  return rows;
+  return rows as T[];
 }
 
-export async function withTransaction(fn) {
+export async function withTransaction<T>(fn: (conn: PoolConnection) => Promise<T>): Promise<T> {
   const conn = await getPool().getConnection();
   try {
     await conn.beginTransaction();
@@ -51,8 +52,9 @@ const CONN_ERR = new Set([
   'ER_DBACCESS_DENIED_ERROR', 'ER_BAD_DB_ERROR',
 ]);
 
-export function isConnError(err) {
+export function isConnError(err: unknown): boolean {
   if (!err) return false;
-  if (CONN_ERR.has(err.code) || CONN_ERR.has(err.errno)) return true;
-  return typeof err.code === 'string' && (err.code.startsWith('PROTOCOL') || err.code.startsWith('ECONN'));
+  const e = err as { code?: string; errno?: unknown };
+  if (CONN_ERR.has(e.code as string) || CONN_ERR.has(e.errno as string)) return true;
+  return typeof e.code === 'string' && (e.code.startsWith('PROTOCOL') || e.code.startsWith('ECONN'));
 }
