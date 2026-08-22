@@ -34,7 +34,7 @@ Each interface is written to match exactly what its corresponding `rowToX` funct
 
 ## Scope: which files convert in this phase
 
-**`src/lib/` (17 files), pure/no-DB layer first (lowest risk, already unit-tested), in this order:**
+**`src/lib/` (15 files), pure/no-DB layer first (lowest risk, already unit-tested), in this order:**
 
 1. `utils.js` → `utils.ts`
 2. `calendar.js` → `calendar.ts`
@@ -57,7 +57,7 @@ Each interface is written to match exactly what its corresponding `rowToX` funct
 
 **Not touched by this phase (client-only React state, no test coverage change needed, but excluded — see Non-goals for why):** `store.js`, `uiStore.js`, `theme.js`, `useCountUp.js`, `confirm.js`, `leadPrefs.js`, `excel.js` — these either import React (`useSyncExternalStore`) or are tightly coupled to component consumers; converting them without also touching components risks incomplete typing at the boundary. Deferred to the future component-conversion phase.
 
-**Then `src/app/api/**/route.js` (23 files) → `.ts`**, same file-by-file discipline, after all of `src/lib`'s converted files they depend on are done.
+**Then `src/app/api/**/route.js` (24 files) → `.ts`**, same file-by-file discipline, after all of `src/lib`'s converted files they depend on are done.
 
 ## Tooling changes
 
