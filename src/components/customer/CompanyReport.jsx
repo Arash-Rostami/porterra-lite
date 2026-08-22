@@ -1,11 +1,11 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import Utils from '../../lib/utils.js';
+import Utils from '../../lib/utils';
 import CompanySuggest from '../ui/CompanySuggest.jsx';
-import { coordLabel, coordClass, statusBadgeInfo } from '../../lib/filters.js';
-import { custKey } from '../../lib/store.js';
-import { FA_MONTHS, JALALI_MONTHS, formatDisplayDate, gregorianToJalali } from '../../lib/calendar.js';
-import { useUiStore } from '../../lib/uiStore.js';
+import { coordLabel, coordClass, statusBadgeInfo } from '../../lib/filters';
+import { custKey } from '../../lib/store';
+import { FA_MONTHS, JALALI_MONTHS, formatDisplayDate, gregorianToJalali } from '../../lib/calendar';
+import { useUiStore } from '../../lib/uiStore';
 import { XIcon, SearchIcon } from '../ui/Icon.jsx';
 import Pagination, { paginate } from '../ui/Pagination.jsx';
 

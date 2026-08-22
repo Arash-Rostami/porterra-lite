@@ -1,8 +1,8 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { PencilIcon, TrashIcon, PlusIcon, ArrowsUpDownIcon } from '../ui/Icon.jsx';
-import Utils from '../../lib/utils.js';
-import { useUiStore } from '../../lib/uiStore.js';
+import Utils from '../../lib/utils';
+import { useUiStore } from '../../lib/uiStore';
 import Pagination, { paginate } from '../ui/Pagination.jsx';
 
 function Row({ c, isElevated, onEdit, onDelete }) {

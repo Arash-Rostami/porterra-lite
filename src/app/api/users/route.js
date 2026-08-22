@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { handle } from '@/lib/apiHandler.js';
-import { requireUser, requireAdmin, requireElevated } from '@/lib/auth.js';
-import { parseOrThrow, UserCreate } from '@/lib/models.js';
+import { handle } from '@/lib/apiHandler';
+import { requireUser, requireAdmin, requireElevated } from '@/lib/auth';
+import { parseOrThrow, UserCreate } from '@/lib/models';
 import {
   listUsers,
   listUsersRaw,
@@ -9,9 +9,9 @@ import {
   findUserByUsername,
   findUserByEmail,
   findDepartmentByNormalizedName,
-} from '@/lib/queries.js';
-import { encryptString, decryptString } from '@/lib/crypto.js';
-import { rowToUser } from '@/lib/mappers.js';
+} from '@/lib/queries';
+import { encryptString, decryptString } from '@/lib/crypto';
+import { rowToUser } from '@/lib/mappers';
 
 export const GET = handle(async (req) => {
   if (req.nextUrl.searchParams.get('raw') === '1') {

@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
-import Utils from './utils.js';
-import { coordLabel, coordCodeFromLabel, effectiveResult } from './filters.js';
+import Utils from './utils';
+import { coordLabel, coordCodeFromLabel, effectiveResult } from './filters';
 
 const IMPORT_ALIASES = {
   coordinator: ['coordinator', 'کارشناس', 'هماهنگ کننده', 'هماهنگ\u200cکننده'],

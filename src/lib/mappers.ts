@@ -1,9 +1,9 @@
-import type { Lead } from '../types/lead.js';
-import type { Product } from '../types/product.js';
-import type { Category } from '../types/category.js';
-import type { Activity, CompanyMeta } from '../types/activity.js';
-import type { Reminder } from '../types/reminder.js';
-import type { User } from '../types/user.js';
+import type { Lead } from '../types/lead';
+import type { Product } from '../types/product';
+import type { Category } from '../types/category';
+import type { Activity, CompanyMeta } from '../types/activity';
+import type { Reminder } from '../types/reminder';
+import type { User } from '../types/user';
 
 // Row shapes as returned by mysql2 for each table (snake_case columns, matching
 // db/schema.sql). Numeric/boolean-ish columns are typed `unknown` rather than

@@ -1,10 +1,10 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
-import { computeDailyAgentData } from '../../lib/analytics.js';
-import { chartGridColor, chartTextColor } from '../../lib/theme.js';
-import { coordLabel } from '../../lib/filters.js';
-import { useUiStore } from '../../lib/uiStore.js';
+import { computeDailyAgentData } from '../../lib/analytics';
+import { chartGridColor, chartTextColor } from '../../lib/theme';
+import { coordLabel } from '../../lib/filters';
+import { useUiStore } from '../../lib/uiStore';
 
 export default function DailyAgentChart({ records, dark, onSelectDay }) {
   const calendar = useUiStore((u) => u.calendar);

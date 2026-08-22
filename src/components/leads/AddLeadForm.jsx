@@ -4,11 +4,11 @@ import Modal from '../ui/Modal.jsx';
 import Dropdown from '../ui/Dropdown.jsx';
 import DateField from '../ui/DateField.jsx';
 import ProductField from './ProductField.jsx';
-import Utils from '../../lib/utils.js';
-import { findDuplicateCompany, findDuplicatePhone } from '../../lib/duplicates.js';
-import { scopedCoordOptions, coordLabel, RESULT_OPTS, PRIORITY_OPTS, sourceSuggestions } from '../../lib/filters.js';
-import { findLeadByCompany } from '../../lib/apiClient.js';
-import { useStore } from '../../lib/store.js';
+import Utils from '../../lib/utils';
+import { findDuplicateCompany, findDuplicatePhone } from '../../lib/duplicates';
+import { scopedCoordOptions, coordLabel, RESULT_OPTS, PRIORITY_OPTS, sourceSuggestions } from '../../lib/filters';
+import { findLeadByCompany } from '../../lib/apiClient';
+import { useStore } from '../../lib/store';
 import { toast } from '../ui/Toast.jsx';
 import { CheckIcon, XCircleIcon } from '../ui/Icon.jsx';
 

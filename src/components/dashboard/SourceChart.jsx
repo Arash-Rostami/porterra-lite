@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
-import { computeSourceData } from '../../lib/analytics.js';
-import { chartGridColor, chartTextColor } from '../../lib/theme.js';
+import { computeSourceData } from '../../lib/analytics';
+import { chartGridColor, chartTextColor } from '../../lib/theme';
 
 export default function SourceChart({ records, dark, onSelectSource }) {
   const canvasRef = useRef(null);

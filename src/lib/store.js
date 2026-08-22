@@ -1,10 +1,10 @@
 'use client';
 import {useSyncExternalStore, useMemo} from 'react';
-import Utils from './utils.js';
+import Utils from './utils';
 import {SEED_DATA} from '../data/seed.js';
 import {toast, toastShownRecently} from '../components/ui/Toast.jsx';
-import {setAgentDirectory} from './filters.js';
-import {initLeadPrefsForUser, resetLeadPrefs} from './leadPrefs.js';
+import {setAgentDirectory} from './filters';
+import {initLeadPrefsForUser, resetLeadPrefs} from './leadPrefs';
 import {
     addChangeLog as addChangeLogAction,
     addComment as addCommentAction,
@@ -27,7 +27,7 @@ import {
     updateProductAction,
     updateReminder as updateReminderAction,
     logout as logoutAction,
-} from './apiClient.js';
+} from './apiClient';
 
 let state = {
     records: [],

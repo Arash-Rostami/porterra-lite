@@ -1,16 +1,16 @@
 'use client';
 import { useState, useMemo } from 'react';
-import { computeAgentStats } from '../../lib/analytics.js';
-import { computeSuggestions } from '../../lib/suggestions.js';
-import { coordLabel, statusBadgeInfo } from '../../lib/filters.js';
-import Utils from '../../lib/utils.js';
+import { computeAgentStats } from '../../lib/analytics';
+import { computeSuggestions } from '../../lib/suggestions';
+import { coordLabel, statusBadgeInfo } from '../../lib/filters';
+import Utils from '../../lib/utils';
 import RingChart from '../ui/RingChart.jsx';
 import Modal from '../ui/Modal.jsx';
 import DateField from '../ui/DateField.jsx';
 import PhoneLink from '../ui/PhoneLink.jsx';
-import useCountUp from '../../lib/useCountUp.js';
-import { useUiStore } from '../../lib/uiStore.js';
-import { formatDisplayDate } from '../../lib/calendar.js';
+import useCountUp from '../../lib/useCountUp';
+import { useUiStore } from '../../lib/uiStore';
+import { formatDisplayDate } from '../../lib/calendar';
 import { FilterIcon, TrashIcon } from '../ui/Icon.jsx';
 import Pagination, { paginate } from '../ui/Pagination.jsx';
 

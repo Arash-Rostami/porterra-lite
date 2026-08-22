@@ -1,5 +1,5 @@
 'use client';
-import { computeFunnelStages } from '../../lib/analytics.js';
+import { computeFunnelStages } from '../../lib/analytics';
 
 export default function FunnelChart({ records }) {
   const { stages, leadConversionRate, quoteToSaleRate } = computeFunnelStages(records);

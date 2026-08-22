@@ -1,4 +1,4 @@
-import Utils from './utils.js';
+import Utils from './utils';
 
 export const COORD_LABELS: Record<string, string> = { FARNAZ: 'فرناز', PARDIS: 'پردیس', ZOHREH: 'زهره' };
 export const COORD_OPTS: { value: string; label: string }[] = [

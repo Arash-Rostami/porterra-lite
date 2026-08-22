@@ -1,11 +1,11 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { PencilIcon, TrashIcon, PlusIcon, DownloadIcon, ArrowsUpDownIcon } from '../ui/Icon.jsx';
-import { badgeClass } from '../../lib/filters.js';
-import { exportProductsToExcel } from '../../lib/excel.js';
+import { badgeClass } from '../../lib/filters';
+import { exportProductsToExcel } from '../../lib/excel';
 import { toast } from '../ui/Toast.jsx';
-import Utils from '../../lib/utils.js';
-import { useUiStore } from '../../lib/uiStore.js';
+import Utils from '../../lib/utils';
+import { useUiStore } from '../../lib/uiStore';
 import Pagination, { paginate } from '../ui/Pagination.jsx';
 
 function Row({ p, isElevated, onEdit, onDelete }) {

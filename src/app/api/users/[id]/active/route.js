@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { handle } from '@/lib/apiHandler.js';
-import { requireElevated } from '@/lib/auth.js';
-import { parseOrThrow, Id } from '@/lib/models.js';
-import { setUserActive } from '@/lib/queries.js';
+import { handle } from '@/lib/apiHandler';
+import { requireElevated } from '@/lib/auth';
+import { parseOrThrow, Id } from '@/lib/models';
+import { setUserActive } from '@/lib/queries';
 
 export const PATCH = handle(async (req, ctx) => {
   await requireElevated();

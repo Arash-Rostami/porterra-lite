@@ -6,8 +6,8 @@ import LastUpdatedLabel from './LastUpdatedLabel.jsx';
 import UserMenu from './UserMenu.jsx';
 import DateTime from './DateTime.jsx';
 import { CalendarIcon, PlusIcon, MinusIcon } from '../ui/Icon.jsx';
-import { useStore } from '../../lib/store.js';
-import { useUiStore, toggleCalendar, increaseFontScale, decreaseFontScale } from '../../lib/uiStore.js';
+import { useStore } from '../../lib/store';
+import { useUiStore, toggleCalendar, increaseFontScale, decreaseFontScale } from '../../lib/uiStore';
 
 export default function Header({ leadCount, customerCount, dark, onToggleTheme }) {
   const calendar = useUiStore((u) => u.calendar);

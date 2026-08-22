@@ -1,9 +1,9 @@
 'use client';
 import { useState } from 'react';
-import { summarizeSuggestions } from '../../lib/suggestions.js';
-import { findLatestComment } from '../../lib/store.js';
-import Utils from '../../lib/utils.js';
-import { useUiStore } from '../../lib/uiStore.js';
+import { summarizeSuggestions } from '../../lib/suggestions';
+import { findLatestComment } from '../../lib/store';
+import Utils from '../../lib/utils';
+import { useUiStore } from '../../lib/uiStore';
 import { XIcon } from '../ui/Icon.jsx';
 
 export function ReminderBanner({ byAgent }) {

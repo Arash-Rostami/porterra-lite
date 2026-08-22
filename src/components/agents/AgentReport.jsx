@@ -1,8 +1,8 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { computeAgentReport, exportAgentReportToExcel, agentColor } from '../../lib/analytics.js';
-import { coordLabel } from '../../lib/filters.js';
-import Utils from '../../lib/utils.js';
+import { computeAgentReport, exportAgentReportToExcel, agentColor } from '../../lib/analytics';
+import { coordLabel } from '../../lib/filters';
+import Utils from '../../lib/utils';
 import RingChart from '../ui/RingChart.jsx';
 import { toast } from '../ui/Toast.jsx';
 import { DownloadIcon } from '../ui/Icon.jsx';

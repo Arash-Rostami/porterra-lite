@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { handle } from '@/lib/apiHandler.js';
-import { createSession } from '@/lib/auth.js';
-import { authenticateUser } from '@/lib/serverOps.js';
+import { handle } from '@/lib/apiHandler';
+import { createSession } from '@/lib/auth';
+import { authenticateUser } from '@/lib/serverOps';
 
 export const POST = handle(async (req) => {
   const body = await req.json();

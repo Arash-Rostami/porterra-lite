@@ -1,6 +1,6 @@
 'use client';
-import { computeKpis } from '../../lib/analytics.js';
-import useCountUp from '../../lib/useCountUp.js';
+import { computeKpis } from '../../lib/analytics';
+import useCountUp from '../../lib/useCountUp';
 
 function KpiCard({ label, value, cls, onClick }) {
   const display = useCountUp(value);

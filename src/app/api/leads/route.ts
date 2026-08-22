@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { handle } from '@/lib/apiHandler.js';
-import { requireUser, isElevated } from '@/lib/auth.js';
-import { tryOp, resolveScope } from '@/lib/serverOps.js';
-import { parseOrThrow, LeadCreate } from '@/lib/models.js';
+import { handle } from '@/lib/apiHandler';
+import { requireUser, isElevated } from '@/lib/auth';
+import { tryOp, resolveScope } from '@/lib/serverOps';
+import { parseOrThrow, LeadCreate } from '@/lib/models';
 
 export const POST = handle(async (req: NextRequest) => {
   const user = await requireUser();

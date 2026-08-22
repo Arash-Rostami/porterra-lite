@@ -1,12 +1,12 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useStore } from '../../lib/store.js';
-import { listUsersAction, createUserAction, updateUserAction, setUserActiveAction, deleteUserAction, listDepartmentsAction } from '../../lib/apiClient.js';
+import { useStore } from '../../lib/store';
+import { listUsersAction, createUserAction, updateUserAction, setUserActiveAction, deleteUserAction, listDepartmentsAction } from '../../lib/apiClient';
 import UsersPanel from '../../components/users/UsersPanel.jsx';
 import UserFormModal from '../../components/users/UserFormModal.jsx';
 import { toast } from '../../components/ui/Toast.jsx';
-import { confirm } from '../../lib/confirm.js';
+import { confirm } from '../../lib/confirm';
 
 function isUnauthorized(err) {
   return err && (err.message === 'UNAUTHORIZED' || err.message === 'FORBIDDEN');

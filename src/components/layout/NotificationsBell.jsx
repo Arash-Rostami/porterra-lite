@@ -1,13 +1,13 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
-import { getDueReminders, markReminderDone, findLatestComment, custKey, useScopedData } from '../../lib/store.js';
-import { openProfile } from '../../lib/uiStore.js';
-import { coordLabel } from '../../lib/filters.js';
+import { getDueReminders, markReminderDone, findLatestComment, custKey, useScopedData } from '../../lib/store';
+import { openProfile } from '../../lib/uiStore';
+import { coordLabel } from '../../lib/filters';
 import { BellIcon, CheckIcon } from '../ui/Icon.jsx';
 import { toast } from '../ui/Toast.jsx';
-import Utils from '../../lib/utils.js';
-import { useUiStore } from '../../lib/uiStore.js';
-import { formatDisplayDate } from '../../lib/calendar.js';
+import Utils from '../../lib/utils';
+import { useUiStore } from '../../lib/uiStore';
+import { formatDisplayDate } from '../../lib/calendar';
 import Pagination, { paginate } from '../ui/Pagination.jsx';
 
 const PER_PAGE = 6;

@@ -1,6 +1,6 @@
 'use client';
 import Modal from './Modal.jsx';
-import { useConfirmState, answerConfirm } from '../../lib/confirm.js';
+import { useConfirmState, answerConfirm } from '../../lib/confirm';
 import { XCircleIcon, CheckIcon, TrashIcon } from './Icon.jsx';
 
 // single instance in AppShell driven by confirm() store so all confirms reuse one Modal shell

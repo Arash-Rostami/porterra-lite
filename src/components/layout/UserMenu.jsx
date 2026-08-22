@@ -1,5 +1,5 @@
 'use client';
-import { useStore, logout } from '../../lib/store.js';
+import { useStore, logout } from '../../lib/store';
 import { LogoutIcon } from '../ui/Icon.jsx';
 
 export default function UserMenu() {

@@ -1,4 +1,4 @@
-import { gregorianToJalali, JALALI_MONTHS } from './calendar.js';
+import { gregorianToJalali, JALALI_MONTHS } from './calendar';
 
 export type Calendar = 'gregorian' | 'jalali';
 

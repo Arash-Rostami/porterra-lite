@@ -1,7 +1,7 @@
 'use client';
-import { useUiStore } from '../../lib/uiStore.js';
+import { useUiStore } from '../../lib/uiStore';
 import Dropdown from './Dropdown.jsx';
-import { gregorianToJalali, jalaliToGregorian, jalaliMonthLength, JALALI_MONTHS } from '../../lib/calendar.js';
+import { gregorianToJalali, jalaliToGregorian, jalaliMonthLength, JALALI_MONTHS } from '../../lib/calendar';
 
 const pad2 = (n) => String(n).padStart(2, '0');
 const MONTH_OPTS = JALALI_MONTHS.map((label, i) => ({ value: String(i + 1), label }));

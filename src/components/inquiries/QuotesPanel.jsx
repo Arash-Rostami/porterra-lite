@@ -2,11 +2,11 @@
 import { useMemo, useState } from 'react';
 import Modal from '../ui/Modal.jsx';
 import Dropdown from '../ui/Dropdown.jsx';
-import Utils from '../../lib/utils.js';
-import { coordLabel, coordClass, PRICE_TYPE_OPTS } from '../../lib/filters.js';
-import { announceQuotePrice, resolveQuote } from '../../lib/store.js';
-import { formatDisplayDate } from '../../lib/calendar.js';
-import { useUiStore } from '../../lib/uiStore.js';
+import Utils from '../../lib/utils';
+import { coordLabel, coordClass, PRICE_TYPE_OPTS } from '../../lib/filters';
+import { announceQuotePrice, resolveQuote } from '../../lib/store';
+import { formatDisplayDate } from '../../lib/calendar';
+import { useUiStore } from '../../lib/uiStore';
 import { toast } from '../ui/Toast.jsx';
 import { CheckIcon, XCircleIcon } from '../ui/Icon.jsx';
 import Pagination, { paginate } from '../ui/Pagination.jsx';

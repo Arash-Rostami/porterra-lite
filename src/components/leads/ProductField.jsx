@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react';
 import Dropdown from '../ui/Dropdown.jsx';
 import Modal from '../ui/Modal.jsx';
-import { useStore, addProduct } from '../../lib/store.js';
+import { useStore, addProduct } from '../../lib/store';
 import { toast } from '../ui/Toast.jsx';
 import { PlusIcon, CheckIcon, XCircleIcon } from '../ui/Icon.jsx';
 

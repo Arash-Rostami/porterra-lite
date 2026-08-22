@@ -2,10 +2,10 @@
 import { useState } from 'react';
 import Dropdown from '../ui/Dropdown.jsx';
 import { paginate } from '../ui/Pagination.jsx';
-import { filterAgentSuggestions, sortSuggestions, exportSuggestionsToExcel, SUGGESTION_SORT_MODES } from '../../lib/suggestions.js';
-import { agentColor } from '../../lib/analytics.js';
-import { coordLabel } from '../../lib/filters.js';
-import { useStore } from '../../lib/store.js';
+import { filterAgentSuggestions, sortSuggestions, exportSuggestionsToExcel, SUGGESTION_SORT_MODES } from '../../lib/suggestions';
+import { agentColor } from '../../lib/analytics';
+import { coordLabel } from '../../lib/filters';
+import { useStore } from '../../lib/store';
 import { toast } from '../ui/Toast.jsx';
 import PhoneLink from '../ui/PhoneLink.jsx';
 import { DownloadIcon, TrashIcon, InfoIcon } from '../ui/Icon.jsx';

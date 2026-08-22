@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { handle } from '@/lib/apiHandler.js';
-import { deleteSession } from '@/lib/auth.js';
+import { handle } from '@/lib/apiHandler';
+import { deleteSession } from '@/lib/auth';
 
 export const POST = handle(async () => {
   await deleteSession();

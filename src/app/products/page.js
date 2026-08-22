@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { useStore, addProduct, updateProduct, deleteProduct } from '../../lib/store.js';
-import { confirm } from '../../lib/confirm.js';
+import { useStore, addProduct, updateProduct, deleteProduct } from '../../lib/store';
+import { confirm } from '../../lib/confirm';
 import { toast } from '../../components/ui/Toast.jsx';
 import ProductsPanel from '../../components/products/ProductsPanel.jsx';
 import ProductFormModal from '../../components/products/ProductFormModal.jsx';

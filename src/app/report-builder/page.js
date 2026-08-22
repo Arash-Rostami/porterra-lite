@@ -1,6 +1,6 @@
 'use client';
 import ReportBuilder from '../../components/reports/ReportBuilder.jsx';
-import { useScopedData } from '../../lib/store.js';
+import { useScopedData } from '../../lib/store';
 
 export default function ReportBuilderPage() {
     const { records } = useScopedData();

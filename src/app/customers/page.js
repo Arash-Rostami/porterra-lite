@@ -3,11 +3,11 @@ import { useMemo, useState } from 'react';
 import AddLeadForm from '../../components/leads/AddLeadForm.jsx';
 import LeadFilters from '../../components/leads/LeadFilters.jsx';
 import LeadTable from '../../components/leads/LeadTable.jsx';
-import { addRecords, deleteRecordWithLog, useScopedData } from '../../lib/store.js';
-import { openProfile, DEFAULT_FILTERS } from '../../lib/uiStore.js';
-import { exportToExcel } from '../../lib/excel.js';
-import { getFiltered } from '../../lib/filters.js';
-import { confirm } from '../../lib/confirm.js';
+import { addRecords, deleteRecordWithLog, useScopedData } from '../../lib/store';
+import { openProfile, DEFAULT_FILTERS } from '../../lib/uiStore';
+import { exportToExcel } from '../../lib/excel';
+import { getFiltered } from '../../lib/filters';
+import { confirm } from '../../lib/confirm';
 import { toast } from '../../components/ui/Toast.jsx';
 
 export default function CustomersPage() {

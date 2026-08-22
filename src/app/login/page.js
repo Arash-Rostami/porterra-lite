@@ -1,8 +1,8 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { login } from '../../lib/apiClient.js';
-import { useTheme } from '../../lib/theme.js';
+import { login } from '../../lib/apiClient';
+import { useTheme } from '../../lib/theme';
 import ThemeToggle from '../../components/layout/ThemeToggle.jsx';
 
 export default function LoginPage() {

@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { useStore, addCategory, updateCategory, deleteCategory } from '../../lib/store.js';
-import { confirm } from '../../lib/confirm.js';
+import { useStore, addCategory, updateCategory, deleteCategory } from '../../lib/store';
+import { confirm } from '../../lib/confirm';
 import { toast } from '../../components/ui/Toast.jsx';
 import CategoriesPanel from '../../components/categories/CategoriesPanel.jsx';
 import CategoryFormModal from '../../components/categories/CategoryFormModal.jsx';

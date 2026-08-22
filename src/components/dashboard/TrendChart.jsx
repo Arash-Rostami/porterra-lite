@@ -1,9 +1,9 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
-import { computeTrendData } from '../../lib/analytics.js';
-import { chartGridColor, chartTextColor } from '../../lib/theme.js';
-import { useUiStore } from '../../lib/uiStore.js';
+import { computeTrendData } from '../../lib/analytics';
+import { chartGridColor, chartTextColor } from '../../lib/theme';
+import { useUiStore } from '../../lib/uiStore';
 
 export default function TrendChart({ records, dark, onSelectMonth }) {
   const calendar = useUiStore((u) => u.calendar);

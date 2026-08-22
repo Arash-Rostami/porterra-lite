@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { useUiStore } from '../../lib/uiStore.js';
-import { gregorianToJalali, JALALI_MONTHS, FA_MONTHS } from '../../lib/calendar.js';
+import { useUiStore } from '../../lib/uiStore';
+import { gregorianToJalali, JALALI_MONTHS, FA_MONTHS } from '../../lib/calendar';
 
 const WEEKDAYS = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنج‌شنبه', 'جمعه', 'شنبه'];
 const toFa = (s) => String(s).replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[+d]);

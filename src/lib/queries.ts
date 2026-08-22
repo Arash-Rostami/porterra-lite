@@ -1,21 +1,21 @@
 import type { PoolConnection } from 'mysql2/promise';
 import type { z } from 'zod';
-import { query, withTransaction } from './db.js';
-import Utils from './utils.js';
+import { query, withTransaction } from './db';
+import Utils from './utils';
 import {
     ACTIVITY_COLS, activityToRow, CATEGORY_COLS, categoryToRow, LEAD_COLS, leadToRow, PRODUCT_COLS, productToRow,
     REMINDER_COLS, reminderToRow, rowsToCompanyMeta, rowToActivity, rowToCategory, rowToLead, rowToProduct,
     rowToReminder, rowToUser, USER_COLS, USER_SAFE_COLS,
-} from './mappers.js';
-import type { LeadRow, ProductRow, CategoryRow, ActivityRow, ReminderRow, UserRow } from './mappers.js';
-import type { Lead } from '../types/lead.js';
-import type { Product } from '../types/product.js';
-import type { Category } from '../types/category.js';
-import type { Activity } from '../types/activity.js';
-import type { Reminder } from '../types/reminder.js';
-import type { User } from '../types/user.js';
-import type { CompanyMeta } from '../types/activity.js';
-import type { LeadCreate, LeadUpdate, ProductCreate, ProductUpdate, CategoryCreate, CategoryUpdate, Activity as ActivitySchema, ActivityUpdate, Reminder as ReminderSchema, ReminderUpdate, UserUpdate } from './models.js';
+} from './mappers';
+import type { LeadRow, ProductRow, CategoryRow, ActivityRow, ReminderRow, UserRow } from './mappers';
+import type { Lead } from '../types/lead';
+import type { Product } from '../types/product';
+import type { Category } from '../types/category';
+import type { Activity } from '../types/activity';
+import type { Reminder } from '../types/reminder';
+import type { User } from '../types/user';
+import type { CompanyMeta } from '../types/activity';
+import type { LeadCreate, LeadUpdate, ProductCreate, ProductUpdate, CategoryCreate, CategoryUpdate, Activity as ActivitySchema, ActivityUpdate, Reminder as ReminderSchema, ReminderUpdate, UserUpdate } from './models';
 
 export type Conn = PoolConnection | undefined;
 export type LeadPatch = z.infer<typeof LeadUpdate>;

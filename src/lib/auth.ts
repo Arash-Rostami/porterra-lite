@@ -1,11 +1,11 @@
 import { cache } from 'react';
 import { cookies } from 'next/headers';
-import { SESSION_COOKIE_NAME, createSessionToken, readSessionToken } from './crypto.js';
-import type { SessionUser } from './crypto.js';
-import { isConnError } from './db.js';
-import { getUserById } from './queries.js';
-import { rowToUser } from './mappers.js';
-import type { User } from '../types/user.js';
+import { SESSION_COOKIE_NAME, createSessionToken, readSessionToken } from './crypto';
+import type { SessionUser } from './crypto';
+import { isConnError } from './db';
+import { getUserById } from './queries';
+import { rowToUser } from './mappers';
+import type { User } from '../types/user';
 
 const loadActiveUser = cache(async (userId: string): Promise<User | null> => {
   const row = await getUserById(userId);

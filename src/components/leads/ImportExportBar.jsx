@@ -1,7 +1,7 @@
 'use client';
 import { useRef, useState } from 'react';
-import { downloadImportTemplate, parseImportFile, countDuplicates, resolveImportCategoryIds } from '../../lib/excel.js';
-import { useStore } from '../../lib/store.js';
+import { downloadImportTemplate, parseImportFile, countDuplicates, resolveImportCategoryIds } from '../../lib/excel';
+import { useStore } from '../../lib/store';
 import { toast } from '../ui/Toast.jsx';
 import { UploadIcon, DownloadIcon } from '../ui/Icon.jsx';
 

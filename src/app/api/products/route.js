@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { handle } from '@/lib/apiHandler.js';
-import { requireUser } from '@/lib/auth.js';
-import { tryOp } from '@/lib/serverOps.js';
-import { parseOrThrow, ProductCreate } from '@/lib/models.js';
+import { handle } from '@/lib/apiHandler';
+import { requireUser } from '@/lib/auth';
+import { tryOp } from '@/lib/serverOps';
+import { parseOrThrow, ProductCreate } from '@/lib/models';
 
 export const POST = handle(async (req) => {
   await requireUser();

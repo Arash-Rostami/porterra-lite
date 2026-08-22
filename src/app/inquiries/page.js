@@ -1,7 +1,7 @@
 'use client';
 import QuotesPanel from '../../components/inquiries/QuotesPanel.jsx';
-import { useScopedData } from '../../lib/store.js';
-import { openProfile } from '../../lib/uiStore.js';
+import { useScopedData } from '../../lib/store';
+import { openProfile } from '../../lib/uiStore';
 
 export default function InquiriesPage() {
     const { records } = useScopedData();

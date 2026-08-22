@@ -1,9 +1,9 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { PencilIcon, TrashIcon, PlusIcon, PowerIcon, ArrowsUpDownIcon } from '../ui/Icon.jsx';
-import { coordLabel } from '../../lib/filters.js';
-import Utils from '../../lib/utils.js';
-import { useUiStore } from '../../lib/uiStore.js';
+import { coordLabel } from '../../lib/filters';
+import Utils from '../../lib/utils';
+import { useUiStore } from '../../lib/uiStore';
 import Pagination, { paginate } from '../ui/Pagination.jsx';
 
 const ROLE_LABELS = { admin: 'مدیر', developer: 'توسعه‌دهنده', manager: 'سرپرست بخش', agent: 'کارشناس' };

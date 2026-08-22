@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { handle } from '@/lib/apiHandler.js';
-import { requireElevated } from '@/lib/auth.js';
-import { tryOp } from '@/lib/serverOps.js';
-import { parseOrThrow, CategoryUpdate, Id } from '@/lib/models.js';
+import { handle } from '@/lib/apiHandler';
+import { requireElevated } from '@/lib/auth';
+import { tryOp } from '@/lib/serverOps';
+import { parseOrThrow, CategoryUpdate, Id } from '@/lib/models';
 
 function dupToValidation(err) {
   if (err && err.code === 'ER_DUP_ENTRY') {

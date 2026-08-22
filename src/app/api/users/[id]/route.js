@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { handle } from '@/lib/apiHandler.js';
-import { requireUser, requireElevated, isElevated } from '@/lib/auth.js';
-import { parseOrThrow, UserUpdate, Id } from '@/lib/models.js';
-import { findUserByEmail, updateUser, deleteUser, findDepartmentByNormalizedName } from '@/lib/queries.js';
-import { encryptString } from '@/lib/crypto.js';
+import { handle } from '@/lib/apiHandler';
+import { requireUser, requireElevated, isElevated } from '@/lib/auth';
+import { parseOrThrow, UserUpdate, Id } from '@/lib/models';
+import { findUserByEmail, updateUser, deleteUser, findDepartmentByNormalizedName } from '@/lib/queries';
+import { encryptString } from '@/lib/crypto';
 
 export const PATCH = handle(async (req, ctx) => {
   const actor = await requireUser();

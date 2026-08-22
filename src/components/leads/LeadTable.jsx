@@ -1,12 +1,12 @@
 'use client';
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { getFiltered, coordLabel, coordClass, badgeClass, statusBadgeInfo } from '../../lib/filters.js';
-import Utils from '../../lib/utils.js';
+import { getFiltered, coordLabel, coordClass, badgeClass, statusBadgeInfo } from '../../lib/filters';
+import Utils from '../../lib/utils';
 import { PencilIcon, TrashIcon, DownloadIcon, PlusIcon, FlagIcon, ArrowsUpDownIcon } from '../ui/Icon.jsx';
-import { useUiStore, setFilters as setUiFilters } from '../../lib/uiStore.js';
-import { useLeadPrefs, toggleFlag, setManualOrder, getOrderIndex } from '../../lib/leadPrefs.js';
-import { formatDisplayDate } from '../../lib/calendar.js';
+import { useUiStore, setFilters as setUiFilters } from '../../lib/uiStore';
+import { useLeadPrefs, toggleFlag, setManualOrder, getOrderIndex } from '../../lib/leadPrefs';
+import { formatDisplayDate } from '../../lib/calendar';
 import ImportExportBar from './ImportExportBar.jsx';
 import CompanySuggest from '../ui/CompanySuggest.jsx';
 import Pagination, { paginate } from '../ui/Pagination.jsx';

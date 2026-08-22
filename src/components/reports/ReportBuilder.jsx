@@ -2,13 +2,13 @@
 import {useMemo, useState} from 'react';
 import Dropdown from '../ui/Dropdown.jsx';
 import DateField from '../ui/DateField.jsx';
-import {effectiveResult, filterOptionsFrom, getFiltered, scopedCoordOptions, STATUS_OPTS} from '../../lib/filters.js';
+import {effectiveResult, filterOptionsFrom, getFiltered, scopedCoordOptions, STATUS_OPTS} from '../../lib/filters';
 import {toast} from '../ui/Toast.jsx';
 import {DownloadIcon} from '../ui/Icon.jsx';
 import PhoneLink from '../ui/PhoneLink.jsx';
-import {useUiStore} from '../../lib/uiStore.js';
-import {useStore} from '../../lib/store.js';
-import {formatDisplayDate} from '../../lib/calendar.js';
+import {useUiStore} from '../../lib/uiStore';
+import {useStore} from '../../lib/store';
+import {formatDisplayDate} from '../../lib/calendar';
 import Pagination, {paginate} from '../ui/Pagination.jsx';
 
 function ChevronIcon() {

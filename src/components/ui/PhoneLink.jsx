@@ -1,4 +1,4 @@
-import Utils from '../../lib/utils.js';
+import Utils from '../../lib/utils';
 
 export default function PhoneLink({ phone, className = 'crm-mono' }) {
   if (!phone) return null;

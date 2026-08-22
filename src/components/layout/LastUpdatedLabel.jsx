@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useStore } from '../../lib/store.js';
+import { useStore } from '../../lib/store';
 
 // isolated so the 1s tick re-renders only this component, not the whole Header
 function relative(lastUpdated, now) {

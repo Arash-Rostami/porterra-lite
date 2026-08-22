@@ -1,7 +1,7 @@
 'use client';
-import { resetToSeed } from '../../lib/store.js';
+import { resetToSeed } from '../../lib/store';
 import { SEED_DATA } from '../../data/seed.js';
-import { confirm } from '../../lib/confirm.js';
+import { confirm } from '../../lib/confirm';
 import { toast } from '../ui/Toast.jsx';
 import { ArrowPathIcon } from '../ui/Icon.jsx';
 

@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { setAddFormOpen } from '../../lib/uiStore.js';
+import { setAddFormOpen } from '../../lib/uiStore';
 import { PlusIcon, SearchIcon } from '../ui/Icon.jsx';
 
 const LINK_GROUPS = [

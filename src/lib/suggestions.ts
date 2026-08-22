@@ -1,6 +1,6 @@
-import Utils from './utils.js';
-import { effectiveResult, coordLabel, type LeadLike } from './filters.js';
-import { custKey } from './store.js';
+import Utils from './utils';
+import { effectiveResult, coordLabel, type LeadLike } from './filters';
+import { custKey } from './store';
 
 const PRIORITY_RANK: Record<string, number> = { 'بالا': 3, 'متوسط': 2, 'پایین': 1 };
 const PRIORITY_SCORE: Record<string, number> = { 'بالا': 45, 'متوسط': 25, 'پایین': 10 };

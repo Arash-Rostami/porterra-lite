@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { handle } from '@/lib/apiHandler.js';
-import { requireUser } from '@/lib/auth.js';
-import { tryOp, checkLeadScope } from '@/lib/serverOps.js';
-import { getLeadById } from '@/lib/queries.js';
-import { parseOrThrow, Id, QuoteAnnouncePrice, QuoteResolve } from '@/lib/models.js';
-import Utils from '@/lib/utils.js';
+import { handle } from '@/lib/apiHandler';
+import { requireUser } from '@/lib/auth';
+import { tryOp, checkLeadScope } from '@/lib/serverOps';
+import { getLeadById } from '@/lib/queries';
+import { parseOrThrow, Id, QuoteAnnouncePrice, QuoteResolve } from '@/lib/models';
+import Utils from '@/lib/utils';
 
 function validationError(message) {
   const err = new Error(message);

@@ -1,8 +1,8 @@
 'use client';
 import AgentsPanel from '../../components/agents/AgentsPanel.jsx';
 import AgentReport from '../../components/agents/AgentReport.jsx';
-import { useScopedData } from '../../lib/store.js';
-import { useUiStore, setCoordinatorFilter, openAgentProfile } from '../../lib/uiStore.js';
+import { useScopedData } from '../../lib/store';
+import { useUiStore, setCoordinatorFilter, openAgentProfile } from '../../lib/uiStore';
 
 export default function AgentsPage() {
     const { records } = useScopedData();

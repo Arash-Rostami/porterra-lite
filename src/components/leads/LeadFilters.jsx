@@ -3,8 +3,8 @@ import { useMemo } from 'react';
 import Dropdown from '../ui/Dropdown.jsx';
 import DateField from '../ui/DateField.jsx';
 import { TrashIcon } from '../ui/Icon.jsx';
-import { filterOptionsFrom, scopedCoordOptions, STATUS_OPTS } from '../../lib/filters.js';
-import { useStore } from '../../lib/store.js';
+import { filterOptionsFrom, scopedCoordOptions, STATUS_OPTS } from '../../lib/filters';
+import { useStore } from '../../lib/store';
 
 const emptyFilters = { q: '', coordinator: '', category: '', source: '', product: '', status: '', dateFrom: '', dateTo: '' };
 

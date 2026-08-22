@@ -4,7 +4,7 @@ import Modal from '../ui/Modal.jsx';
 import Dropdown from '../ui/Dropdown.jsx';
 import { toast } from '../ui/Toast.jsx';
 import { CheckIcon, PlusIcon, XCircleIcon } from '../ui/Icon.jsx';
-import { useStore, addCategory } from '../../lib/store.js';
+import { useStore, addCategory } from '../../lib/store';
 
 const empty = { name: '', categoryId: '' };
 

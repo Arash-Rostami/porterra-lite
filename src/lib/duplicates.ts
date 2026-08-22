@@ -1,5 +1,5 @@
-import Utils from './utils.js';
-import { coordLabel, type LeadLike } from './filters.js';
+import Utils from './utils';
+import { coordLabel, type LeadLike } from './filters';
 
 export function findDuplicateCompany<T extends LeadLike>(records: T[], companyInput: string | null | undefined): string | null {
   const company = Utils.normSpace(companyInput).toLowerCase();

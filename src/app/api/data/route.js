@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { handle } from '@/lib/apiHandler.js';
-import { requireUser } from '@/lib/auth.js';
-import { loadBootData } from '@/lib/serverOps.js';
+import { handle } from '@/lib/apiHandler';
+import { requireUser } from '@/lib/auth';
+import { loadBootData } from '@/lib/serverOps';
 
 export const GET = handle(async () => {
   const user = await requireUser();

@@ -2,9 +2,9 @@
 import { ReminderBanner, CommentBanner } from '../../components/suggestions/ReminderBanner.jsx';
 import RemindersList from '../../components/suggestions/RemindersList.jsx';
 import SuggestionsPanel from '../../components/suggestions/SuggestionsPanel.jsx';
-import { markReminderDone, useScopedData } from '../../lib/store.js';
-import { computeSuggestions } from '../../lib/suggestions.js';
-import { openProfile } from '../../lib/uiStore.js';
+import { markReminderDone, useScopedData } from '../../lib/store';
+import { computeSuggestions } from '../../lib/suggestions';
+import { openProfile } from '../../lib/uiStore';
 import { toast } from '../../components/ui/Toast.jsx';
 
 export default function SuggestionsPage() {

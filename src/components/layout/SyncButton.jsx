@@ -1,5 +1,5 @@
 'use client';
-import { useStore, syncNow } from '../../lib/store.js';
+import { useStore, syncNow } from '../../lib/store';
 import { ArrowsRightLeftIcon } from '../ui/Icon.jsx';
 
 // badge surfaces pending changes (queueCount) or offline state even when nothing is queued

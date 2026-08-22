@@ -1,8 +1,8 @@
 'use client';
 import { useMemo, useState } from 'react';
-import Utils from '../../lib/utils.js';
-import { coordLabel } from '../../lib/filters.js';
-import { agentColor } from '../../lib/analytics.js';
+import Utils from '../../lib/utils';
+import { coordLabel } from '../../lib/filters';
+import { agentColor } from '../../lib/analytics';
 import Pagination, { paginate } from '../ui/Pagination.jsx';
 
 const PER_PAGE = 20;

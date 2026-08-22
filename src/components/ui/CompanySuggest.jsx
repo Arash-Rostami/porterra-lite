@@ -1,6 +1,6 @@
 'use client';
 import { useState, useRef } from 'react';
-import Utils from '../../lib/utils.js';
+import Utils from '../../lib/utils';
 
 // live company typeahead; the text field still works identically without the dropdown
 export default function CompanySuggest({ records, value, onChange, onSelect, ...inputProps }) {

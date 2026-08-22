@@ -1,6 +1,6 @@
-import Utils from './utils.js';
-import { FA_MONTHS, JALALI_MONTHS, gregorianToJalali, jalaliToGregorian, jalaliMonthLength } from './calendar.js';
-import { effectiveResult, coordLabel, type LeadLike } from './filters.js';
+import Utils from './utils';
+import { FA_MONTHS, JALALI_MONTHS, gregorianToJalali, jalaliToGregorian, jalaliMonthLength } from './calendar';
+import { effectiveResult, coordLabel, type LeadLike } from './filters';
 
 const pad2 = (n: number): string => String(n).padStart(2, '0');
 const ddmmyyyy = (y: number, m: number, d: number): string => `${pad2(d)}.${pad2(m)}.${y}`;

@@ -8,10 +8,10 @@ import DailyAgentChart from '../../components/dashboard/DailyAgentChart.jsx';
 import CategoryChart from '../../components/dashboard/CategoryChart.jsx';
 import SourceChart from '../../components/dashboard/SourceChart.jsx';
 import DashboardFilters, { emptyDashboardFilters } from '../../components/dashboard/DashboardFilters.jsx';
-import { useScopedData } from '../../lib/store.js';
-import { useTheme } from '../../lib/theme.js';
-import { applyCategoryFilter, applySourceFilter, applyMonthFilter, applyDayFilter, applyKpiFilter } from '../../lib/uiStore.js';
-import { getFiltered } from '../../lib/filters.js';
+import { useScopedData } from '../../lib/store';
+import { useTheme } from '../../lib/theme';
+import { applyCategoryFilter, applySourceFilter, applyMonthFilter, applyDayFilter, applyKpiFilter } from '../../lib/uiStore';
+import { getFiltered } from '../../lib/filters';
 
 export default function DashboardPage() {
     const { records } = useScopedData();

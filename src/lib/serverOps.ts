@@ -1,17 +1,17 @@
-import { withTransaction, isConnError } from './db.js';
+import { withTransaction, isConnError } from './db';
 import {
   applyOp, loadAllFromDb, reseedLeads, findUserByEmail, createUser, updateUserLastLogin, listAgentCodesByDepartment,
-} from './queries.js';
-import type { BootData } from './queries.js';
+} from './queries';
+import type { BootData } from './queries';
 import { mkdir, readdir, readFile, rename, unlink, writeFile } from 'fs/promises';
 import path from 'path';
 import { SEED_DATA } from '../data/seed.js';
-import { parseOrThrow, LeadCreate, LoginInput } from './models.js';
-import { encryptString, decryptString } from './crypto.js';
-import { rowToUser } from './mappers.js';
-import { isElevated } from './auth.js';
-import Utils from './utils.js';
-import type { User } from '../types/user.js';
+import { parseOrThrow, LeadCreate, LoginInput } from './models';
+import { encryptString, decryptString } from './crypto';
+import { rowToUser } from './mappers';
+import { isElevated } from './auth';
+import Utils from './utils';
+import type { User } from '../types/user';
 
 export interface ScopedUser {
   role?: string | null;

@@ -4,7 +4,7 @@ import Modal from '../ui/Modal.jsx';
 import Dropdown from '../ui/Dropdown.jsx';
 import { toast } from '../ui/Toast.jsx';
 import { CheckIcon, PlusIcon, XCircleIcon } from '../ui/Icon.jsx';
-import { coordLabel } from '../../lib/filters.js';
+import { coordLabel } from '../../lib/filters';
 
 const ROLE_OPTS = [{ value: 'admin', label: 'مدیر' }, { value: 'developer', label: 'توسعه‌دهنده' }, { value: 'manager', label: 'سرپرست بخش' }, { value: 'agent', label: 'کارشناس' }];
 

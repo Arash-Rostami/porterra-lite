@@ -1,4 +1,4 @@
-import { getPool } from '../db.js';
+import { getPool } from '../db';
 
 const SEED_CATEGORIES = [
   { id: 'CAT-chempoly', name: 'Chemical/Polymer' },

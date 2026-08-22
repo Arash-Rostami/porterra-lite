@@ -9,9 +9,9 @@ import { Toast } from '../ui/Toast.jsx';
 import LeadProfileModal from '../leads/LeadProfileModal.jsx';
 import AgentProfileModal from '../agents/AgentProfileModal.jsx';
 import ConfirmDialog from '../ui/ConfirmDialog.jsx';
-import { useStore, loadAll, syncNow } from '../../lib/store.js';
-import { useUiStore, closeProfile, closeAgentProfile, openProfile } from '../../lib/uiStore.js';
-import { useTheme } from '../../lib/theme.js';
+import { useStore, loadAll, syncNow } from '../../lib/store';
+import { useUiStore, closeProfile, closeAgentProfile, openProfile } from '../../lib/uiStore';
+import { useTheme } from '../../lib/theme';
 
 export default function AppShell({ children }) {
   const pathname = usePathname();

@@ -1,10 +1,10 @@
 'use client';
 import { useState } from 'react';
-import { getDueReminders, custKey } from '../../lib/store.js';
-import { coordLabel } from '../../lib/filters.js';
-import { useUiStore } from '../../lib/uiStore.js';
-import { formatDisplayDate } from '../../lib/calendar.js';
-import Utils from '../../lib/utils.js';
+import { getDueReminders, custKey } from '../../lib/store';
+import { coordLabel } from '../../lib/filters';
+import { useUiStore } from '../../lib/uiStore';
+import { formatDisplayDate } from '../../lib/calendar';
+import Utils from '../../lib/utils';
 import { CheckIcon } from '../ui/Icon.jsx';
 import Pagination, { paginate } from '../ui/Pagination.jsx';
 

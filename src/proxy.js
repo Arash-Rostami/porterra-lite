@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { SESSION_COOKIE_NAME, readSessionToken } from './lib/crypto.js';
+import { SESSION_COOKIE_NAME, readSessionToken } from './lib/crypto';
 
 export async function proxy(req) {
   const { pathname } = req.nextUrl;

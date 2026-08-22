@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
-import { computeCategoryData } from '../../lib/analytics.js';
-import { chartTextColor } from '../../lib/theme.js';
+import { computeCategoryData } from '../../lib/analytics';
+import { chartTextColor } from '../../lib/theme';
 
 export default function CategoryChart({ records, dark, onSelectCategory }) {
   const canvasRef = useRef(null);

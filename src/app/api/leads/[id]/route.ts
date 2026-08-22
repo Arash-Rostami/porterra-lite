@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { handle } from '@/lib/apiHandler.js';
-import { requireUser } from '@/lib/auth.js';
-import { tryOp, checkLeadScope } from '@/lib/serverOps.js';
-import { getLeadById } from '@/lib/queries.js';
-import { parseOrThrow, LeadUpdate, Activity, Id } from '@/lib/models.js';
+import { handle } from '@/lib/apiHandler';
+import { requireUser } from '@/lib/auth';
+import { tryOp, checkLeadScope } from '@/lib/serverOps';
+import { getLeadById } from '@/lib/queries';
+import { parseOrThrow, LeadUpdate, Activity, Id } from '@/lib/models';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
