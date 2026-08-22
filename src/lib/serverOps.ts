@@ -1,14 +1,9 @@
 import { withTransaction, isConnError } from './db.js';
 import {
-  applyOp,
-  loadAllFromDb,
-  reseedLeads,
-  findUserByEmail,
-  createUser,
-  updateUserLastLogin,
-  listAgentCodesByDepartment,
+  applyOp, loadAllFromDb, reseedLeads, findUserByEmail, createUser, updateUserLastLogin, listAgentCodesByDepartment,
 } from './queries.js';
-import {mkdir, readdir, readFile, rename, unlink, writeFile} from 'fs/promises';
+import type { BootData } from './queries.js';
+import { mkdir, readdir, readFile, rename, unlink, writeFile } from 'fs/promises';
 import path from 'path';
 import { SEED_DATA } from '../data/seed.js';
 import { parseOrThrow, LeadCreate, LoginInput } from './models.js';
@@ -16,8 +11,20 @@ import { encryptString, decryptString } from './crypto.js';
 import { rowToUser } from './mappers.js';
 import { isElevated } from './auth.js';
 import Utils from './utils.js';
+import type { User } from '../types/user.js';
 
-export async function resolveScope(user) {
+export interface ScopedUser {
+  role?: string | null;
+  department?: string | null;
+  agentCode?: string | null;
+}
+
+export type Scope =
+  | { type: 'all' }
+  | { type: 'department'; agentCodes: string[] }
+  | { type: 'own'; agentCode: string | null };
+
+export async function resolveScope(user: ScopedUser): Promise<Scope> {
     if (isElevated(user)) return { type: 'all' };
     if (user.role === 'manager') {
         if (!user.department) return { type: 'department', agentCodes: [] };
@@ -31,25 +38,27 @@ export async function resolveScope(user) {
     return { type: 'own', agentCode: user.agentCode || null };
 }
 
-// Shared by every route that patches a `contacts` row (leads PATCH/DELETE, quotes PATCH) —
-// a non-elevated user may only touch a lead whose coordinator is within their resolved scope.
-export async function checkLeadScope(user, existingLead, nextCoordinator) {
+export async function checkLeadScope(
+    user: ScopedUser,
+    existingLead: { coordinator?: string | null } | null | undefined,
+    nextCoordinator: string | null | undefined
+): Promise<void> {
     if (isElevated(user)) return;
     const scope = await resolveScope(user);
-    const covers = (code) => (scope.type === 'own' ? code === scope.agentCode : scope.agentCodes.includes(code));
+    const covers = (code: string | null | undefined) => (scope.type === 'own' ? code === scope.agentCode : scope.type === 'department' ? scope.agentCodes.includes(code ?? '') : true);
     if (existingLead && !covers(existingLead.coordinator)) throw new Error('FORBIDDEN');
     if (nextCoordinator !== undefined && !covers(nextCoordinator)) throw new Error('FORBIDDEN');
 }
 
-function scopeBootData(data, scope) {
+function scopeBootData(data: BootData, scope: Scope | null | undefined): BootData {
     if (!scope || scope.type === 'all') return data;
     const matchAgent = scope.type === 'own'
-        ? (code) => code === scope.agentCode
-        : (code) => scope.agentCodes.includes(code);
+        ? (code: string | null) => code === scope.agentCode
+        : (code: string | null) => scope.agentCodes.includes(code ?? '');
     const records = data.records.filter((r) => matchAgent(r.coordinator));
     const reminders = data.reminders.filter((rm) => matchAgent(rm.forAgent));
     const companyKeys = new Set(records.map((r) => Utils.normSpace(r.company).toLowerCase()).filter(Boolean));
-    const companyMeta = {};
+    const companyMeta: BootData['companyMeta'] = {};
     for (const key of Object.keys(data.companyMeta || {})) {
         if (companyKeys.has(key)) companyMeta[key] = data.companyMeta[key];
     }
@@ -60,24 +69,30 @@ const OFFLINE_DIR = path.join(process.cwd(), '.porterra');
 const QUEUE_FILE = path.join(OFFLINE_DIR, 'queue.json');
 const SNAPSHOT_FILE = path.join(OFFLINE_DIR, 'snapshot.json');
 
-let queueChain = Promise.resolve();
+interface QueueEntry {
+  id: string;
+  op: string;
+  payload: Record<string, unknown>;
+  ts: number;
+}
 
-async function ensureDir() {
-    await mkdir(OFFLINE_DIR, {recursive: true});
-    // Sweep stale temp files left by a crash mid-write.
-    for (const name of await readdir(OFFLINE_DIR).catch(() => [])) {
+let queueChain: Promise<unknown> = Promise.resolve();
+
+async function ensureDir(): Promise<void> {
+    await mkdir(OFFLINE_DIR, { recursive: true });
+    for (const name of await readdir(OFFLINE_DIR).catch(() => [] as string[])) {
         if (name.endsWith('.tmp')) await unlink(path.join(OFFLINE_DIR, name)).catch(() => {});
     }
 }
 
-async function writeJson(file, data) {
+async function writeJson(file: string, data: unknown): Promise<void> {
     await ensureDir();
     const tmp = file + '.tmp';
     await writeFile(tmp, JSON.stringify(data));
     await rename(tmp, file);
 }
 
-async function readJson(file) {
+async function readJson(file: string): Promise<unknown> {
     try {
         return JSON.parse(await readFile(file, 'utf8'));
     } catch {
@@ -85,37 +100,37 @@ async function readJson(file) {
     }
 }
 
-function readQueue() {
-    return readJson(QUEUE_FILE).then((q) => (Array.isArray(q) ? q : []));
+function readQueue(): Promise<QueueEntry[]> {
+    return readJson(QUEUE_FILE).then((q) => (Array.isArray(q) ? (q as QueueEntry[]) : []));
 }
 
-function appendOp(op, payload) {
+function appendOp(op: string, payload: Record<string, unknown>): Promise<number> {
     queueChain = queueChain.then(async () => {
         const q = await readQueue();
-        q.push({id: `${op}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, op, payload, ts: Date.now()});
+        q.push({ id: `${op}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, op, payload, ts: Date.now() });
         await writeJson(QUEUE_FILE, q);
         return q.length;
     });
-    return queueChain;
+    return queueChain as Promise<number>;
 }
 
-function clearQueue() {
-    return unlink(QUEUE_FILE).catch(() => {});
+function clearQueue(): Promise<void> {
+    return unlink(QUEUE_FILE).then(() => undefined).catch(() => undefined);
 }
 
-function getQueueCount() {
+function getQueueCount(): Promise<number> {
     return readQueue().then((q) => q.length);
 }
 
-function readSnapshot() {
-    return readJson(SNAPSHOT_FILE);
+function readSnapshot(): Promise<BootData | null> {
+    return readJson(SNAPSHOT_FILE) as Promise<BootData | null>;
 }
 
-function writeSnapshot(data) {
+function writeSnapshot(data: BootData): Promise<void> {
     return writeJson(SNAPSHOT_FILE, data);
 }
 
-export async function tryOp(op, payload) {
+export async function tryOp(op: string, payload: Record<string, unknown>): Promise<{ ok: boolean; queued?: boolean; queueCount?: number }> {
   try {
     await applyOp(op, payload);
     return { ok: true };
@@ -128,21 +143,24 @@ export async function tryOp(op, payload) {
   }
 }
 
-export async function loadBootData(user) {
+export async function loadBootData(user: ScopedUser): Promise<{ data: BootData; offline: boolean; queueCount: number }> {
   const scope = await resolveScope(user);
-  let data;
+  let data: BootData;
   try {
     data = await loadAllFromDb();
   } catch {
     const snap = await readSnapshot();
-    const fallback = snap || { records: [], companyMeta: {}, reminders: [], products: [], agents: [], categories: [] };
+    const fallback: BootData = snap || { records: [], companyMeta: {}, reminders: [], products: [], agents: [], categories: [] };
     return { data: scopeBootData(fallback, scope), offline: true, queueCount: await getQueueCount() };
   }
   await writeSnapshot(data).catch(() => {});
   return { data: scopeBootData(data, scope), offline: false, queueCount: await getQueueCount() };
 }
 
-export async function syncData(user) {
+export async function syncData(user: ScopedUser): Promise<
+  | { data: BootData; synced: number; remaining: number }
+  | { error: string; message: string; remaining: number }
+> {
   const queue = await readQueue();
   try {
     if (queue.length > 0) {
@@ -156,11 +174,12 @@ export async function syncData(user) {
     const scope = await resolveScope(user);
     return { data: scopeBootData(data, scope), synced: queue.length, remaining: 0 };
   } catch (err) {
-    return { error: 'sync-failed', message: err && err.message ? err.message : 'sync failed', remaining: await getQueueCount() };
+    const e = err as { message?: string };
+    return { error: 'sync-failed', message: e && e.message ? e.message : 'sync failed', remaining: await getQueueCount() };
   }
 }
 
-export async function importLeads(records) {
+export async function importLeads(records: unknown[]): Promise<{ ok: boolean; count?: number; queued?: boolean; queueCount?: number }> {
   const valid = records.map((r) => parseOrThrow(LeadCreate, r));
   try {
     await applyOp('importRecords', { records: valid });
@@ -175,12 +194,16 @@ export async function importLeads(records) {
   }
 }
 
-export async function resetData() {
-  await reseedLeads(SEED_DATA);
+export async function resetData(): Promise<{ ok: boolean }> {
+  // SEED_DATA (src/data/seed.js) predates the categoryId/quote-workflow migration and uses the
+  // old free-text `category` shape (see src/lib/CLAUDE.md) — it's a known, accepted mismatch with
+  // the current LeadCreate schema (yields NULL category_id on reset), not a real runtime type. Cast
+  // only; no validation added here, preserving the original's un-validated reseed behavior exactly.
+  await reseedLeads(SEED_DATA as unknown as Parameters<typeof reseedLeads>[0]);
   return { ok: true };
 }
 
-export async function authenticateUser(email, password) {
+export async function authenticateUser(email: string, password: string): Promise<{ user: User } | { error: string }> {
   const input = parseOrThrow(LoginInput, { email, password });
   const row = await findUserByEmail(input.email);
   if (!row) return { error: 'invalid' };
