@@ -1,19 +1,23 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { handle } from '@/lib/apiHandler';
 import { requireElevated } from '@/lib/auth';
 import { tryOp } from '@/lib/serverOps';
 import { parseOrThrow, CategoryUpdate, Id } from '@/lib/models';
 
-function dupToValidation(err) {
-  if (err && err.code === 'ER_DUP_ENTRY') {
-    const dup = new Error('این دسته‌بندی قبلاً ثبت شده');
+interface RouteContext {
+  params: Promise<{ id: string }>;
+}
+
+function dupToValidation(err: unknown): never {
+  if ((err as { code?: string })?.code === 'ER_DUP_ENTRY') {
+    const dup = new Error('این دسته‌بندی قبلاً ثبت شده') as Error & { code?: string };
     dup.code = 'VALIDATION';
     throw dup;
   }
   throw err;
 }
 
-export const PATCH = handle(async (req, ctx) => {
+export const PATCH = handle(async (req: NextRequest, ctx: RouteContext) => {
   await requireElevated();
   const { id: rawId } = await ctx.params;
   const id = parseOrThrow(Id, rawId);
@@ -27,15 +31,16 @@ export const PATCH = handle(async (req, ctx) => {
   return NextResponse.json({ ok: true });
 });
 
-export const DELETE = handle(async (req, ctx) => {
+export const DELETE = handle(async (req: NextRequest, ctx: RouteContext) => {
   await requireElevated();
   const { id: rawId } = await ctx.params;
   const id = parseOrThrow(Id, rawId);
   try {
     await tryOp('deleteCategory', { id });
   } catch (err) {
-    if (err && (err.code === 'ER_ROW_IS_REFERENCED_2' || err.code === 'ER_ROW_IS_REFERENCED')) {
-      const ref = new Error('این دسته‌بندی توسط محصول یا سرنخ در استفاده است و قابل حذف نیست');
+    const code = (err as { code?: string })?.code;
+    if (code === 'ER_ROW_IS_REFERENCED_2' || code === 'ER_ROW_IS_REFERENCED') {
+      const ref = new Error('این دسته‌بندی توسط محصول یا سرنخ در استفاده است و قابل حذف نیست') as Error & { code?: string };
       ref.code = 'VALIDATION';
       throw ref;
     }
