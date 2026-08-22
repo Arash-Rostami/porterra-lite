@@ -13,9 +13,16 @@ See `../app/CLAUDE.md` for the route map and the UI/UX design-pattern contract (
 None of these functions should touch the DOM or React — they take plain data in, return
 plain data out. Components call them and render the result. Keep it that way.
 
+Most of this folder is now TypeScript (15 files, see below); `store.js`, `uiStore.js`,
+`theme.js`, `useCountUp.js`, `confirm.js`, `leadPrefs.js`, `excel.js` stay `.js` (React-coupled,
+deferred to a future component-conversion phase). **Any import into `src/lib`/`src/types` must be
+extensionless** (`from '../../lib/queries'`, never `'../../lib/queries.js'`) — Next.js 16's
+Turbopack bundler will not resolve a `.js`-suffixed specifier to a `.ts` file, even though
+`tsc --noEmit` accepts it.
+
 ## File-by-file
 
-### `utils.js` — `Utils` static class
+### `utils.ts` — `Utils` static class
 Date/string primitives everything else depends on: `parseDate` (parses `dd.mm.yyyy`, the
 canonical date format used everywhere in this app — never `Date` objects in stored data),
 `toISODate`/`fromISODate` (bridge to `<input type="date">`, which wants `yyyy-mm-dd`),
@@ -29,7 +36,7 @@ non-dial chars; `PhoneLink` (`src/components/ui/PhoneLink.jsx`) uses it to build
 URIs for read-only phone displays (agent suggestions, suggestions panel, report preview
 phone column) — phone edit inputs stay plain `<input>`.
 
-### `filters.js`
+### `filters.ts`
 - Also holds the app's shared enum constants (`COORD_OPTS`, `RESULT_OPTS`, `STATUS_OPTS`,
   `PRIORITY_OPTS`, `PRICE_TYPE_OPTS`) — these used to be duplicated per-component; this file
   already owned `COORD_LABELS` so the rest of the label/option vocabulary lives beside it instead
@@ -53,13 +60,13 @@ phone column) — phone edit inputs stay plain `<input>`.
   `coordOptions()` list, a `manager` gets only agents whose `department` (via the parallel
   `AGENT_DEPARTMENTS` map, populated alongside `AGENT_DIRECTORY` in `setAgentDirectory`) matches
   their own, and a plain `agent` gets a single-item list of just themselves. This is a UI
-  convenience layered on top of the real server-side scoping (see `auth.js`/`serverOps.js`
+  convenience layered on top of the real server-side scoping (see `auth.ts`/`serverOps.ts`
   below) — picking an out-of-scope value isn't possible from these dropdowns, and would also be
   rejected server-side if forced via a direct API call. Raw `coordOptions()` should no longer be
   called directly from a filter/picker component; use `scopedCoordOptions` instead.
   `coordClass(co)` still special-cases exactly `FARNAZ`/`PARDIS`/`ZOHREH` for their brand colors
   and falls back to `-other` for any other agent — same treatment as `agentColor()` in
-  `analytics.js`, intentionally not extended to a per-agent color table. `coordCodeFromLabel(label)`
+  `analytics.ts`, intentionally not extended to a per-agent color table. `coordCodeFromLabel(label)`
   is the reverse of `coordLabel` (display name → `agentCode`, or null); `excel.js`'s
   `normalizeImportCoordinator` tries it first so an imported display name (e.g. `'فرناز'`) for any
   active agent resolves to its code, then falls back to the legacy 3-name map, then raw passthrough.
@@ -79,7 +86,7 @@ phone column) — phone edit inputs stay plain `<input>`.
   lists — no `sources` table, no migration, no FK; rename/delete unsupported (a source
   "exists" while leads use it — same no-table trade-off as `agentCode`). `SOURCE_OPTS`/
   `filterOptionsFrom` (which already returns a data-driven `.sources` list) are unchanged.
-- `badgeClass(cat)` (here) and `catColors` (`analytics.js`) are **intentional color logic keyed
+- `badgeClass(cat)` (here) and `catColors` (`analytics.ts`) are **intentional color logic keyed
   on the hydrated category NAME**, not a category list. They survived the category→`category_id`
   migration on purpose — `hydrateAllCategoryNames()` (store.js) resolves `categoryId`→display
   `name` onto every record/product as `r.category`/`p.category`, so these name-keyed color helpers
@@ -131,7 +138,7 @@ phone column) — phone edit inputs stay plain `<input>`.
   topSet}`. This is a *separate* filter dimension from `filters.category`/`filters.source` — see
   the `uiStore.js` note below for the rule about keeping them mutually exclusive.
 
-### `suggestions.js`
+### `suggestions.ts`
 `computeSuggestions(records)` — the "who to call today" engine, grouped by agent. Algorithm
 (exact order, don't reorder):
 1. Reduce to **one record per customer** — the most recent by date. Older records for the
@@ -148,7 +155,7 @@ on top of the computed pool and returns the sorted `filtered` list; `Suggestions
 paginates it client-side (same pagination pattern as `LeadTable.jsx`/`AgentProfileModal.jsx`)
 rather than the function itself capping the visible count.
 
-### `duplicates.js`
+### `duplicates.ts`
 `findDuplicateCompany` — exact match after `normSpace().toLowerCase()`. `findDuplicatePhone`
 — compares the **last 8 digits** after stripping non-digits, to tolerate `0912…` vs
 `+98912…` formats. Both sides now route through `Utils.normalizePhone` so Persian/Arabic-digit
@@ -157,7 +164,7 @@ live-as-you-type warnings, not hard blocks — the prototype never
 prevented saving a duplicate, only warned. Keep it that way; hard-blocking would be a
 behavior change, not a bug fix.
 
-### `analytics.js`
+### `analytics.ts`
 Pure "compute metrics from records" — folded `kpis.js` + `chartData.js` + `agentStats.js`
 into one file. `computeKpis` — 6 fixed cards matching the quote-model status set: total
 records, `converted` count, open-quote count (`isQuoteOpen`), `'غیرفعال'` count, `'در حال
@@ -165,7 +172,7 @@ records, `converted` count, open-quote count (`isQuoteOpen`), `'غیرفعال'`
 record into exactly one of `noAnswer`/`deactivated`/`followUp`/`quoteOpen`/`quoteWon`/
 `quoteLost` via `effectiveResult`, then branches into the quote sub-states by `r.quoteResult`
 when `effectiveResult === 'در حال استعلام'` — **never** compares `effectiveResult` against
-`'موفق'`/`'ناموفق'` directly, since `result` can't hold those values (see `filters.js`).
+`'موفق'`/`'ناموفق'` directly, since `result` can't hold those values (see `filters.ts`).
 `computeAgentReport` — per-agent totals across all records; `computeAgentStats` — same tally
 for one agent with an optional date range (agent profile modal). `agentColor` — 3 hardcoded
 brand colors for FARNAZ/PARDIS/ZOHREH, falls back to a deterministic HSL hash for any other
@@ -192,7 +199,7 @@ export (`src/app/leads/page.js` `handleExport`) passes
 `getFiltered(records, filters, chartFilter)` into `exportToExcel`, so export respects the
 active filter + chart drill-down, not the raw scoped set.
 
-### `calendar.js`
+### `calendar.ts`
 Jalali/Persian date conversion. Exports `JALALI_MONTHS`, `FA_MONTHS` (Persian month names for
 Gregorian months, index 0 = January — used for trend-chart / company report month labels when
 the toggle is off; folded in from the deleted `constants.js`), `gregorianToJalali(gy,gm,gd)`,
@@ -203,7 +210,7 @@ formula), `formatDisplayDate(ddmmyyyy, calendar)`. Dates are always *stored* as 
 `dd.mm.yyyy` — the toggle never changes that. What it *does* change: `DateField.jsx`
 (`src/components/ui/DateField.jsx`) renders Jalali day/month/year `Dropdown`s instead of the
 native `<input type="date">`, converting to/from the same Gregorian ISO value contract; and
-`computeTrendData`/`computeDailyAgentData` in `analytics.js` bucket by Jalali month instead of
+`computeTrendData`/`computeDailyAgentData` in `analytics.ts` bucket by Jalali month instead of
 Gregorian when passed `calendar === 'jalali'`. Because of that second point, the chart
 click-to-filter payload (`applyMonthFilter`/`applyDayFilter` in `uiStore.js`) is a Gregorian
 date-range/date, not a `{y,m}`/`{y,m,day}` int pair — see the `uiStore.js` note below.
@@ -225,16 +232,16 @@ name-based and unchanged — called on `loadAll`/`syncNow` and after `updateReco
 one pass).
 
 Client singleton holding `records`/`companyMeta`/`reminders`/`currentUser`, backed by
-**MySQL via the REST API in `src/app/api/*` (client `apiClient.js` → server `serverOps.js`)** —
+**MySQL via the REST API in `src/app/api/*` (client `apiClient.ts` → server `serverOps.ts`)** —
 the prototype's `window.storage` is gone, and the former `src/app/actions.js` Server Actions
 layer is gone too (replaced wholesale by the API). `loadAll()` calls `loadAllDataAction` once
 (guarded against re-entry) and stashes
 `currentUser`; mutations go through `persist(rollback, actionFn)`, which applies the change
 optimistically and rolls back on failure, redirecting to `/login` on `UNAUTHORIZED`/`FORBIDDEN`.
 `logout()` clears state and redirects. `custKey` (company normalization) lives here rather than
-`filters.js` only because it's needed to key `companyMeta`/reminders — anything else needing a
+`filters.ts` only because it's needed to key `companyMeta`/reminders — anything else needing a
 company key should import it from here. **The real access-control boundary is server-side now**
-(see `auth.js`/`serverOps.js`/`queries.js` below: `resolveScope(user)` + `scopeBootData()`, plus
+(see `auth.ts`/`serverOps.ts`/`queries.ts` below: `resolveScope(user)` + `scopeBootData()`, plus
 per-record checks in the leads API routes) — `GET /api/data`/`POST /api/sync` already return only
 the records/reminders/companyMeta a `department`/`agent`-scoped `role` is allowed to see.
 `useScopedData` (folded in from a separate `useScopedData.js`) is the read hook every top-level
@@ -266,21 +273,21 @@ while online (the 20s `syncNow` timer in `AppShell` fires only while `offline ==
 `records`/`companyMeta`/`reminders` always sits on disk in plaintext JSON — that's the offline
 fallback and the reason `.porterra/` must stay gitignored and local.
 
-### `auth.js`, `crypto.js` — new infra (NOT prototype ports)
+### `auth.ts`, `crypto.ts` — new infra (NOT prototype ports)
 These three exist only because of the login + multi-user + MySQL migration; they have no
 ancestor in `panel_mostaqel_moshtarian.html`. (The offline queue/snapshot mechanics that
-used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
+used to live in `offline.js` are now inlined into `serverOps.ts` — see below.)
 - **`leadPrefs.js`** (new, also not a prototype port): per-user **view** preferences for the
   leads table — a manual row order (`order`: `string[]` of record ids) and a set of
   "important" flags (`flags`: `string[]`). Persisted in `localStorage` keyed per username
   (`crm_lead_order_${username}` / `crm_lead_flags_${username}`), same per-username-key convention
   as `uiStore.js`'s `calendar`/`fontScale` prefs. `initLeadPrefsForUser` runs from `store.loadAll`; `resetLeadPrefs`
   from `store.logout`. **Manual ordering is applied in `LeadTable.jsx` *after* `getFiltered`
-  returns (passing `sort=null` in manual mode) — never inside `filters.js`**, whose order of
+  returns (passing `sort=null` in manual mode) — never inside `filters.ts`**, whose order of
   operations mirrors the prototype and must stay pure. Records absent from `order` sort after
   the ranked ones, preserving their `getFiltered` order. Drag-drop reorders the full stored
   `order` (so filtered-out rows keep their positions), not just the visible page.
-- **`auth.js`** (server-only): `getSessionUser()` reads the `crm_session` cookie, decrypts it,
+- **`auth.ts`** (server-only): `getSessionUser()` reads the `crm_session` cookie, decrypts it,
   and **re-validates the user against the DB on every call** (React `cache` memoizes
   per-request) — `proxy.js` is not a security boundary, so this is the real check. Falls back
   to the token payload only when the DB is unreachable (`isConnError`), so offline mode still
@@ -288,25 +295,25 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
   scoping keeps working while offline. `requireUser()`/`requireAdmin()` throw
   `UNAUTHORIZED`/`FORBIDDEN`; **every API route handler calls one at the top** (via
   `apiHandler.handle`). `isElevated(user)` (`role === 'admin' || 'developer'`) is the one helper
-  every department-scoping check in `serverOps.js`/`queries.js`/the leads & users API routes
+  every department-scoping check in `serverOps.ts`/`queries.ts`/the leads & users API routes
   branches on first — elevated always bypasses scoping entirely. `requireElevated()` is the
   route-guard wrapper (`requireUser()` + `isElevated()` check) gating all `users` table CRUD
   (`POST /api/users`, `PATCH`/`DELETE /api/users/[id]`, `PATCH /api/users/[id]/active`) —
-  `manager` does not get an exception here, by design (see `serverOps.js` below).
-- **`crypto.js`** (server-only): AES-256-GCM `encryptString`/`decryptString` + session-token
+  `manager` does not get an exception here, by design (see `serverOps.ts` below).
+- **`crypto.ts`** (server-only): AES-256-GCM `encryptString`/`decryptString` + session-token
   pack/unpack, keyed by `ENCRYPTION_KEY` (env, never committed). Powers BOTH password storage
   (reversible by the user's explicit request — weaker than hashing, acceptable only for this
   local CRM; a reviewer will flag it, it stays because the user required it) and the httpOnly
   session cookie. Zero deps (Node `crypto` only).
-- **offline queue/snapshot** (server-only, inlined in `serverOps.js`): atomic append-only
+- **offline queue/snapshot** (server-only, inlined in `serverOps.ts`): atomic append-only
   queue (`queue.json`) + snapshot (`snapshot.json`) under the gitignored `/.porterra/` dir.
   `tryOp` queues a mutation when the DB is unreachable; `syncData` replays the queue then
   writes a fresh snapshot. **Data must never be lost** — the queue is never cleared on logout;
-  it persists until a successful sync. (Was a separate `offline.js`; folded into `serverOps.js`
+  it persists until a successful sync. (Was a separate `offline.js`; folded into `serverOps.ts`
   since `serverOps` was its only consumer.)
-- **`apiClient.js`** / **`serverOps.js`** / **`apiHandler.js`** / **`src/app/api/**/route.js`** —
+- **`apiClient.ts`** / **`serverOps.ts`** / **`apiHandler.ts`** / **`src/app/api/**/route.ts`** —
   the REST API transport that **replaced `src/app/actions.js` wholesale** (new infra, not
-  prototype ports). `apiClient.js` is the **client** fetch mirror: it exports the *same names,
+  prototype ports). `apiClient.ts` is the **client** fetch mirror: it exports the *same names,
   signatures, and return shapes* the old Server Actions had, so `store.js`/`users/page.js`
   swapped one import path and nothing else, and `login/page.js` moved from `useActionState` to a
   controlled `onSubmit`. `loadAllData` translates a 401 into
@@ -314,7 +321,7 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
   `unauthorized` branch is untouched; `login` returns `{user}`/`{error}` (no throw) so
   `login/page.js`'s `res?.user`/`res?.error` logic is untouched. All other exports throw
   `Error('UNAUTHORIZED')` on 401 and `Error('FORBIDDEN')` on 403 — the exact strings
-  `store.isUnauthorized` / `users.isUnauthorized` branch on. `serverOps.js` is the **server**
+  `store.isUnauthorized` / `users.isUnauthorized` branch on. `serverOps.ts` is the **server**
   orchestration moved verbatim out of `actions.js`: `tryOp`, `loadBootData` (MySQL→snapshot
   fallback + writeSnapshot), `syncData` (replay queue in one transaction → `loadAllFromDb` →
   snapshot), `importLeads` (per-record queue on DB-down), `resetData`, `authenticateUser`.
@@ -322,7 +329,7 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
   for elevated, `{type:'department', agentCodes}` for a manager via `listAgentCodesByDepartment`,
   `{type:'own', agentCode}` for an agent — fails closed to an empty set on a lookup error) and run
   the response through `scopeBootData(data, scope)`, a pure in-memory filter over
-  `records`/`reminders`/`companyMeta` (products/categories are never scoped — see `filters.js`
+  `records`/`reminders`/`companyMeta` (products/categories are never scoped — see `filters.ts`
   above). **Critically, `loadAllFromDb()` itself — and the `snapshot.json` it writes — stays
   always unscoped**; scoping is applied as a post-filter on top of either the live query or the
   snapshot read, never baked into the snapshot-writing query. Scoping a snapshot at write time
@@ -330,7 +337,7 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
   serving a different, less-privileged user's session someone else's data during a DB outage.
   It also inlines the offline queue/snapshot mechanics (append-only `queue.json`, atomic
   `snapshot.json` under `/.porterra/`) that were a separate `offline.js`.
-  `apiHandler.js` exports `handle(fn)`, the one error→status mapper every route uses:
+  `apiHandler.ts` exports `handle(fn)`, the one error→status mapper every route uses:
   `UNAUTHORIZED`→401, `FORBIDDEN`→403, `VALIDATION` (by `err.code` or `message` prefix)→400,
   else 500 — passing `err.message` through verbatim so `users.cleanErr` and `store.persist`
   toasts are byte-identical to the old Server-Action path. Route handlers are thin
@@ -340,8 +347,8 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
   `/api`** so an unauthenticated API call returns 401 JSON (handled by `apiClient`) instead of a
   307 redirect to `/login`.
 
-### `queries.js` / `mappers.js` / `models.js` — server-only DB CRUD (MySQL)
-`queries.js` exports one consistent CRUD set per table — `listX`, `getXById`, `createX`,
+### `queries.ts` / `mappers.ts` / `models.ts` — server-only DB CRUD (MySQL)
+`queries.ts` exports one consistent CRUD set per table — `listX`, `getXById`, `createX`,
 `updateX`, `deleteX` — every function takes an optional pooled `conn` (used when called inside
 `applyOp`'s transaction; otherwise runs on the pool). Coverage:
 - **`contacts`** (table name kept as-is — "leads" in the app layer, `contacts` is the physical
@@ -350,7 +357,7 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
   (`deactivate_reason`, `quote_price`, `quote_price_type`, `quote_terms`, `quote_price_date`,
   `quote_result`, `quote_result_date`, `quote_fail_reason`) added for the inquiry workflow —
   `quote_price_date`/`quote_result_date` are `dd.mm.yyyy` VARCHAR like `date`, not SQL `DATE`, to
-  match the rest of this app's date convention (`normDate` in `mappers.js` covers all three).
+  match the rest of this app's date convention (`normDate` in `mappers.ts` covers all three).
   `updateLead` maps camelCase patch keys to snake_case columns via the `LEAD_UPDATE` `{k, col}`
   array (the multi-word quote fields don't collapse to their column name the way the single-word
   legacy fields did).
@@ -359,7 +366,7 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
 - **`users`**: `listUsers`/`listUsersRaw`, `getUserById`, `createUser`, `updateUser`, `deleteUser`, plus finders
   (`findUserByUsername`, `findUserByEmail`) and partial setters (`updateUserLastLogin`, `setUserActive`).
   `role` is a 4-value ENUM: `admin`, `developer` (both "elevated" — see `isElevated()` in
-  `auth.js`, they bypass all scoping and see/manage everything), `manager` (department-scoped
+  `auth.ts`, they bypass all scoping and see/manage everything), `manager` (department-scoped
   view of leads/customers/reminders/activity and of the `users` list, but **no create/edit/delete
   rights over other users** — those stay elevated-only, same as before this role existed), and
   `agent` (own-records-only scope). `department` (`users.department VARCHAR(150) NULL`) is a
@@ -386,11 +393,11 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
   `category` column on `products`/`contacts` is retained for external/legacy consumers that still
   read it directly from the DB — `createProduct`/`updateProduct`/`createLead`/`updateLead`/
   `upsertLeads` write-sync it from `categoryId` on every save (via `CATEGORY_NAME_SUBQUERY` in
-  `queries.js`), so it's never stale even though app code itself reads `category_id` exclusively.
+  `queries.ts`), so it's never stale even though app code itself reads `category_id` exclusively.
 - **`categories`**: `listCategories`, `getCategoryById`, `createCategory`, `updateCategory`,
   `deleteCategory` + `CATEGORY_COLS`/`CATEGORY_UPDATE` — same CRUD shape as the other tables.
-  `rowToCategory`/`categoryToRow` in `mappers.js`; `CategoryCreate`/`CategoryUpdate` Zod schemas
-  in `models.js`. POST `/api/categories` is `requireUser` (any authenticated user can create —
+  `rowToCategory`/`categoryToRow` in `mappers.ts`; `CategoryCreate`/`CategoryUpdate` Zod schemas
+  in `models.ts`. POST `/api/categories` is `requireUser` (any authenticated user can create —
   the inline create-category shortcut in `ProductField`/`ProductFormModal` relies on that);
   PATCH/DELETE `/api/categories/[id]` is `requireElevated` (admin/developer only). DELETE is
   blocked by `ON DELETE RESTRICT` — a category in use surfaces as a `VALIDATION` toast. Leads
@@ -414,12 +421,12 @@ handoff spec calls out as missing (client-only validation there).
 this matches the last-write-wins + offline-queue model. `update*` take a partial patch and `SET`
 only present keys (absent = unchanged). **`applyOp` is the offline-queueable mutation dispatcher
 and calls these same functions** — client-driven writes go through it (via `tryOp` in
-`serverOps.js`) so a DB-down mutation lands in the `/.porterra/queue.json` queue; do not call the
+`serverOps.ts`) so a DB-down mutation lands in the `/.porterra/queue.json` queue; do not call the
 `create/update/delete*` functions directly from an API route for client mutations unless you
 also wire the offline path. `loadAllFromDb` + `reseedLeads` are bulk read/reset, not CRUD.
-Row⇄object mapping lives in `mappers.js` (`rowToLead`/`rowToActivity`/`rowToReminder`/`rowToUser`
+Row⇄object mapping lives in `mappers.ts` (`rowToLead`/`rowToActivity`/`rowToReminder`/`rowToUser`
 + `*ToRow`); the `*_COLS` arrays there are the single source of truth for column order.
-`models.js` holds the Zod schemas (`*Create`/`*Update`, `Id`, `LoginInput`) every API route
+`models.ts` holds the Zod schemas (`*Create`/`*Update`, `Id`, `LoginInput`) every API route
 handler validates via `parseOrThrow` before any SQL runs.
 
 ### `uiStore.js`

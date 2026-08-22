@@ -13,19 +13,19 @@ convention.
 All routes except `/login` require a session (`src/proxy.js` redirects
 unauthenticated requests there; it only checks *presence* of a valid session
 cookie — role/department scoping is enforced server-side per-route, see
-`../lib/CLAUDE.md`'s `auth.js`/`serverOps.js`/`queries.js` sections, not here).
+`../lib/CLAUDE.md`'s `auth.ts`/`serverOps.ts`/`queries.ts` sections, not here).
 
 | Route | Renders | Notes |
 |---|---|---|
 | `/` | — | Redirects to `/dashboard`. |
 | `/login` | login form | No `Sidebar`/`Header` — `AppShell.jsx` early-returns for this path. |
-| `/dashboard` | `KpiCards`, `FunnelChart`, `TrendChart`, `DailyAgentChart`, … | KPI/analytics home; data via `computeKpis`/`computeFunnelStages`/etc. (`../lib/analytics.js`). |
+| `/dashboard` | `KpiCards`, `FunnelChart`, `TrendChart`, `DailyAgentChart`, … | KPI/analytics home; data via `computeKpis`/`computeFunnelStages`/etc. (`../lib/analytics.ts`). |
 | `/leads` | `AddLeadForm`, `LeadFilters`, `LeadTable` | The main contacts/leads table — filters, search, manual order, import/export. |
 | `/customers` | `AddLeadForm`, `LeadFilters`, `LeadTable` | Same components as `/leads` — an in-progress rename of the "leads" concept to "customers" terminology; if you're asked to change one, check whether the other needs the same change before assuming it's dead. |
 | `/company-report` | company/customer profile report | Smart search + full stats + timeline + monthly chart, keyed by normalized company name (`custKey`, `../lib/store.js`). |
 | `/agents` | `AgentsPanel`, `AgentReport` | Per-agent chips + profile modal (`AgentProfileModal`) with full stat breakdown; `AgentReport` adds per-agent summary cards. |
-| `/inquiries` | `QuotesPanel` | Open-quotes workflow — the 3-stage quote lifecycle (`../lib/CLAUDE.md`'s `filters.js`/`store.js` sections document it in full). |
-| `/suggestions` | `ReminderBanner`, `CommentBanner`, `SuggestionsPanel`, `RemindersList` | "Who to call today" engine (`../lib/suggestions.js`) + reminders. |
+| `/inquiries` | `QuotesPanel` | Open-quotes workflow — the 3-stage quote lifecycle (`../lib/CLAUDE.md`'s `filters.ts`/`store.js` sections document it in full). |
+| `/suggestions` | `ReminderBanner`, `CommentBanner`, `SuggestionsPanel`, `RemindersList` | "Who to call today" engine (`../lib/suggestions.ts`) + reminders. |
 | `/report-builder` | `ReportBuilder` | Column-picker + filter + Excel export, custom report. |
 | `/products` | `ProductsPanel`, `ProductFormModal` | Product CRUD (admin/developer only for edit/delete — see `requireElevated` in `../lib/CLAUDE.md`). |
 | `/categories` | `CategoriesPanel`, `CategoryFormModal` | 1:1 structural clone of `/products` — same CRUD + card/table pattern. |
@@ -181,7 +181,7 @@ store + `useSyncExternalStore` (the `uiStore.js` pattern; `theme.js` was convert
 too once the login page needed to toggle theme, so AppShell + /login + /dashboard share one
 `dark` state instead of each holding a separate `useState`).
 
-- **Calendar toggle** (`../lib/calendar.js`, `uiStore.js`'s `calendar`/`toggleCalendar`)
+- **Calendar toggle** (`../lib/calendar.ts`, `uiStore.js`'s `calendar`/`toggleCalendar`)
   — Gregorian ⇄ Jalali *display only*. Records are always stored `dd.mm.yyyy`
   (Gregorian) — `formatDisplayDate(date, calendar)` is the only thing that changes.
   Chart month-bucket grouping (trend chart, company report monthly breakdown)
@@ -203,7 +203,7 @@ These are new surfaces with no BMS-CM ancestor; they follow the same token/tier 
   (`.crm-auth-card`, `backdrop-filter: blur`) frosted over the app's normal ambient background
   — no Sidebar/Header (see `AppShell.jsx`'s `/login` early return). Inputs are `dir=ltr`
   (email + password), form driven by a controlled `onSubmit` → the `login` REST route
-  (`../lib/apiClient.js`). The logo is the **same theme-aware pair as the sidebar**
+  (`../lib/apiClient.ts`). The logo is the **same theme-aware pair as the sidebar**
   (`logo-light.png`/`logo-dark.png`), the
   submit button uses `var(--accent)` (so it's #5C6AC4 light / #6750A4 dark like every other
   primary button, not a fixed gradient), and a `ThemeToggle` is floated in the top-start
@@ -435,7 +435,7 @@ to be a one-off neutral/bordered button for «ثبت تماس جدید» — it'
 The `/categories` admin tab (sidebar "مدیریت" group) is a 1:1 structural clone of `/products`:
 same CRUD panel + form-modal pattern, same card/table/badge conventions. Its سفارشی/پایه
 (custom/base) type badge uses `crm-status-badge` (`-success` for سفارشی, `-none` for پایه)
-rather than `badgeClass` (`../lib/filters.js`) — `badgeClass` is category-**name**-specific color
+rather than `badgeClass` (`../lib/filters.ts`) — `badgeClass` is category-**name**-specific color
 logic, meaningless for the custom/base flag. The form modal is the shared `Modal.jsx` shell
 with an inline create-category shortcut (Plus → modal → `addCategory` → auto-select) in
 `ProductField`/`ProductFormModal`, same inline-create pattern as the product add-on-the-fly

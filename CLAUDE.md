@@ -4,7 +4,7 @@
 
 A Persian (RTL) sales CRM: contacts/leads, a 3-stage quote workflow, per-agent
 call suggestions, and reporting. Next.js 16 (App Router) + MySQL, no ORM (raw
-`mysql2` + hand-written SQL in `src/lib/queries.js`). Visually synced 1:1 with
+`mysql2` + hand-written SQL in `src/lib/queries.ts`). Visually synced 1:1 with
 a sister Laravel/Filament app, `BMS-CM`.
 
 ## Read these first, in order
@@ -21,11 +21,11 @@ a sister Laravel/Filament app, `BMS-CM`.
 ```
 Components (src/components/**)
     ↓ read via useScopedData / call plain functions
-src/lib/*.js — pure business logic (store.js, filters.js, analytics.js, …)
-    ↓ store.js mutations go through apiClient.js
-src/app/api/**/route.js — thin REST handlers (auth → validate → delegate)
+src/lib/*.js|*.ts — pure business logic (store.js, filters.ts, analytics.ts, …)
+    ↓ store.js mutations go through apiClient.ts
+src/app/api/**/route.ts — thin REST handlers (auth → validate → delegate)
     ↓
-src/lib/serverOps.js / queries.js — orchestration + SQL, offline queue/snapshot
+src/lib/serverOps.ts / queries.ts — orchestration + SQL, offline queue/snapshot
     ↓
 MySQL (schema: db/schema.sql)
 ```
@@ -55,3 +55,10 @@ Two invariants that override any "looks about right" instinct:
 If you add a new top-level convention (a new shared pattern, a new table, a
 new route group), update the relevant doc in this map rather than leaving it
 undocumented — that's the whole point of this map staying accurate.
+
+**Import specifiers into `src/lib`/`src/types` must be extensionless** (e.g.
+`from '../../lib/queries'`, never `'../../lib/queries.js'`). Next.js 16's
+Turbopack bundler will not resolve a `.js`-suffixed specifier to a `.ts` file
+— even though `tsc --noEmit` (`moduleResolution: "bundler"`) accepts it —
+so a `.js`-suffixed import silently breaks the dev/build bundle while
+typechecking stays green.
