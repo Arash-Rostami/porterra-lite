@@ -2,10 +2,10 @@
 import {z} from 'zod';
 
 // '' / undefined -> null, so empty client strings become SQL NULL (not '').
-const emptyToNull = (v) => (v === '' || v === undefined ? null : v);
+const emptyToNull = (v: unknown) => (v === '' || v === undefined ? null : v);
 
-const optStr = (max) => z.preprocess(emptyToNull, z.string().max(max).nullable());
-const reqStr = (max) => z.string().min(1).max(max);
+const optStr = (max: number) => z.preprocess(emptyToNull, z.string().max(max).nullable());
+const reqStr = (max: number) => z.string().min(1).max(max);
 
 // A standalone row/object id (contacts, activity, reminders all share VARCHAR(40) PKs).
 export const Id = reqStr(40);
@@ -22,7 +22,7 @@ const boolField = z.preprocess((v) => v === true || v === 1 || v === '1' || v ==
 
 const quoteResultField = z.preprocess(emptyToNull, z.enum(['موفق', 'ناموفق']).nullable());
 
-const requireDeactivateReason = (data, ctx) => {
+const requireDeactivateReason = (data: any, ctx: z.RefinementCtx) => {
     if (data.result === 'غیرفعال' && !data.deactivateReason) {
         ctx.addIssue({code: z.ZodIssueCode.custom, message: 'deactivateReason is required when result is غیرفعال', path: ['deactivateReason']});
     }
@@ -189,12 +189,12 @@ export const LoginInput = z.object({
     password: reqStr(256),
 });
 
-export function parseOrThrow(schema, input) {
+export function parseOrThrow<T>(schema: z.ZodType<T>, input: unknown): T {
     const r = schema.safeParse(input);
     if (!r.success) {
         const issue = r.error.issues[0];
         const path = issue && issue.path.length ? issue.path.join('.') : '(root)';
-        const err = new Error(`Validation [${path}]: ${issue ? issue.message : 'error'}`);
+        const err = new Error(`Validation [${path}]: ${issue ? issue.message : 'error'}`) as Error & { code?: string };
         err.code = 'VALIDATION';
         throw err;
     }
