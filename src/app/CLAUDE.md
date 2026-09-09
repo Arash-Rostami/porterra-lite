@@ -22,7 +22,7 @@ cookie — role/department scoping is enforced server-side per-route, see
 | `/dashboard` | `KpiCards`, `FunnelChart`, `TrendChart`, `DailyAgentChart`, … | KPI/analytics home; data via `computeKpis`/`computeFunnelStages`/etc. (`../lib/analytics.js`). |
 | `/leads` | `AddLeadForm`, `LeadFilters`, `LeadTable` | The main contacts/leads table — filters, search, manual order, import/export. |
 | `/customers` | `AddLeadForm`, `LeadFilters`, `LeadTable` | Same components as `/leads` — an in-progress rename of the "leads" concept to "customers" terminology; if you're asked to change one, check whether the other needs the same change before assuming it's dead. |
-| `/company-report` | company/customer profile report | Smart search + full stats + timeline + monthly chart, keyed by normalized company name (`custKey`, `../lib/store.js`). |
+| `/company-report` | company/customer profile report | Smart search + full stats + timeline + monthly chart, keyed by normalized company name (`custKey`, `../lib/store.js`). Below the stats/chart, a `.crm-modal-tabs` strip (same shared tabs as `LeadProfileModal`, via `CompanyActivityTabs.jsx`) switches between تاریخچه تماس‌ها (the pre-existing history list, now tab-gated), تاریخچه تغییرات, مکاتبات, and یادآوری‌ها — so a company's full activity is visible here without opening any individual lead's profile modal. |
 | `/agents` | `AgentsPanel`, `AgentReport` | Per-agent chips + profile modal (`AgentProfileModal`) with full stat breakdown; `AgentReport` adds per-agent summary cards. |
 | `/inquiries` | `QuotesPanel` | Open-quotes workflow — the 3-stage quote lifecycle (`../lib/CLAUDE.md`'s `filters.js`/`store.js` sections document it in full). |
 | `/suggestions` | `ReminderBanner`, `CommentBanner`, `SuggestionsPanel`, `RemindersList` | "Who to call today" engine (`../lib/suggestions.js`) + reminders. |
@@ -259,6 +259,24 @@ wired into the table in `LeadTable.jsx`.
   bottom edge (a line indicator, not a filled surface). A `.crm-manual-hint` line shows under the
   title row. No new card tier is introduced — these are row-level states, not surfaces.
 
+### Placing a toolbar-oriented shared component inside `.crm-field`
+
+`.crm-field { display: flex; flex-direction: column; gap: 5px; }` — a **column** flex
+container. Some shared `ui/` components (`Dropdown.jsx`'s `.crm-dd`, `DateField.jsx`'s
+`.crm-jalali-date`, `CompanySuggest.jsx`'s `.crm-search-wrap`) carry their own `flex: … Npx`
+sizing meant for their *original* home, a **row** flex toolbar (`.crm-toolbar`) — in a row
+container that `flex-basis` sets a preferred *width*. Drop one of those components straight
+into a `.crm-field` without an override and the exact same `flex-basis` now sets a preferred
+*height* instead (flex-basis follows the container's main axis, which flipped to vertical),
+silently opening a large empty gap under the field. **Hit once already** — `CompanySuggest`
+in `AddLeadForm.jsx`'s company field opened a ~240px gap under the first form row because
+`.crm-search-wrap { flex: 1 1 240px; }` was read as a height. Fix pattern (already applied for
+the other two, now for `CompanySuggest` too): add a `.crm-field .crm-<component>` override that
+resets `flex: none; width: 100%;` — see `.crm-field .crm-dd`, `.crm-field .crm-jalali-date`,
+`.crm-field .crm-search-wrap` in `globals.css`. Any *new* row-toolbar-oriented shared component
+you later place inside a `.crm-field` needs the same override, on sight — don't wait to notice
+the gap.
+
 ### Modals — one shared component, never hand-rolled
 
 `src/components/ui/Modal.jsx` is the *only* way a modal should be built. It owns the
@@ -280,7 +298,25 @@ create/edit modal anywhere in the app, do the same:
 
 Pick `width` by how much the body actually needs — the customer/agent profile modals
 use `4xl` (896px) because they hold a 3-column form grid + history + feed; a simple
-confirm-style modal should stay at the `3xl` default. **Never hardcode a modal's
+confirm-style modal should stay at the `3xl` default. Modals can stack — `LeadTable.jsx`
+opens a `4xl` `<Modal>` wrapping `CompanyReport.jsx` (the same page-level component
+`/company-report` renders, reused as-is — see the route table above) so a company-name
+click shows its report inline instead of navigating away; clicking a call record inside
+that inline report opens `LeadProfileModal` (`onOpenRecord={onEdit}`) layered on top, a
+second `Modal` over the first. `Modal.jsx`'s `openCount`/`lockScroll`/`unlockScroll`
+already handle N simultaneously-open modals correctly (a counter, not a boolean), so
+nested modals were free — don't add your own scroll-lock guard when nesting. **Gotcha
+hit while building this:** `LeadTable`'s own `records` prop is pre-narrowed by whichever
+page rendered it (`/leads` passes only `!r.converted`, `/customers` passes only
+`r.converted` — see `../lib/CLAUDE.md`'s `store.js` section) — passing that same narrowed
+`records` into the inline `CompanyReport` would silently drop half a company's history
+(customers page hides its leads, leads page hides its customers) versus the full-page
+`/company-report` route, which always uses the complete `useScopedData().records`. Fixed
+by having `LeadTable` pull its OWN `{records: allRecords, reminders} = useScopedData()`
+and feed `allRecords` (not its `records` prop) to `CompanyReport` — the prop stays
+narrowed for the table's own rows, only the inline report gets the full set. Any future
+"reuse a whole-record-set component inline from a pre-filtered list" needs the same
+double-source pattern. **Never hardcode a modal's
 `max-width` in a component's own CSS** — that's exactly the bug that made every modal
 "too thin" before this component existed (`.crm-modal` had a bare `max-width:640px`,
 ignoring the content it needed to hold).
@@ -301,9 +337,16 @@ mounted once in `Header.jsx` so it's visible on every tab. It deliberately reuse
 `findLatestComment` from `store.js` — rather than recomputing anything. If the
 suggestions/reminders data model ever changes, both the Suggestions-page banners and
 this bell need updating together; they're two views over the same source, not two
-separate features. The badge count is `due.length` only — there's no "seen/unseen"
-state for the latest-comment line (no timestamp of last view exists anywhere in this
-app), so don't add it to the badge count without first adding that tracking.
+separate features. **Now has real seen/unseen tracking (added 2026-09-09):** a top
+"اعلان‌ها" section lists `notifications.filter(n => !n.read)` (newest first, paginated
+same as the reminders section below it), each with a mark-read button
+(`markNotificationRead`, `store.js`) — see `../lib/CLAUDE.md`'s `queries.js`
+`notifications` entry for what creates them. The badge count is now
+`due.length + unread.length` (both are genuinely "needs attention" counts). The
+pre-existing "آخرین مکاتبه" (latest comment) section below is UNCHANGED and deliberately
+left in place — it's a different, broader signal (the single most recent comment
+app-wide, visible to everyone including elevated roles who aren't a `notifications`
+recipient for anything), not superseded by the new per-recipient notification list.
 
 ### Boot loader (`.loader-overlay` + `BootLoader.jsx`)
 

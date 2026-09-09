@@ -4,9 +4,10 @@ import Modal from '../ui/Modal.jsx';
 import Dropdown from '../ui/Dropdown.jsx';
 import DateField from '../ui/DateField.jsx';
 import ProductField from './ProductField.jsx';
+import CompanyActivityTabs, { COMPANY_ACTIVITY_TABS } from '../customer/CompanyActivityTabs.jsx';
 import Utils from '../../lib/utils.js';
 import { coordLabel, coordClass, statusBadgeInfo, scopedCoordOptions, RESULT_OPTS, PRIORITY_OPTS, sourceSuggestions } from '../../lib/filters.js';
-import { useStore, custKey, updateRecord, deleteRecordWithLog, addRecords, addChangeLogEntry, addComment, addReminder, getUnifiedFeed } from '../../lib/store.js';
+import { useStore, custKey, updateRecord, deleteRecordWithLog, addRecords, addChangeLogEntry, addReminder, getUnifiedFeed, EMPTY_RECORD_PATCH } from '../../lib/store.js';
 import { confirm } from '../../lib/confirm.js';
 import { toast } from '../ui/Toast.jsx';
 import { CheckIcon, XCircleIcon, PlusIcon, TrashIcon } from '../ui/Icon.jsx';
@@ -25,7 +26,7 @@ function formFromRecord(rec) {
   };
 }
 const emptyReminder = { date: '', time: '', for: '', text: '' };
-const emptyQuickCall = { coordinator: '', name: '', phone: '', product: '', categoryId: '', source: '', date: '', price: '', result: '', priority: '', notes: '', deactivateReason: '' };
+const emptyQuickCall = { coordinator: '', name: '', phone: '', product: '', categoryId: '', source: '', date: '', price: '', result: '', priority: 'پایین', notes: '', deactivateReason: '' };
 const TAB_PAGE_SIZE = 6;
 const pageOf = (items, page) => paginate(items, page, TAB_PAGE_SIZE);
 
@@ -34,7 +35,7 @@ function StatusBadge({ r }) {
   return <span className={`crm-status-badge ${className}`}>{text}</span>;
 }
 
-export default function LeadProfileModal({ recordId, records, companyMeta, onClose, onOpenRecord }) {
+export default function LeadProfileModal({ recordId, records, companyMeta, reminders, onMarkReminderDone, onClose, onOpenRecord }) {
   const calendar = useUiStore((u) => u.calendar);
   const categories = useStore((s) => s.categories);
   const currentUser = useStore((s) => s.currentUser);
@@ -46,13 +47,15 @@ export default function LeadProfileModal({ recordId, records, companyMeta, onClo
   const [errors, setErrors] = useState({});
   const [reminder, setReminder] = useState(emptyReminder);
   const [quickOpen, setQuickOpen] = useState(false);
-  const [quick, setQuick] = useState(() => ({ ...emptyQuickCall, coordinator: rec?.coordinator || '' }));
+  const [quick, setQuick] = useState(() => (rec ? {
+    ...emptyQuickCall,
+    coordinator: rec.coordinator || '', name: rec.name || '', phone: rec.phone || '',
+    product: rec.product || '', categoryId: rec.categoryId || '', source: rec.source || '',
+    date: Utils.toISODate(Utils.todayDdMmYyyy()),
+  } : emptyQuickCall));
   const [quickReminder, setQuickReminder] = useState(emptyReminder);
-  const [commentText, setCommentText] = useState('');
   const [mainTab, setMainTab] = useState('form');
   const [historyPage, setHistoryPage] = useState(1);
-  const [changelogPage, setChangelogPage] = useState(1);
-  const [correspondencePage, setCorrespondencePage] = useState(1);
 
   const key = rec ? custKey(rec.company) : null;
   const history = useMemo(() => {
@@ -64,11 +67,12 @@ export default function LeadProfileModal({ recordId, records, companyMeta, onClo
   }, [records, key]);
 
   const feed = key ? getUnifiedFeed(key) : [];
-  const changelogItems = feed.filter((i) => i.type === 'change');
-  const correspondenceItems = feed.filter((i) => i.type === 'comment');
+  const activityCounts = {
+    changelog: feed.filter((i) => i.type === 'change').length,
+    correspondence: feed.filter((i) => i.type === 'comment').length,
+    reminders: (reminders || []).filter((rm) => rm.custKey === key && !rm.done).length,
+  };
   const historyPaged = pageOf(history, historyPage);
-  const changelogPaged = pageOf(changelogItems, changelogPage);
-  const correspondencePaged = pageOf(correspondenceItems, correspondencePage);
 
   if (!rec || !form) return null;
   const set = (k) => (v) => { setForm((s) => ({ ...s, [k]: v })); setErrors((s) => (s[k] ? { ...s, [k]: null } : s)); };
@@ -132,20 +136,27 @@ export default function LeadProfileModal({ recordId, records, companyMeta, onClo
   async function handleDelete(id) {
     const target = records.find((r) => r.id === id);
     if (!target) return;
+    const k = custKey(target.company);
+    const remaining = records.find((r) => r.id !== id && custKey(r.company) === k);
     const ok = await confirm({
       title: 'حذف تماس',
-      message: `این تماس با «${target.company || '-'}» (تاریخ ${target.date || '-'}) برای همیشه حذف بشه؟`,
+      message: remaining
+        ? `این تماس با «${target.company || '-'}» (تاریخ ${target.date || '-'}) برای همیشه حذف بشه؟`
+        : `این تنها تماسیه که از «${target.company || '-'}» تو لیست شما مونده — با تأیید، فقط اطلاعات این تماس پاک میشه؛ خود شرکت تو لیست شما می‌مونه. ادامه بدید؟`,
       confirmText: 'حذف',
       cancelText: 'انصراف',
     });
     if (!ok) return;
-    const k = custKey(target.company);
-    const wasCurrent = id === recordId;
-    deleteRecordWithLog(target);
-    toast('تماس حذف شد');
-    if (wasCurrent) {
-      const remaining = records.find((r) => r.id !== id && custKey(r.company) === k);
-      if (remaining) onOpenRecord(remaining.id); else onClose();
+    if (remaining) {
+      const wasCurrent = id === recordId;
+      deleteRecordWithLog(target);
+      toast('تماس حذف شد');
+      if (wasCurrent) onOpenRecord(remaining.id);
+    } else {
+      updateRecord(target.id, EMPTY_RECORD_PATCH);
+      addChangeLogEntry(k, 'آخرین تماس این شرکت پاک شد — شرکت در لیست باقی موند', currentUserName);
+      toast(`اطلاعات آخرین تماس پاک شد — «${target.company || '-'}» همچنان تو لیست شما هست`);
+      onClose();
     }
   }
 
@@ -181,13 +192,6 @@ export default function LeadProfileModal({ recordId, records, companyMeta, onClo
     toast('تماس جدید ثبت شد' + (reminderCreated ? ' — یادآوری ثبت شد' : ''));
   }
 
-  function submitComment() {
-    if (!commentText.trim()) { toast('متن نظر خالیه'); return; }
-    addComment(key, commentText.trim(), currentUserName);
-    setCommentText('');
-    toast('نظر ثبت شد');
-  }
-
   return (
     <Modal
       open
@@ -202,8 +206,9 @@ export default function LeadProfileModal({ recordId, records, companyMeta, onClo
           <div className="crm-modal-tabs">
             <button type="button" className={`crm-modal-tab${mainTab === 'form' ? ' -active' : ''}`} onClick={() => setMainTab('form')}>فرم</button>
             <button type="button" className={`crm-modal-tab${mainTab === 'history' ? ' -active' : ''}`} onClick={() => setMainTab('history')}>تاریخچه تماس‌ها <span>({history.length.toLocaleString('en-US')})</span></button>
-            <button type="button" className={`crm-modal-tab${mainTab === 'changelog' ? ' -active' : ''}`} onClick={() => setMainTab('changelog')}>تاریخچه تغییرات <span>({feed.filter((i) => i.type === 'change').length.toLocaleString('en-US')})</span></button>
-            <button type="button" className={`crm-modal-tab${mainTab === 'correspondence' ? ' -active' : ''}`} onClick={() => setMainTab('correspondence')}>مکاتبات <span>({feed.filter((i) => i.type === 'comment').length.toLocaleString('en-US')})</span></button>
+            {COMPANY_ACTIVITY_TABS.map((t) => (
+              <button key={t.key} type="button" className={`crm-modal-tab${mainTab === t.key ? ' -active' : ''}`} onClick={() => setMainTab(t.key)}>{t.label} <span>({activityCounts[t.key].toLocaleString('en-US')})</span></button>
+            ))}
           </div>
 
           <div className="crm-profile-tab-content">
@@ -288,7 +293,7 @@ export default function LeadProfileModal({ recordId, records, companyMeta, onClo
               {!history.length ? <div className="crm-empty">تماسی ثبت نشده</div> : historyPaged.pageItems.map((r) => (
                 <div className={`crm-history-item${r.id === recordId ? ' -current' : ''}`} key={r.id} onClick={() => onOpenRecord(r.id)}>
                   <div className="crm-history-item-top">
-                    <span><span className={`crm-coord-tag ${coordClass(r.coordinator)}`}>{r.coordinator ? coordLabel(r.coordinator) : '-'}</span> <b>{formatDisplayDate(r.date, calendar) || '-'}</b></span>
+                    <span><span className={`crm-coord-tag ${coordClass(r.coordinator)}`}>{r.coordinator ? coordLabel(r.coordinator) : '-'}</span> <b>{formatDisplayDate(r.date, calendar) || '-'}</b>{r.name && <> — {r.name}</>}</span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <StatusBadge r={r} />
                       <button type="button" className="crm-delete-btn crm-history-delete" title="حذف این تماس" onClick={(e) => { e.stopPropagation(); handleDelete(r.id); }}><TrashIcon />حذف</button>
@@ -302,36 +307,16 @@ export default function LeadProfileModal({ recordId, records, companyMeta, onClo
           </div>
           )}
 
-          {mainTab === 'changelog' && (
-          <div className="crm-profile-block -notop">
-            <div className="crm-feed-list">
-              {!changelogItems.length ? <div className="crm-feed-empty">هنوز تغییری برای این سرنخ ثبت نشده</div> : changelogPaged.pageItems.map((item) => (
-                <div className="crm-feed-item -change" key={item.id}>
-                  <div className="crm-feed-item-head"><b>{item.author || 'سیستم'}</b><span>{Utils.formatTs(item.ts, calendar)}</span></div>
-                  <div>{item.text}</div>
-                </div>
-              ))}
-            </div>
-            <Pagination safePage={changelogPaged.safePage} totalPages={changelogPaged.totalPages} onPage={setChangelogPage} />
-          </div>
-          )}
-
-          {mainTab === 'correspondence' && (
-          <div className="crm-profile-block -notop">
-            <div className="crm-comment-form">
-              <textarea className="crm-textarea" rows={2} value={commentText} onChange={(e) => setCommentText(e.target.value)} placeholder="نظر یا یادداشت خودتو بنویس..." />
-              <button type="button" className="crm-btn-primary" onClick={submitComment}><CheckIcon />ثبت نظر</button>
-            </div>
-            <div className="crm-feed-list">
-              {!correspondenceItems.length ? <div className="crm-feed-empty">هنوز نظری برای این سرنخ ثبت نشده</div> : correspondencePaged.pageItems.map((item) => (
-                <div className="crm-feed-item -comment" key={item.id}>
-                  <div className="crm-feed-item-head"><b>{item.author}</b><span>{Utils.formatTs(item.ts, calendar)}</span></div>
-                  <div>{item.text}</div>
-                </div>
-              ))}
-            </div>
-            <Pagination safePage={correspondencePaged.safePage} totalPages={correspondencePaged.totalPages} onPage={setCorrespondencePage} />
-          </div>
+          {(mainTab === 'changelog' || mainTab === 'correspondence' || mainTab === 'reminders') && (
+            <CompanyActivityTabs
+              tab={mainTab}
+              custKey={key}
+              company={rec.company}
+              reminders={reminders}
+              onMarkReminderDone={onMarkReminderDone}
+              currentUser={currentUser}
+              currentUserName={currentUserName}
+            />
           )}
           </div>
     </Modal>

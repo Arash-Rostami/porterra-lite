@@ -32,18 +32,19 @@ department, an `agent` seeing only their own records) is enforced inside
 | `/api/auth/login` | POST | — | Email+password login, sets `crm_session` cookie. |
 | `/api/auth/logout` | POST | — | Clears the session cookie. |
 | `/api/auth/me` | GET | session (soft) | Current user from the session cookie. |
-| `/api/data` | GET | requireUser | Full scoped boot payload (records/reminders/companyMeta/products/categories/agents) — `store.js`'s `loadAll`. |
+| `/api/data` | GET | requireUser | Full scoped boot payload (records/reminders/notifications/companyMeta/products/categories/agents) — `store.js`'s `loadAll`. |
 | `/api/sync` | POST | requireUser | Replay offline queue + refresh boot data — `store.js`'s `syncNow`. |
 | `/api/leads` | POST | requireUser | Create a lead (physical table `contacts`). Listing happens via `GET /api/data`'s boot payload, not a per-route GET. |
-| `/api/leads/[id]` | PATCH, DELETE | requireUser | Update / delete one lead. |
-| `/api/leads/by-company` | GET | requireUser | The single most-recent lead for one company name (`findLatestLeadByCompany`, `queries.js`) — used by `AddLeadForm` to autofill fields when the company name matches an existing lead. |
+| `/api/leads/[id]` | PATCH, DELETE | requireUser | Update / delete one lead. A PATCH that actually changes `coordinator` to someone other than the acting user notifies the new coordinator (`updateLeadWithNotification` — see `../../lib/CLAUDE.md`'s `queries.js` `notifications` entry). |
+| `/api/leads/by-company` | GET | requireUser | The single most-recent lead for one company name (`findLatestLeadByCompany`, `queries.js`) — **deliberately unscoped** (any authenticated user, no department/agent narrowing) so `AddLeadForm`'s autofill still finds a match another agent logged. Fires on `CompanySuggest`'s `onSelect` (picking a live-typeahead suggestion) and still on plain blur (typing a full company name with no suggestion picked) — see `AddLeadForm.jsx`'s `autofillFromCompany`. |
 | `/api/leads/import` | POST | requireUser | Bulk `.xlsx` import (per-record offline-queueable). |
-| `/api/quotes/[id]` | PATCH | requireUser + `checkLeadScope` | Quote lifecycle transitions (`announce-price` / `resolve`) via `action` body field — still just a lead patch under the hood, so it enforces the same department/own-record scope as `/api/leads/[id]` (both call the shared `checkLeadScope` in `serverOps.js`). |
-| `/api/activity` | POST | requireUser | Add a comment/changelog entry for a company. |
+| `/api/quotes/[id]` | PATCH | requireUser + `checkLeadScope` | Quote lifecycle transitions (`announce-price` / `resolve`) via `action` body field — still just a lead patch under the hood, so it enforces the same department/own-record scope as `/api/leads/[id]` (both call the shared `checkLeadScope` in `serverOps.js`). If the lead's coordinator differs from the acting user, this also notifies them (`updateLeadWithNotification` — see `../../lib/CLAUDE.md`'s `queries.js` `notifications` entry). |
+| `/api/activity` | POST | requireUser | Add a comment/changelog entry for a company. A new comment (not a changelog entry) also notifies the company's current coordinator if it isn't the commenter themselves — see `../../lib/CLAUDE.md`. |
 | `/api/activity/[id]` | PATCH, DELETE | requireUser | Edit/delete one activity entry. |
 | `/api/reminders` | POST | requireUser | Create a reminder. |
 | `/api/reminders/[id]` | PATCH, DELETE | requireUser | Update/delete a reminder. |
 | `/api/reminders/[id]/done` | POST | requireUser | Mark a reminder done. |
+| `/api/notifications/[id]/read` | POST | requireUser | Mark one notification read — same shape as `/api/reminders/[id]/done`. No `GET`/list route: notifications ride along in `/api/data`'s boot payload, same as reminders. |
 | `/api/products` | POST | requireUser (open to any authenticated user — the inline "add on the fly" widget relies on this) | Create a product. Listing happens via `GET /api/data`'s boot payload, not a per-route GET. |
 | `/api/products/[id]` | PATCH, DELETE | requireElevated | Edit/delete a product. |
 | `/api/categories` | POST | requireUser (same inline-create rationale as products) | Create a category. Listing happens via `GET /api/data`'s boot payload, not a per-route GET. |

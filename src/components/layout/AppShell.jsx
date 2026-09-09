@@ -9,7 +9,7 @@ import { Toast } from '../ui/Toast.jsx';
 import LeadProfileModal from '../leads/LeadProfileModal.jsx';
 import AgentProfileModal from '../agents/AgentProfileModal.jsx';
 import ConfirmDialog from '../ui/ConfirmDialog.jsx';
-import { useStore, loadAll, syncNow } from '../../lib/store.js';
+import { useStore, loadAll, syncNow, markReminderDone } from '../../lib/store.js';
 import { useUiStore, closeProfile, closeAgentProfile, openProfile } from '../../lib/uiStore.js';
 import { useTheme } from '../../lib/theme.js';
 
@@ -18,6 +18,7 @@ export default function AppShell({ children }) {
   const isAuth = pathname === '/login';
   const records = useStore((s) => s.records);
   const companyMeta = useStore((s) => s.companyMeta);
+  const reminders = useStore((s) => s.reminders);
   const loaded = useStore((s) => s.loaded);
   const offline = useStore((s) => s.offline);
   const queueCount = useStore((s) => s.queueCount);
@@ -64,6 +65,8 @@ export default function AppShell({ children }) {
           recordId={profileId}
           records={records}
           companyMeta={companyMeta}
+          reminders={reminders}
+          onMarkReminderDone={markReminderDone}
           onClose={closeProfile}
           onOpenRecord={(id) => openProfile(id)}
         />

@@ -1,6 +1,6 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
-import { getDueReminders, markReminderDone, findLatestComment, custKey, useScopedData } from '../../lib/store.js';
+import { getDueReminders, markReminderDone, markNotificationRead, findLatestComment, custKey, useScopedData } from '../../lib/store.js';
 import { openProfile } from '../../lib/uiStore.js';
 import { coordLabel } from '../../lib/filters.js';
 import { BellIcon, CheckIcon } from '../ui/Icon.jsx';
@@ -14,15 +14,17 @@ const PER_PAGE = 6;
 
 // surfaces due reminders + latest comment on every tab, not just Suggestions
 export default function NotificationsBell() {
-  const { records, reminders, companyMeta } = useScopedData();
+  const { records, reminders, notifications, companyMeta } = useScopedData();
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [notifPage, setNotifPage] = useState(1);
   const rootRef = useRef(null);
   const calendar = useUiStore((u) => u.calendar);
 
   function toggleOpen() {
     setOpen((o) => !o);
     setPage(1);
+    setNotifPage(1);
   }
 
   useEffect(() => {
@@ -35,6 +37,8 @@ export default function NotificationsBell() {
 
   const due = getDueReminders(reminders);
   const duePaged = paginate(due, page, PER_PAGE);
+  const unread = notifications.filter((n) => !n.read).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const unreadPaged = paginate(unread, notifPage, PER_PAGE);
   const latestComment = findLatestComment(companyMeta, records);
 
   function goTo(id) {
@@ -46,11 +50,32 @@ export default function NotificationsBell() {
     <div className="crm-notif-wrap" ref={rootRef}>
       <button type="button" className="crm-theme-toggle crm-notif-bell" onClick={toggleOpen} title="اعلان‌ها">
         <BellIcon />
-        {due.length > 0 && <span className="crm-notif-badge">{due.length > 9 ? '9+' : due.length}</span>}
+        {(due.length + unread.length) > 0 && <span className="crm-notif-badge">{(due.length + unread.length) > 9 ? '9+' : (due.length + unread.length)}</span>}
       </button>
 
       {open && (
         <div className="crm-notif-dropdown">
+          {!!unread.length && (
+            <>
+              <div className="crm-notif-dropdown-title">اعلان‌ها</div>
+              {unreadPaged.pageItems.map((n) => {
+                const rec = records.find((r) => custKey(r.company) === n.custKey);
+                return (
+                  <div className="crm-notif-item" key={n.id}>
+                    <div className="crm-notif-item-main" onClick={() => rec && goTo(rec.id)}>
+                      <div className="crm-notif-item-company">{n.company || '-'}</div>
+                      <div className="crm-notif-item-text">{n.text}</div>
+                      <div className="crm-notif-item-meta">{Utils.formatTs(n.createdAt, calendar)}</div>
+                    </div>
+                    <button type="button" className="crm-notif-done-btn" title="خوانده شد" onClick={(e) => { e.stopPropagation(); markNotificationRead(n.id); }}>
+                      <CheckIcon />
+                    </button>
+                  </div>
+                );
+              })}
+              <Pagination safePage={unreadPaged.safePage} totalPages={unreadPaged.totalPages} onPage={setNotifPage} />
+            </>
+          )}
           <div className="crm-notif-dropdown-title">یادآوری‌های سررسیدشده</div>
           {!due.length ? (
             <div className="crm-notif-empty">🎉 پیشنهاد تماسی نیست — همه پیگیری‌ها به‌روزن</div>

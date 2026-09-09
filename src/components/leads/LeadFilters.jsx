@@ -21,11 +21,11 @@ export default function LeadFilters({ records, filters, onChange, chartFilter, o
     <div className="crm-section crm-collapsible-section">
       <div className="crm-section-title">فیلترها</div>
       <div className="crm-toolbar">
-        <Dropdown value={filters.coordinator} onChange={set('coordinator')} options={scopedCoordOptions(currentUser)} placeholder="همه کارشناسان" />
-        <Dropdown value={filters.category} onChange={set('category')} options={categoryOpts} placeholder="همه دسته‌ها" />
-        <Dropdown value={filters.product} onChange={set('product')} options={productOpts} placeholder="همه محصولات" />
-        <Dropdown value={filters.source} onChange={set('source')} options={opts.sources} placeholder="همه منابع سرنخ" />
-        <Dropdown value={filters.status} onChange={set('status')} options={STATUS_OPTS} placeholder="همه وضعیت‌ها" />
+        <Dropdown multiple value={filters.coordinator} onChange={set('coordinator')} options={scopedCoordOptions(currentUser)} placeholder="همه کارشناسان" />
+        <Dropdown multiple value={filters.category} onChange={set('category')} options={categoryOpts} placeholder="همه دسته‌ها" />
+        <Dropdown multiple value={filters.product} onChange={set('product')} options={productOpts} placeholder="همه محصولات" />
+        <Dropdown multiple value={filters.source} onChange={set('source')} options={opts.sources} placeholder="همه منابع سرنخ" />
+        <Dropdown multiple value={filters.status} onChange={set('status')} options={STATUS_OPTS} placeholder="همه وضعیت‌ها" />
         <div className="crm-date-range">
           <DateField className="crm-input crm-mono" value={filters.dateFrom} onChange={set('dateFrom')} />
           <span>تا</span>

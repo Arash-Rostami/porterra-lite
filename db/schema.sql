@@ -124,6 +124,24 @@ CREATE TABLE IF NOT EXISTS `reminders` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
+-- notifications — persistent per-agent notifications (new comment on your
+-- company, quote priced/resolved by someone else, lead reassigned to you).
+-- Separate from `reminders` (due-date follow-ups) — see src/lib/CLAUDE.md.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `notifications` (
+  `id`         varchar(40)  COLLATE utf8mb4_unicode_ci NOT NULL,
+  `for_agent`  varchar(32)  COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type`       varchar(32)  COLLATE utf8mb4_unicode_ci NOT NULL,
+  `cust_key`   varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `company`    varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `text`       text         COLLATE utf8mb4_unicode_ci,
+  `created_at` bigint(20)   DEFAULT NULL,
+  `is_read`    tinyint(1)   NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  KEY `idx_notifications_agent_read` (`for_agent`,`is_read`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
 -- users
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `users` (

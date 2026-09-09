@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react';
 import { PencilIcon, TrashIcon, PlusIcon, ArrowsUpDownIcon } from '../ui/Icon.jsx';
 import Utils from '../../lib/utils.js';
+import { textFilter } from '../../lib/filters.js';
 import { useUiStore } from '../../lib/uiStore.js';
 import Pagination, { paginate } from '../ui/Pagination.jsx';
 
@@ -26,9 +27,7 @@ export default function CategoriesPanel({ categories, loaded, isElevated, onAdd,
   const [perPage, setPerPage] = useState(20);
   const [sort, setSort] = useState({ key: 'createdAt', dir: -1 });
   const filtered = useMemo(() => {
-    const query = Utils.normSpace(q).toLowerCase();
-    if (!query) return categories;
-    return categories.filter((c) => (c.name || '').toLowerCase().includes(query));
+    return textFilter(categories, q, (c) => [c.name]);
   }, [categories, q]);
   const sorted = useMemo(() => {
     if (sort.key !== 'createdAt') return filtered;

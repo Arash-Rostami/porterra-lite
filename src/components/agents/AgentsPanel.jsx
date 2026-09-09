@@ -1,7 +1,7 @@
 'use client';
 import { useMemo, useState } from 'react';
 import Utils from '../../lib/utils.js';
-import { coordLabel } from '../../lib/filters.js';
+import { coordLabel, textFilter } from '../../lib/filters.js';
 import { agentColor } from '../../lib/analytics.js';
 import Pagination, { paginate } from '../ui/Pagination.jsx';
 
@@ -18,9 +18,7 @@ export default function AgentsPanel({ records, activeCoordinator, onToggleCoordi
   }
   const allNames = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
   const names = useMemo(() => {
-    const query = Utils.normSpace(q).toLowerCase();
-    if (!query) return allNames;
-    return allNames.filter((n) => coordLabel(n).toLowerCase().includes(query));
+    return textFilter(allNames, q, (n) => [coordLabel(n)]);
   }, [allNames, q]);
 
   function changeQuery(v) {
@@ -29,6 +27,7 @@ export default function AgentsPanel({ records, activeCoordinator, onToggleCoordi
   }
 
   const { pageItems, totalPages, safePage } = paginate(names, page, PER_PAGE);
+  const isActiveCoordinator = (n) => (Array.isArray(activeCoordinator) ? activeCoordinator.includes(n) : activeCoordinator === n);
 
   return (
     <div className="crm-section" id="crmAgents">
@@ -48,7 +47,7 @@ export default function AgentsPanel({ records, activeCoordinator, onToggleCoordi
           <button
             key={n}
             type="button"
-            className={`crm-agent-chip${activeCoordinator === n ? ' -active' : ''}`}
+            className={`crm-agent-chip${isActiveCoordinator(n) ? ' -active' : ''}`}
             onClick={() => onToggleCoordinator(activeCoordinator === n ? '' : n)}
           >
             <span className="crm-agent-dot" style={{ background: agentColor(n) }}></span>

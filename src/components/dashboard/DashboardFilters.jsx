@@ -11,12 +11,13 @@ export default function DashboardFilters({ filters, onChange }) {
   const currentUser = useStore((s) => s.currentUser);
   const set = (k) => (v) => onChange({ ...filters, [k]: v });
   const setInput = (k) => (e) => onChange({ ...filters, [k]: e.target.value });
-  const active = filters.coordinator || filters.dateFrom || filters.dateTo;
+  const hasCoordinator = Array.isArray(filters.coordinator) ? filters.coordinator.length > 0 : !!filters.coordinator;
+  const active = hasCoordinator || filters.dateFrom || filters.dateTo;
 
   return (
     <div className="crm-section">
       <div className="crm-toolbar">
-        <Dropdown value={filters.coordinator} onChange={set('coordinator')} options={scopedCoordOptions(currentUser)} placeholder="همه کارشناسان" />
+        <Dropdown multiple value={filters.coordinator} onChange={set('coordinator')} options={scopedCoordOptions(currentUser)} placeholder="همه کارشناسان" />
         <div className="crm-date-range">
           <DateField className="crm-input crm-mono" value={filters.dateFrom} onChange={set('dateFrom')} />
           <span>تا</span>

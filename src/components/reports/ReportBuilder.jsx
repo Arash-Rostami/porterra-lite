@@ -103,15 +103,15 @@ export default function ReportBuilder({records}) {
             <div className="crm-section">
                 <div className="crm-section-title">فیلترها</div>
                 <div className="crm-toolbar">
-                    <Dropdown value={filters.coordinator} onChange={set('coordinator')} options={scopedCoordOptions(currentUser)}
+                    <Dropdown multiple value={filters.coordinator} onChange={set('coordinator')} options={scopedCoordOptions(currentUser)}
                               placeholder="همه کارشناسان"/>
-                    <Dropdown value={filters.category} onChange={set('category')} options={categoryOpts}
+                    <Dropdown multiple value={filters.category} onChange={set('category')} options={categoryOpts}
                               placeholder="همه دسته‌ها"/>
-                    <Dropdown value={filters.product} onChange={set('product')} options={productOpts}
+                    <Dropdown multiple value={filters.product} onChange={set('product')} options={productOpts}
                               placeholder="همه محصولات"/>
-                    <Dropdown value={filters.source} onChange={set('source')} options={opts.sources}
+                    <Dropdown multiple value={filters.source} onChange={set('source')} options={opts.sources}
                               placeholder="همه منابع سرنخ"/>
-                    <Dropdown value={filters.status} onChange={set('status')} options={STATUS_OPTS}
+                    <Dropdown multiple value={filters.status} onChange={set('status')} options={STATUS_OPTS}
                               placeholder="همه وضعیت‌ها"/>
                     <div className="crm-date-range">
                         <DateField className="crm-input crm-mono" value={filters.dateFrom} onChange={set('dateFrom')}/>

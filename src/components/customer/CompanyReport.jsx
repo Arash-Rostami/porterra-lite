@@ -2,8 +2,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import Utils from '../../lib/utils.js';
 import CompanySuggest from '../ui/CompanySuggest.jsx';
+import CompanyActivityTabs, { COMPANY_ACTIVITY_TABS } from './CompanyActivityTabs.jsx';
 import { coordLabel, coordClass, statusBadgeInfo } from '../../lib/filters.js';
-import { custKey } from '../../lib/store.js';
+import { custKey, useStore, getUnifiedFeed } from '../../lib/store.js';
 import { FA_MONTHS, JALALI_MONTHS, formatDisplayDate, gregorianToJalali } from '../../lib/calendar.js';
 import { useUiStore } from '../../lib/uiStore.js';
 import { XIcon, SearchIcon } from '../ui/Icon.jsx';
@@ -22,7 +23,7 @@ function buildReport(records, input, calendar) {
   if (!trimmed) return { empty: 'یک نام شرکت وارد کن یا از لیست انتخاب کن' };
   const key = custKey(trimmed);
   let matches = records.filter((r) => custKey(r.company) === key);
-  if (!matches.length) matches = records.filter((r) => Utils.normSpace(r.company).toLowerCase().indexOf(trimmed.toLowerCase()) > -1);
+  if (!matches.length) matches = records.filter((r) => Utils.normText(r.company).indexOf(Utils.normText(trimmed)) > -1);
   if (!matches.length) return { empty: 'شرکتی با این نام پیدا نشد' };
 
   const displayName = matches[0].company;
@@ -53,14 +54,24 @@ function buildReport(records, input, calendar) {
   return { displayName, matches, sorted, firstRec, lastRec, daysSinceLast, coords, monthly, monthKeys, maxMonthly };
 }
 
-export default function CompanyReport({ records, onOpenRecord, initialCompany = '' }) {
+export default function CompanyReport({ records, reminders, onMarkReminderDone, onOpenRecord, initialCompany = '' }) {
   const calendar = useUiStore((u) => u.calendar);
+  const currentUser = useStore((s) => s.currentUser);
+  const currentUserName = currentUser?.displayName || currentUser?.username || null;
   const [input, setInput] = useState(initialCompany);
   const [query, setQuery] = useState(initialCompany);
   const [page, setPage] = useState(1);
   const [companyListPage, setCompanyListPage] = useState(1);
+  const [activityTab, setActivityTab] = useState('history');
   const report = query ? buildReport(records, query, calendar) : null;
   const historyPage = report && !report.empty ? paginate(report.sorted, page, PER_PAGE) : null;
+  const reportKey = report && !report.empty ? custKey(report.displayName) : null;
+  const feed = reportKey ? getUnifiedFeed(reportKey) : [];
+  const activityCounts = {
+    changelog: feed.filter((i) => i.type === 'change').length,
+    correspondence: feed.filter((i) => i.type === 'comment').length,
+    reminders: (reminders || []).filter((rm) => rm.custKey === reportKey && !rm.done).length,
+  };
 
   useEffect(() => {
     if (!initialCompany) return;
@@ -70,6 +81,7 @@ export default function CompanyReport({ records, onOpenRecord, initialCompany = 
     setInput(initialCompany);
     setQuery(initialCompany);
     setPage(1);
+    setActivityTab('history');
   }, [initialCompany]);
 
   const companies = useMemo(() => {
@@ -88,6 +100,7 @@ export default function CompanyReport({ records, onOpenRecord, initialCompany = 
   function runQuery(v) {
     setQuery(v);
     setPage(1);
+    setActivityTab('history');
   }
 
   return (
@@ -157,18 +170,40 @@ export default function CompanyReport({ records, onOpenRecord, initialCompany = 
                 })}
               </div>
             )}
-            <div className="crm-history-list" id="crmCompanyReportHistory" style={{ maxHeight: 'none' }}>
-              {historyPage.pageItems.map((r) => (
-                <div className="crm-history-item" key={r.id} onClick={() => onOpenRecord(r.id)}>
-                  <div className="crm-history-item-top">
-                    <span><span className={`crm-coord-tag ${coordClass(r.coordinator)}`}>{r.coordinator ? coordLabel(r.coordinator) : '-'}</span> <b>{formatDisplayDate(r.date, calendar) || 'بدون تاریخ'}</b></span>
-                    <StatusBadge r={r} />
-                  </div>
-                  <div className="crm-history-item-notes">{r.notes || 'بدون یادداشت'}</div>
-                </div>
+            <div className="crm-modal-tabs">
+              <button type="button" className={`crm-modal-tab${activityTab === 'history' ? ' -active' : ''}`} onClick={() => setActivityTab('history')}>تاریخچه تماس‌ها <span>({report.matches.length.toLocaleString('en-US')})</span></button>
+              {COMPANY_ACTIVITY_TABS.map((t) => (
+                <button key={t.key} type="button" className={`crm-modal-tab${activityTab === t.key ? ' -active' : ''}`} onClick={() => setActivityTab(t.key)}>{t.label} <span>({activityCounts[t.key].toLocaleString('en-US')})</span></button>
               ))}
             </div>
-            <Pagination safePage={historyPage.safePage} totalPages={historyPage.totalPages} onPage={setPage} />
+            {activityTab === 'history' && (
+              <>
+                <div className="crm-history-list" id="crmCompanyReportHistory" style={{ maxHeight: 'none' }}>
+                  {historyPage.pageItems.map((r) => (
+                    <div className="crm-history-item" key={r.id} onClick={() => onOpenRecord(r.id)}>
+                      <div className="crm-history-item-top">
+                        <span><span className={`crm-coord-tag ${coordClass(r.coordinator)}`}>{r.coordinator ? coordLabel(r.coordinator) : '-'}</span> <b>{formatDisplayDate(r.date, calendar) || 'بدون تاریخ'}</b>{r.name && <> — {r.name}</>}</span>
+                        <StatusBadge r={r} />
+                      </div>
+                      <div className="crm-history-item-notes">{r.notes || 'بدون یادداشت'}</div>
+                    </div>
+                  ))}
+                </div>
+                <Pagination safePage={historyPage.safePage} totalPages={historyPage.totalPages} onPage={setPage} />
+              </>
+            )}
+            {(activityTab === 'changelog' || activityTab === 'correspondence' || activityTab === 'reminders') && (
+              <CompanyActivityTabs
+                tab={activityTab}
+                custKey={reportKey}
+                company={report.displayName}
+                reminders={reminders}
+                onMarkReminderDone={onMarkReminderDone}
+                onOpenRecord={(rm) => { const rec = records.find((r) => custKey(r.company) === rm.custKey); if (rec) onOpenRecord(rec.id); }}
+                currentUser={currentUser}
+                currentUserName={currentUserName}
+              />
+            )}
           </>
         )}
       </div>

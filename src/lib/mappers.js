@@ -77,6 +77,19 @@ export function rowToReminder(row) {
   };
 }
 
+export function rowToNotification(row) {
+  return {
+    id: row.id,
+    forAgent: row.for_agent,
+    type: row.type,
+    custKey: row.cust_key,
+    company: row.company,
+    text: row.text,
+    createdAt: row.created_at == null ? null : Number(row.created_at),
+    read: Boolean(row.is_read),
+  };
+}
+
 export function rowsToCompanyMeta(rows) {
   const meta = {};
   for (const row of rows) {
@@ -149,6 +162,19 @@ export function reminderToRow(r) {
   };
 }
 
+export function notificationToRow(notif) {
+  return {
+    id: notif.id,
+    for_agent: notif.forAgent,
+    type: notif.type,
+    cust_key: n(notif.custKey),
+    company: n(notif.company),
+    text: n(notif.text),
+    created_at: notif.createdAt == null ? null : notif.createdAt,
+    is_read: notif.read ? 1 : 0,
+  };
+}
+
 export function activityToRow(a) {
   return {
     id: a.id,
@@ -180,6 +206,7 @@ export const LEAD_COLS = [
   'deactivate_reason', 'quote_price', 'quote_price_type', 'quote_terms', 'quote_price_date', 'quote_result', 'quote_result_date', 'quote_fail_reason',
 ];
 export const REMINDER_COLS = ['id', 'cust_key', 'company', 'due_date', 'due_time', 'for_agent', 'text', 'created_at', 'done'];
+export const NOTIFICATION_COLS = ['id', 'for_agent', 'type', 'cust_key', 'company', 'text', 'created_at', 'is_read'];
 export const ACTIVITY_COLS = ['id', 'company_key', 'type', 'ts', 'author', 'text'];
 export const USER_COLS = ['id', 'username', 'email', 'display_name', 'agent_code', 'department', 'password_cipher', 'role', 'active', 'last_login', 'created_at'];
 export const USER_SAFE_COLS = ['id', 'username', 'email', 'display_name', 'agent_code', 'department', 'role', 'active', 'last_login', 'created_at'];

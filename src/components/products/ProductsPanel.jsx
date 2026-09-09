@@ -1,7 +1,7 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { PencilIcon, TrashIcon, PlusIcon, DownloadIcon, ArrowsUpDownIcon } from '../ui/Icon.jsx';
-import { badgeClass } from '../../lib/filters.js';
+import { badgeClass, textFilter } from '../../lib/filters.js';
 import { exportProductsToExcel } from '../../lib/excel.js';
 import { toast } from '../ui/Toast.jsx';
 import Utils from '../../lib/utils.js';
@@ -29,9 +29,7 @@ export default function ProductsPanel({ products, loaded, isElevated, onAdd, onE
   const [perPage, setPerPage] = useState(20);
   const [sort, setSort] = useState({ key: 'createdAt', dir: -1 });
   const filtered = useMemo(() => {
-    const query = Utils.normSpace(q).toLowerCase();
-    if (!query) return products;
-    return products.filter((p) => (p.name || '').toLowerCase().includes(query) || (p.category || '').toLowerCase().includes(query));
+    return textFilter(products, q, (p) => [p.name, p.category]);
   }, [products, q]);
   const sorted = useMemo(() => {
     if (sort.key !== 'createdAt') return filtered;

@@ -22,10 +22,22 @@ export const PATCH = handle(async (req, ctx) => {
   await checkLeadScope(user, lead, undefined);
   if (lead.result !== 'در حال استعلام') throw validationError('این لید در وضعیت استعلام نیست');
 
+  function notify(type, text) {
+    if (!lead.coordinator || lead.coordinator === user.agentCode) return undefined;
+    return {
+      id: 'NOTIF-' + Date.now() + '-' + Math.floor(Math.random() * 100000),
+      forAgent: lead.coordinator, type,
+      custKey: Utils.normSpace(lead.company).toLowerCase(), company: lead.company,
+      text, createdAt: Date.now(), read: false,
+    };
+  }
+
   if (body.action === 'announce-price') {
     const input = parseOrThrow(QuoteAnnouncePrice, body);
     const patch = { quotePrice: input.price, quotePriceType: input.priceType, quoteTerms: input.terms, quotePriceDate: Utils.todayDdMmYyyy() };
-    return NextResponse.json(await tryOp('updateLead', { id, patch }));
+    const notification = notify('quote_priced', `قیمت برای استعلام «${lead.company}» اعلام شد`);
+    if (!notification) return NextResponse.json(await tryOp('updateLead', { id, patch }));
+    return NextResponse.json(await tryOp('updateLeadWithNotification', { id, patch, notification }));
   }
   if (body.action === 'resolve') {
     if (!lead.quotePrice) throw validationError('ابتدا باید قیمت اعلام شود');
@@ -37,7 +49,9 @@ export const PATCH = handle(async (req, ctx) => {
       quoteFailReason: input.result === 'ناموفق' ? input.failReason : null,
       converted: input.result === 'موفق' ? true : lead.converted,
     };
-    return NextResponse.json(await tryOp('updateLead', { id, patch }));
+    const notification = notify('quote_resolved', `استعلام «${lead.company}» با نتیجه «${input.result}» نهایی شد`);
+    if (!notification) return NextResponse.json(await tryOp('updateLead', { id, patch }));
+    return NextResponse.json(await tryOp('updateLeadWithNotification', { id, patch, notification }));
   }
   throw validationError('action نامعتبر');
 });

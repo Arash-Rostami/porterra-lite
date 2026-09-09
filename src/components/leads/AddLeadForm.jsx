@@ -2,6 +2,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import Modal from '../ui/Modal.jsx';
 import Dropdown from '../ui/Dropdown.jsx';
+import CompanySuggest from '../ui/CompanySuggest.jsx';
 import DateField from '../ui/DateField.jsx';
 import ProductField from './ProductField.jsx';
 import Utils from '../../lib/utils.js';
@@ -12,7 +13,7 @@ import { useStore } from '../../lib/store.js';
 import { toast } from '../ui/Toast.jsx';
 import { CheckIcon, XCircleIcon } from '../ui/Icon.jsx';
 
-const empty = { coordinator: '', company: '', name: '', phone: '', product: '', categoryId: '', source: '', date: '', price: '', result: '', priority: '', notes: '', deactivateReason: '' };
+const empty = { coordinator: '', company: '', name: '', phone: '', product: '', categoryId: '', source: '', date: '', price: '', result: '', priority: 'پایین', notes: '', deactivateReason: '' };
 
 // create and edit share the same <Modal> chrome for UI consistency
 export default function AddLeadForm({ open, records, defaultCoordinator, onSubmit, onCancel }) {
@@ -27,15 +28,20 @@ export default function AddLeadForm({ open, records, defaultCoordinator, onSubmi
   useEffect(() => {
     // Must re-run every time the form reopens (this component stays mounted between opens,
     // per Modal.jsx's conditional-render pattern) without stomping an in-progress edit.
+    if (!open) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (open && defaultCoordinator) setF((s) => (s.coordinator ? s : { ...s, coordinator: defaultCoordinator }));
+    setF((s) => ({
+      ...s,
+      coordinator: s.coordinator || defaultCoordinator || '',
+      date: s.date || Utils.toISODate(Utils.todayDdMmYyyy()),
+    }));
   }, [open, defaultCoordinator]);
 
-  async function handleCompanyBlur() {
-    const company = f.company.trim();
-    if (!company) return;
+  async function autofillFromCompany(company) {
+    const trimmed = company.trim();
+    if (!trimmed) return;
     try {
-      const { lead } = await findLeadByCompany(company);
+      const { lead } = await findLeadByCompany(trimmed);
       if (!lead) return;
       setF((s) => ({
         ...s,
@@ -50,6 +56,8 @@ export default function AddLeadForm({ open, records, defaultCoordinator, onSubmi
     } catch {
     }
   }
+  function handleCompanyBlur() { autofillFromCompany(f.company); }
+  function handleCompanySelect(name) { setF((s) => ({ ...s, company: name })); autofillFromCompany(name); }
 
   const companyDup = useMemo(() => findDuplicateCompany(records, f.company), [records, f.company]);
   const phoneDup = useMemo(() => findDuplicatePhone(records, f.phone), [records, f.phone]);
@@ -110,7 +118,7 @@ export default function AddLeadForm({ open, records, defaultCoordinator, onSubmi
         </div>
         <div className="crm-field -span2">
           <label>نام شرکت *</label>
-          <input className="crm-input" value={f.company} onChange={setInput('company')} onBlur={handleCompanyBlur} required placeholder="مثلاً: شرکت نمونه صنعت" />
+          <CompanySuggest records={records} className="crm-input" value={f.company} onChange={set('company')} onSelect={handleCompanySelect} onBlur={handleCompanyBlur} required placeholder="مثلاً: شرکت نمونه صنعت" />
           {companyDup && <div className="crm-dup-warning -show">{companyDup}</div>}
         </div>
         <div className="crm-field">

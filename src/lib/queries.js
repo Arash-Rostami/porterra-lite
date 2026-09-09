@@ -7,6 +7,8 @@ import {
     categoryToRow,
     LEAD_COLS,
     leadToRow,
+    NOTIFICATION_COLS,
+    notificationToRow,
     PRODUCT_COLS,
     productToRow,
     REMINDER_COLS,
@@ -15,6 +17,7 @@ import {
     rowToActivity,
     rowToCategory,
     rowToLead,
+    rowToNotification,
     rowToProduct,
     rowToReminder,
     rowToUser,
@@ -29,6 +32,7 @@ const CATEGORY_NAME_SUBQUERY = '(SELECT `name` FROM `categories` WHERE `id`=?)';
 
 const LEAD_SET = LEAD_COLS.filter((c) => c !== 'id');
 const REMINDER_SET = REMINDER_COLS.filter((c) => c !== 'id');
+const NOTIFICATION_SET = NOTIFICATION_COLS.filter((c) => c !== 'id');
 const LEAD_UPDATE = [
     {k: 'converted', col: 'converted'},
     {k: 'company', col: 'company'},
@@ -58,6 +62,7 @@ const USER_SAFE_SELECT = selectCols(USER_SAFE_COLS);
 const LEAD_SELECT = selectCols(LEAD_COLS);
 const ACTIVITY_SELECT = selectCols(ACTIVITY_COLS);
 const REMINDER_SELECT = selectCols(REMINDER_COLS);
+const NOTIFICATION_SELECT = selectCols(NOTIFICATION_COLS);
 const PRODUCT_SELECT = selectCols(PRODUCT_COLS);
 const CATEGORY_SELECT = selectCols(CATEGORY_COLS);
 
@@ -200,11 +205,36 @@ export async function deleteReminder(id, conn) {
     await exec(conn, 'DELETE FROM `reminders` WHERE `id`=?', [id]);
 }
 
+export async function listNotifications(conn) {
+    const rows = await exec(conn, `SELECT ${NOTIFICATION_SELECT} FROM \`notifications\``);
+    return (rows || []).map(rowToNotification);
+}
+export async function createNotification(notif, conn) {
+    const row = notificationToRow(notif);
+    const sql = `INSERT INTO \`notifications\` (\`${NOTIFICATION_COLS.join('`,`')}\`)
+                 VALUES (${ph(NOTIFICATION_COLS.length)})
+                 ON DUPLICATE KEY UPDATE ${NOTIFICATION_SET.map((x) => `\`${x}\`=VALUES(\`${x}\`)`).join(',')}`;
+    await exec(conn, sql, NOTIFICATION_COLS.map((c) => row[c]));
+}
+export async function markNotificationRead(id, conn) {
+    await exec(conn, 'UPDATE `notifications` SET `is_read`=1 WHERE `id`=?', [id]);
+}
+export async function findCompanyOwnerByCustKey(key, conn) {
+    const rows = await exec(conn, 'SELECT `coordinator`,`company`,`contact_date` FROM `contacts` WHERE LOWER(TRIM(`company`)) LIKE ?', [`%${key.split(/\s+/).join('%')}%`]);
+    let best = null;
+    for (const r of rows || []) {
+        if (Utils.normSpace(r.company).toLowerCase() !== key) continue;
+        if (!best || (r.contact_date && (!best.contact_date || r.contact_date > best.contact_date))) best = r;
+    }
+    return best ? { coordinator: best.coordinator, company: best.company } : null;
+}
+
 export async function loadAllFromDb() {
-    const [leadRows, activityRows, reminderRows, productRows, categoryRows, agents] = await Promise.all([
+    const [leadRows, activityRows, reminderRows, notificationRows, productRows, categoryRows, agents] = await Promise.all([
         query(`SELECT ${LEAD_SELECT} FROM \`contacts\``),
         query(`SELECT ${ACTIVITY_SELECT} FROM \`customer_activity\``),
         query(`SELECT ${REMINDER_SELECT} FROM \`reminders\``),
+        query(`SELECT ${NOTIFICATION_SELECT} FROM \`notifications\``),
         query(`SELECT ${PRODUCT_SELECT} FROM \`products\``),
         query(`SELECT ${CATEGORY_SELECT} FROM \`categories\` ORDER BY \`name\``),
         listActiveAgents(),
@@ -213,6 +243,7 @@ export async function loadAllFromDb() {
         records: leadRows.map(rowToLead),
         companyMeta: rowsToCompanyMeta(activityRows),
         reminders: reminderRows.map(rowToReminder),
+        notifications: notificationRows.map(rowToNotification),
         products: productRows.map(rowToProduct),
         categories: categoryRows.map(rowToCategory),
         agents,
@@ -395,12 +426,27 @@ export async function applyOp(op, payload, conn) {
             return updateLead(payload.id, payload.patch, conn);
         case 'addChangeLog':
             return createActivity({...payload.activity, type: 'change'}, conn);
-        case 'addComment':
-            return createActivity({...payload.activity, type: 'comment'}, conn);
+        case 'addComment': {
+            if (!payload.notification) return createActivity({...payload.activity, type: 'comment'}, conn);
+            const run = async (c) => {
+                await createActivity({...payload.activity, type: 'comment'}, c);
+                await createNotification(payload.notification, c);
+            };
+            return conn ? run(conn) : withTransaction(run);
+        }
         case 'addReminder':
             return createReminder(payload.reminder, conn);
         case 'markReminderDone':
             return exec(conn, 'UPDATE `reminders` SET `done`=1 WHERE `id`=?', [payload.id]);
+        case 'markNotificationRead':
+            return markNotificationRead(payload.id, conn);
+        case 'updateLeadWithNotification': {
+            const run = async (c) => {
+                await updateLead(payload.id, payload.patch, c);
+                await createNotification(payload.notification, c);
+            };
+            return conn ? run(conn) : withTransaction(run);
+        }
         case 'updateActivity':
             return updateActivity(payload.id, payload.patch, conn);
         case 'deleteActivity':

@@ -92,39 +92,51 @@ export function statusBadgeInfo(r) {
   return { text: effRes, className: '-progress' };
 }
 
+export function textFilter(items, query, fieldsFn) {
+  const q = Utils.normText(query);
+  if (!q) return items;
+  return items.filter((item) => fieldsFn(item).some((v) => v && Utils.normText(v).indexOf(q) > -1));
+}
+
 export function smartSearch(records, query) {
   if (!query || !query.trim()) return records.map((r) => ({ r, score: 1 }));
-  const tokens = query.trim().toLowerCase().split(/\s+/);
+  const tokens = Utils.normText(query).split(/\s+/).filter(Boolean);
   const fields = ['company', 'name', 'phone', 'notes', 'product', 'category', 'source', 'coordinator'];
   const out = [];
   for (const r of records) {
+    const hay = fields.map((f) => r[f] ? Utils.normText(r[f]) : '');
+    if (r.coordinator) hay.push(Utils.normText(coordLabel(r.coordinator)));
     let score = 0;
     for (const tok of tokens) {
-      let hit = false;
-      for (const f of fields) {
-        const v = r[f];
-        if (v && String(v).toLowerCase().indexOf(tok) > -1) { hit = true; break; }
-      }
-      if (!hit && r.coordinator && coordLabel(r.coordinator).toLowerCase().indexOf(tok) > -1) hit = true;
-      if (hit) score++;
+      if (hay.some((v) => v && v.indexOf(tok) > -1)) score++;
     }
     if (score > 0) out.push({ r, score });
   }
   return out;
 }
 
+export function matchesFilter(fieldValue, filterValue) {
+  if (Array.isArray(filterValue)) return !filterValue.length || filterValue.includes(fieldValue);
+  return !filterValue || fieldValue === filterValue;
+}
+
+function activeStatuses(status) {
+  if (Array.isArray(status)) return status.length ? status : null;
+  return status ? [status] : null;
+}
+
 export function getFiltered(records, filters, chartFilter, sort) {
   let base = records;
   const { coordinator, category, source, product, status, dateFrom, dateTo } = filters;
   base = base.filter((r) => {
-    if (coordinator && r.coordinator !== coordinator) return false;
-    if (category && r.category !== category) return false;
-    if (source && Utils.normSpace(r.source) !== source) return false;
-    if (product && r.product !== product) return false;
-    if (status) {
+    if (!matchesFilter(r.coordinator, coordinator)) return false;
+    if (!matchesFilter(r.category, category)) return false;
+    if (!matchesFilter(Utils.normSpace(r.source), source)) return false;
+    if (!matchesFilter(r.product, product)) return false;
+    const statuses = activeStatuses(status);
+    if (statuses) {
       const eff = effectiveResult(r);
-      if (status === 'بدون وضعیت') { if (eff) return false; }
-      else if (eff !== status) return false;
+      if (!statuses.some((s) => (s === 'بدون وضعیت' ? !eff : eff === s))) return false;
     }
     return true;
   });

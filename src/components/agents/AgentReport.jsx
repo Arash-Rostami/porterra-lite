@@ -1,8 +1,7 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { computeAgentReport, exportAgentReportToExcel, agentColor } from '../../lib/analytics.js';
-import { coordLabel } from '../../lib/filters.js';
-import Utils from '../../lib/utils.js';
+import { coordLabel, textFilter } from '../../lib/filters.js';
 import RingChart from '../ui/RingChart.jsx';
 import { toast } from '../ui/Toast.jsx';
 import { DownloadIcon } from '../ui/Icon.jsx';
@@ -40,9 +39,7 @@ export default function AgentReport({ records }) {
   const [page, setPage] = useState(1);
   const data = computeAgentReport(records);
   const filtered = useMemo(() => {
-    const query = Utils.normSpace(q).toLowerCase();
-    if (!query) return data;
-    return data.filter((d) => coordLabel(d.agent).toLowerCase().includes(query));
+    return textFilter(data, q, (d) => [coordLabel(d.agent)]);
   }, [data, q]);
   const { pageItems, totalPages, safePage } = paginate(filtered, page, PER_PAGE);
 

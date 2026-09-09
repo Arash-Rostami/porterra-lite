@@ -28,6 +28,24 @@ almost certainly belongs in `src/lib/` instead, likely already exists there.
 
 ## Shared components you must reuse, not hand-roll
 
+- **`ui/CompanySuggest.jsx`** — accepts an optional `onBlur` prop that composes with (doesn't
+  replace) its own internal blur handler (the 150ms delayed dropdown-close). Pass a real
+  handler here, never via the spread `...inputProps` — `CompanySuggest` sets its own `onBlur`
+  on the underlying `<input>` *after* spreading `inputProps`, so an `onBlur` slipped in through
+  `inputProps` would be silently shadowed and never fire. `AddLeadForm.jsx` is the reference
+  usage: `onSelect` (a suggestion was clicked) and `onBlur` (the user typed a full company name
+  and tabbed away without clicking a suggestion) both end up calling the same
+  `autofillFromCompany`, so either path fills the rest of the form the same way.
+- **`ui/Dropdown.jsx`** — pass `multiple` to turn it into a checkbox-style multi-select
+  (value becomes an array; clicking an item toggles it and keeps the menu open instead of
+  closing; the label shows the single selection, `"N انتخاب شده"` for 2+, or the placeholder
+  for none). It also accepts a plain non-array value while `multiple` is set (coerced to a
+  1-item array) so a chart drill-down's `applyCategoryFilter`-style single-value set doesn't
+  need to know which filter UI is currently rendering it. Use `multiple` only on a *filter*
+  dropdown (a list is being narrowed) — never on a dropdown that sets one field of one record
+  being created/edited (coordinator/category/result/priority pickers in `AddLeadForm`/
+  `LeadProfileModal`/`ProductFormModal`/etc. stay single-select on purpose, see
+  `../lib/CLAUDE.md`'s `matchesFilter` note for the filter-side half of this).
 - **`ui/Modal.jsx`** — the only way to build a modal (overlay, header,
   body, `actions` footer slot, named `width` scale). Every create/edit
   surface in the app renders through it. See `../app/CLAUDE.md`'s "Modals"

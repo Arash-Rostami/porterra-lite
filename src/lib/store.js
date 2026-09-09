@@ -20,6 +20,7 @@ import {
     importRecords as importRecordsAction,
     loadAllData as loadAllDataAction,
     markReminderDone as markReminderDoneAction,
+    markNotificationRead as markNotificationReadAction,
     resetToSeed as resetToSeedAction,
     resolveQuote as resolveQuoteAction,
     syncNow as syncNowAction,
@@ -33,6 +34,7 @@ let state = {
     records: [],
     companyMeta: {},
     reminders: [],
+    notifications: [],
     products: [],
     categories: [],
     agents: [],
@@ -62,6 +64,13 @@ function isUnauthorized(err) {
 export function custKey(company) {
     return Utils.normSpace(company).toLowerCase();
 }
+
+export const EMPTY_RECORD_PATCH = {
+    name: null, phone: null, product: null, categoryId: null, source: null, date: null,
+    price: null, result: null, priority: null, notes: null, deactivateReason: null,
+    quotePrice: null, quotePriceType: null, quoteTerms: null, quotePriceDate: null,
+    quoteResult: null, quoteResultDate: null, quoteFailReason: null,
+};
 
 function categoryNameById(id) {
     if (!id) return null;
@@ -102,6 +111,7 @@ export async function loadAll() {
         state.records = (res.data && res.data.records) || [];
         state.companyMeta = (res.data && res.data.companyMeta) || {};
         state.reminders = (res.data && res.data.reminders) || [];
+        state.notifications = (res.data && res.data.notifications) || [];
         state.products = (res.data && res.data.products) || [];
         state.categories = (res.data && res.data.categories) || [];
         hydrateAllCategoryNames();
@@ -121,6 +131,7 @@ export async function loadAll() {
         state.records = [];
         state.companyMeta = {};
         state.reminders = [];
+        state.notifications = [];
         state.offline = true;
         state.loaded = true;
         emit();
@@ -138,6 +149,7 @@ export async function logout() {
     state.records = [];
     state.companyMeta = {};
     state.reminders = [];
+    state.notifications = [];
     state.products = [];
     state.categories = [];
     state.agents = [];
@@ -163,6 +175,7 @@ export async function syncNow() {
             state.records = (res.data && res.data.records) || [];
             state.companyMeta = (res.data && res.data.companyMeta) || {};
             state.reminders = (res.data && res.data.reminders) || [];
+            state.notifications = (res.data && res.data.notifications) || [];
             state.products = (res.data && res.data.products) || [];
             state.categories = (res.data && res.data.categories) || [];
             hydrateAllCategoryNames();
@@ -400,6 +413,15 @@ export function markReminderDone(id) {
     }, () => markReminderDoneAction(id));
 }
 
+export function markNotificationRead(id) {
+    const prev = state.notifications;
+    state.notifications = prev.map((n) => (n.id === id ? {...n, read: true} : n));
+    emit();
+    persist(() => {
+        state.notifications = prev;
+    }, () => markNotificationReadAction(id));
+}
+
 export function addReminder(reminder) {
     const prev = state.reminders;
     state.reminders = prev.concat([reminder]);
@@ -445,21 +467,24 @@ export function findLatestComment(companyMeta, records) {
 export function useScopedData() {
     const records = useStore((s) => s.records);
     const reminders = useStore((s) => s.reminders);
+    const notifications = useStore((s) => s.notifications);
     const companyMeta = useStore((s) => s.companyMeta);
     const currentUser = useStore((s) => s.currentUser);
 
     return useMemo(() => {
         const agentCode = currentUser?.role === 'agent' ? (currentUser?.agentCode || null) : null;
         if (!agentCode) {
-            return {records, reminders, companyMeta, currentUser};
+            return {records, reminders, notifications, companyMeta, currentUser};
         }
-        const scopedRecords = records.filter((r) => r.coordinator === agentCode);
-        const scopedReminders = reminders.filter((rm) => rm.forAgent === agentCode);
+        const owned = records.filter((r) => r.coordinator === agentCode);
+        const ownedCompanyKeys = new Set(owned.map((r) => custKey(r.company)));
+        const scopedRecords = records.filter((r) => r.coordinator === agentCode || ownedCompanyKeys.has(custKey(r.company)));
+        const scopedReminders = reminders.filter((rm) => rm.forAgent === agentCode || (rm.custKey && ownedCompanyKeys.has(rm.custKey)));
         const scopedMeta = {};
         for (const r of scopedRecords) {
             const k = custKey(r.company);
             if (companyMeta[k] && !scopedMeta[k]) scopedMeta[k] = companyMeta[k];
         }
-        return {records: scopedRecords, reminders: scopedReminders, companyMeta: scopedMeta, currentUser};
-    }, [records, reminders, companyMeta, currentUser]);
+        return {records: scopedRecords, reminders: scopedReminders, notifications, companyMeta: scopedMeta, currentUser};
+    }, [records, reminders, notifications, companyMeta, currentUser]);
 }

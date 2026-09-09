@@ -1,7 +1,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 
-export default function Dropdown({ value, onChange, options, placeholder }) {
+export default function Dropdown({ value, onChange, options, placeholder, multiple }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
 
@@ -14,11 +14,29 @@ export default function Dropdown({ value, onChange, options, placeholder }) {
   }, []);
 
   const normalized = options.map((o) => (o && typeof o === 'object' ? o : { value: o, label: o }));
-  const found = value ? normalized.find((o) => o.value === value) : null;
-  const label = value ? (found ? found.label : value) : placeholder;
+  const selected = multiple ? (Array.isArray(value) ? value : (value ? [value] : [])) : null;
+  const isSel = (v) => (multiple ? selected.includes(v) : value === v);
+  const noneSel = multiple ? !selected.length : !value;
+
+  let label = placeholder;
+  if (multiple) {
+    if (selected.length === 1) label = (normalized.find((o) => o.value === selected[0]) || {}).label ?? selected[0];
+    else if (selected.length > 1) label = `${selected.length} انتخاب شده`;
+  } else if (value) {
+    label = (normalized.find((o) => o.value === value) || {}).label ?? value;
+  }
 
   function select(v) {
-    onChange(v);
+    if (multiple) {
+      onChange(selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v]);
+    } else {
+      onChange(v);
+      setOpen(false);
+    }
+  }
+
+  function clearAll() {
+    onChange(multiple ? [] : '');
     setOpen(false);
   }
 
@@ -29,9 +47,9 @@ export default function Dropdown({ value, onChange, options, placeholder }) {
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6" /></svg>
       </button>
       <div className="crm-dd-menu">
-        <div className={`crm-dd-item${!value ? ' -sel' : ''}`} onClick={() => select('')}>{placeholder}</div>
+        <div className={`crm-dd-item${noneSel ? ' -sel' : ''}`} onClick={clearAll}>{placeholder}</div>
         {normalized.map((o) => (
-          <div key={o.value} className={`crm-dd-item${value === o.value ? ' -sel' : ''}`} onClick={() => select(o.value)}>{o.label}</div>
+          <div key={o.value} className={`crm-dd-item${isSel(o.value) ? ' -sel' : ''}`} onClick={() => select(o.value)}>{o.label}</div>
         ))}
       </div>
     </div>

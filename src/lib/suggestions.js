@@ -1,5 +1,5 @@
 import Utils from './utils.js';
-import { effectiveResult, coordLabel } from './filters.js';
+import { effectiveResult, coordLabel, matchesFilter } from './filters.js';
 import { custKey } from './store.js';
 
 const PRIORITY_RANK = { 'بالا': 3, 'متوسط': 2, 'پایین': 1 };
@@ -112,12 +112,12 @@ export function sortSuggestions(items, sortMode) {
 }
 
 export function filterAgentSuggestions(pool, filters) {
-  const searchTerm = (filters.search || '').trim().toLowerCase();
+  const searchTerm = Utils.normText(filters.search);
   const filtered = pool.filter((item) => {
-    if (filters.category && (item.r.category || 'نامشخص') !== filters.category) return false;
-    if (filters.product && item.r.product !== filters.product) return false;
+    if (!matchesFilter(item.r.category || 'نامشخص', filters.category)) return false;
+    if (!matchesFilter(item.r.product, filters.product)) return false;
     if (searchTerm) {
-      const hay = [item.r.company, item.r.name, item.r.phone, item.r.product, item.r.notes].filter(Boolean).join(' ').toLowerCase();
+      const hay = Utils.normText([item.r.company, item.r.name, item.r.phone, item.r.product, item.r.notes].filter(Boolean).join(' '));
       if (hay.indexOf(searchTerm) === -1) return false;
     }
     return true;

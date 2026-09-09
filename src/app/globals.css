@@ -472,6 +472,7 @@
 .crm-dd-item.-sel { background: var(--paper); color: var(--ink); font-weight: 500; }
 .crm-toolbar .crm-dd { flex: 0 0 auto; min-width: 150px; }
 .crm-field .crm-dd { width: 100%; }
+.crm-field .crm-search-wrap { flex: none; width: 100%; min-width: 0; }
 
 .crm-toolbar {
   display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
@@ -930,7 +931,7 @@ html.crm-modal-open .crm-main { overflow: hidden; }
 }
 .crm-reminder-done-btn:hover { background: var(--accent-soft); }
 .crm-dup-warning {
-  display: none; font-size: 11px; color: var(--rust); margin-top: 5px;
+  display: none; position: relative; z-index: 30; font-size: 11px; color: var(--rust); margin-top: 5px;
   background: var(--rust-bg); padding: 5px 9px; border-radius: 8px; line-height: 1.5; border: 1px solid var(--rust-line);
 }
 .crm-dup-warning.-show { display: block; }

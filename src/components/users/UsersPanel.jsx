@@ -1,7 +1,7 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { PencilIcon, TrashIcon, PlusIcon, PowerIcon, ArrowsUpDownIcon } from '../ui/Icon.jsx';
-import { coordLabel } from '../../lib/filters.js';
+import { coordLabel, textFilter } from '../../lib/filters.js';
 import Utils from '../../lib/utils.js';
 import { useUiStore } from '../../lib/uiStore.js';
 import Pagination, { paginate } from '../ui/Pagination.jsx';
@@ -41,9 +41,7 @@ export default function UsersPanel({ users, loaded, currentUserId, isElevated, o
   const [perPage, setPerPage] = useState(20);
   const [sort, setSort] = useState({ key: 'lastLogin', dir: -1 });
   const filtered = useMemo(() => {
-    const query = Utils.normSpace(q).toLowerCase();
-    if (!query) return users;
-    return users.filter((u) => [u.displayName, u.username, u.email].some((v) => (v || '').toLowerCase().includes(query)));
+    return textFilter(users, q, (u) => [u.displayName, u.username, u.email]);
   }, [users, q]);
   const sorted = useMemo(() => {
     if (sort.key !== 'lastLogin') return filtered;

@@ -45,8 +45,8 @@ function AgentCard({ agent, pool, sortMode, categoryOpts, productOpts, onOpenPro
         <input className="crm-input" autoComplete="off" value={f.search} onChange={(e) => setFilter({ ...f, search: e.target.value })} placeholder="جست‌وجو در پیشنهادهای این کارشناس..." />
       </div>
       <div className="crm-suggest-card-filter">
-        <Dropdown value={f.category} onChange={(v) => setFilter({ ...f, category: v })} options={categoryOpts} placeholder="همه دسته‌ها" />
-        <Dropdown value={f.product} onChange={(v) => setFilter({ ...f, product: v })} options={productOpts} placeholder="همه محصولات" />
+        <Dropdown multiple value={f.category} onChange={(v) => setFilter({ ...f, category: v })} options={categoryOpts} placeholder="همه دسته‌ها" />
+        <Dropdown multiple value={f.product} onChange={(v) => setFilter({ ...f, product: v })} options={productOpts} placeholder="همه محصولات" />
         <button type="button" className="crm-suggest-clear-mini" title="پاک کردن" aria-label="پاک کردن" onClick={() => setFilter(emptyAgentFilter)}><TrashIcon /></button>
       </div>
       <div className="crm-suggest-list">

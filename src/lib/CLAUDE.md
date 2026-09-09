@@ -28,6 +28,20 @@ Persian (`۰-۹`) and Arabic-Indic (`٠-٩`) digits to Latin, preserves a leadin
 non-dial chars; `PhoneLink` (`src/components/ui/PhoneLink.jsx`) uses it to build `tel:`
 URIs for read-only phone displays (agent suggestions, suggestions panel, report preview
 phone column) — phone edit inputs stay plain `<input>`.
+`normText(s)` is the **search-comparison normalizer**: lowercases, maps Arabic Yeh/Alef-Maksura
+(`ي`/`ى`) and Arabic Kaf (`ك`) to their Persian forms (`ی`/`ک`), converts Persian/Arabic-Indic
+digits to Latin, strips ZWNJ/LRM/RLM to a space, then collapses whitespace — so text typed on one
+keyboard layout still substring-matches data entered on another even though both render
+identically. Every free-text search comparison in the app routes both the query and the compared
+field through this (never raw `.toLowerCase()`): `smartSearch`/`filterAgentSuggestions` above,
+plus the search boxes in `AgentProfileModal`, `AgentReport`, `AgentsPanel`, `CategoriesPanel`,
+`CompanyReport` (its substring-fallback branch only — the `custKey` exact-match branch is
+identity/grouping, not search, and stays on `normSpace`), `QuotesPanel`, `ProductsPanel`,
+`UsersPanel`, and `CompanySuggest` (`ui/`). If you add a new search input, normalize through this,
+not a local `.toLowerCase()`. Deliberately **not** applied to identity/dedup keys (`custKey` in
+`store.js`, `duplicates.js`, `excel.js`'s import matching, `queries.js`'s department dedup) — those
+compare for exact record/company identity, a different concern from fuzzy search, and stay on
+`normSpace` only.
 
 ### `filters.js`
 - Also holds the app's shared enum constants (`COORD_OPTS`, `RESULT_OPTS`, `STATUS_OPTS`,
@@ -109,6 +123,25 @@ phone column) — phone edit inputs stay plain `<input>`.
   name, phone, notes, product, category, source, coordinator-label). Not a filter — returns
   every record with `score >= 1` sorted by score. This is intentionally permissive (feels
   like "fuzzy" search) rather than an AND-all-tokens filter.
+- `textFilter(items, query, fieldsFn)` — the shared single-substring search filter every
+  simple panel/report search box uses instead of hand-rolling `.toLowerCase().includes()`:
+  normalizes `query` via `Utils.normText` once, keeps items where `fieldsFn(item)` yields at
+  least one field containing it. Used by `AgentProfileModal`, `AgentReport`, `AgentsPanel`,
+  `CategoriesPanel`, `QuotesPanel`, `ProductsPanel`, `UsersPanel`. Not for the leads/customers
+  table search (that's `smartSearch`, scored/multi-token — a different search UX) or
+  `CompanySuggest`/`CompanyReport` (their own field is the *only* candidate field, no
+  `fieldsFn` indirection needed, so they call `Utils.normText` directly).
+- `matchesFilter(fieldValue, filterValue)` — the shared dropdown-filter comparator: if
+  `filterValue` is an array, matches when it's empty (no filter) or contains `fieldValue`;
+  if it's a plain value (legacy single-select shape, and what a chart drill-down still sets
+  — `applyCategoryFilter` etc. in `uiStore.js` never had to change), matches when it's falsy
+  (no filter) or strictly equal. `getFiltered`'s coordinator/category/source/product checks
+  and `filterAgentSuggestions`' category/product checks both route through it, so multi-select
+  (`Dropdown`'s `multiple` mode, `../components/CLAUDE.md`) works everywhere a filter is
+  applied without either function needing to know which UI produced the value. `status` has
+  its own `activeStatuses(status)` normalizer beside it (array/string/empty → an array of
+  active statuses or `null`) because `'بدون وضعیت'` isn't a real `result` value — it means
+  `!effectiveResult(r)` — so it can't reuse plain equality even per-element.
 - `getFiltered(records, filters, chartFilter, sort)` — the single function the contacts
   table's row-list comes from. Order of operations matters and mirrors the original exactly:
   dropdown filters → date range → chart drill-down (`chartFilter`) → smart search → sort.
@@ -224,6 +257,60 @@ name-based and unchanged — called on `loadAll`/`syncNow` and after `updateReco
 `updateProduct`/`addRecords`/`updateCategory` (a category rename re-hydrates every record/product in
 one pass).
 
+`getUnifiedFeed(key)` (per-company changelog + comments, sorted newest-first) and
+`addComment`/`addChangeLogEntry` are consumed by `CompanyActivityTabs.jsx`
+(`src/components/customer/`) — the one shared tab body for a company's activity, used by
+both `LeadProfileModal.jsx` (a single lead's profile) and `CompanyReport.jsx` (the
+company-wide view), so the two surfaces show identical changelog/correspondence/reminders
+without cross-navigating. **Scoping inconsistency, pre-existing, not introduced by that
+component:** `AppShell.jsx` passes `LeadProfileModal` the raw unscoped `records`/
+`companyMeta` straight from `useStore` (not `useScopedData`) — `reminders` was added the
+same unscoped way when the reminders tab was built, matching that existing pattern rather
+than fixing it. `CompanyReport.jsx` (via `/company-report/page.js`) gets all three through
+`useScopedData`, which IS agent-narrowed. A manager/admin never notices (both scoped and
+unscoped resolve to "everything"); a plain `agent` role could in theory see a reminder
+`forAgent`-assigned to a different agent for the same company via the lead-profile route but
+not via `/company-report` — a real inconsistency, but scoped to whether they can *see* a
+reminder's existence, not a security boundary (no mutation, no PII beyond what's already
+in that company's shared record set). Fix it in `AppShell.jsx` if this bites someone —
+route `LeadProfileModal` through `useScopedData()` there too — but that's a bigger change
+than adding the reminders tab warranted on its own, so it wasn't done as part of this.
+The reminders tab also lets a user **create** a reminder directly (`addReminder`, same
+shape as `LeadProfileModal`'s own pre-existing `reminder`/`quickReminder` mini-forms:
+`{date, time, for, text}` → `{custKey, company, dueDate, dueTime, forAgent, text,
+createdAt, done:false}`) — closes the gap where reminders could previously only be created
+while editing a lead's form or during a quick-call. `company` (the display-name string, not
+`custKey`) and `currentUser` (for `scopedCoordOptions(currentUser)`'s role-scoped agent
+picker) are threaded in as two more props alongside `custKey`/`reminders`. Matches the
+existing flows' two non-obvious behaviors exactly: `forAgent` falls back to
+`currentUser?.agentCode` when the "برای چه کسی" picker is left blank (never bare `null` —
+`scopeBootData` in `serverOps.js` drops a `null`-`forAgent` reminder from the boot payload
+for both `agent` and `manager` scopes, so an un-assigned reminder would otherwise be
+invisible to everyone but admin/developer), and every successful `addReminder` here is
+paired with an `addChangeLogEntry(custKey, ...)` call, same as `LeadProfileModal`'s two
+reminder-creation paths — a reminder created from this tab now leaves the same
+"یادآوری برای … ثبت شد" trail in تاریخچه تغییرات that every other reminder-creation
+surface already does. If you add a fourth reminder-creation surface anywhere, pair
+`addReminder` with both of these — never one alone.
+
+`EMPTY_RECORD_PATCH` (beside `custKey`) — a `patch` object nulling every lead field except
+`id`/`company`/`coordinator`/`converted`. Used instead of `deleteRecordWithLog` when a
+delete would remove a company's LAST remaining `contacts` row: since a company only exists
+in this app because it has ≥1 row there, deleting the last one made the company vanish from
+every list. `updateRecord(id, EMPTY_RECORD_PATCH)` blanks the row's call-specific fields
+in place instead — the row (and thus the company) survives, `contact_date` (the STORED
+GENERATED column) auto-recomputes to `NULL` with no special handling needed. Verified
+against the live dev DB and the real `LeadUpdate` Zod schema before shipping (both nullable
+except the 4 excluded fields, `LeadUpdate`'s `requireDeactivateReason` refine only fires
+when `result === 'غیرفعال'`, so `result: null` never trips it). Consumers: `LeadProfileModal.jsx`'s
+`handleDelete` (its `records` prop is already the full unscoped set from `AppShell.jsx`, so
+no extra fix needed there), `src/app/leads/page.js` and `src/app/customers/page.js`'s own
+independent `handleDelete` (each page's `records` IS pre-narrowed by `converted` before
+reaching the handler, so both compute the "is this the last record" check against the
+FULL `useScopedData().records` — call it `allRecords` — not the page's narrowed `records`,
+to avoid a false "last record" positive when the same company has a record on the other
+page). If you add a fourth delete entry point, follow the same `allRecords`-not-`records`
+rule.
 Client singleton holding `records`/`companyMeta`/`reminders`/`currentUser`, backed by
 **MySQL via the REST API in `src/app/api/*` (client `apiClient.js` → server `serverOps.js`)** —
 the prototype's `window.storage` is gone, and the former `src/app/actions.js` Server Actions
@@ -322,8 +409,24 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
   for elevated, `{type:'department', agentCodes}` for a manager via `listAgentCodesByDepartment`,
   `{type:'own', agentCode}` for an agent — fails closed to an empty set on a lookup error) and run
   the response through `scopeBootData(data, scope)`, a pure in-memory filter over
-  `records`/`reminders`/`companyMeta` (products/categories are never scoped — see `filters.js`
-  above). **Critically, `loadAllFromDb()` itself — and the `snapshot.json` it writes — stays
+  `records`/`reminders`/`notifications`/`companyMeta` (products/categories are never scoped — see
+  `filters.js` above). **Company-level sharing (added 2026-09-09):** `scopeBootData` first computes
+  the scoped user's directly-owned records (`matchAgent(r.coordinator)`, same as before), then
+  derives the set of companies those records belong to (`ownedCompanyKeys`) and widens `records` to
+  include EVERY record for any company in that set — regardless of which coordinator/department
+  owns it. This is the fix for the reported gap where two departments both working the same
+  company/lead couldn't see each other's side of it. `reminders` gets the same treatment via
+  `rm.custKey`. **This only widens READ scope** (what `loadBootData`/`syncData` return) — write
+  permission is completely unaffected, still gated purely by `checkLeadScope`'s coordinator check
+  (below), which was NOT touched: you can now see a lead another department owns, but still can't
+  edit/delete it unless you're elevated or it's actually assigned to your scope. An agent/manager
+  with zero company overlap with anyone else sees exactly what they saw before this change — the
+  widening only activates when `ownedCompanyKeys` actually has an entry another coordinator also
+  used. Verified against the live dev DB (dummy cross-department companies, confirmed shared
+  visibility + confirmed an unrelated company never leaks in) before shipping. `notifications` is
+  NOT widened by company-sharing — it stays a strict `matchAgent(n.forAgent)` filter, since a
+  notification is inherently addressed to one specific agent, not company-wide. **Critically,
+  `loadAllFromDb()` itself — and the `snapshot.json` it writes — stays
   always unscoped**; scoping is applied as a post-filter on top of either the live query or the
   snapshot read, never baked into the snapshot-writing query. Scoping a snapshot at write time
   would let one user's restricted view become the shared offline-fallback file, potentially
@@ -356,6 +459,38 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
   legacy fields did).
 - **`customer_activity`**: `listActivity`, `getActivityById`, `createActivity` (upsert), `updateActivity`, `deleteActivity`.
 - **`reminders`**: `listReminders`, `getReminderById`, `createReminder` (upsert), `updateReminder`, `deleteReminder`.
+- **`notifications`** (added 2026-09-09, new table — see `db/README.md`'s Migration history):
+  persistent per-agent notifications, distinct from `reminders` (due-date follow-ups). `listNotifications`,
+  `createNotification` (idempotent upsert like every other `create*` — **required**, not
+  cosmetic: `updateLeadWithNotification`/`addComment`'s notification branch both run inside the
+  offline-queue replay path, and a plain non-upsert `INSERT` would throw `ER_DUP_ENTRY` and jam
+  the whole queue forever if a sync partially succeeds then fails before the queue is cleared —
+  this was caught in review and fixed before shipping), `markNotificationRead`;
+  `findCompanyOwnerByCustKey(key)` resolves a company's current coordinator (most-recent record
+  by `contact_date`) — used to decide WHO gets notified, never exposed to the client. Deliberately
+  does its own exact-match filtering in JS (`Utils.normSpace(...).toLowerCase()`, matching
+  `custKey()`'s contract byte-for-byte) after a cheap SQL `LIKE` pre-filter, rather than trying to
+  replicate whitespace-collapsing in SQL — the live dev DB is actually MySQL 5.7 (despite
+  `db/README.md`/`schema.sql` documenting "MySQL 8+"; worth reconciling separately, not touched
+  here), so `REGEXP_REPLACE` isn't available, and a bare SQL `LOWER(TRIM(...))` under-normalizes
+  (misses internal double-spaces) versus what `custKey()` actually produces client-side — caught
+  in review, fixed, and verified against a live double-space company name before shipping.
+  Notifications are only ever constructed server-side (no client-facing Zod
+  schema; nothing accepts a raw notification object from a request body) at 3 hook points, each
+  skipping the notification entirely if the acting user IS the recipient (no self-notify): (1)
+  `POST /api/activity` — a new comment notifies the company's coordinator; (2)
+  `PATCH /api/quotes/[id]` (`announce-price`/`resolve`) — notifies the lead's own coordinator when
+  someone else prices/resolves their open quote; (3) `PATCH /api/leads/[id]` — notifies the NEW
+  coordinator when a lead's `coordinator` patch field actually changes to someone else. (2) and (3)
+  route through the new `applyOp` case `updateLeadWithNotification` (wraps the existing `updateLead`
+  + a `createNotification`, transaction-wrapped like `deleteLead`) instead of touching the plain
+  `updateLead` case — **`updateLead` itself was deliberately left untouched**, so every other caller
+  (quick-calls, the edit form, `EMPTY_RECORD_PATCH` blanking, bulk import) is unaffected; a
+  regression test confirmed a plain `updateLead` call creates zero notifications. `POST /api/activity`
+  similarly extends the existing `addComment` case with an optional `payload.notification` — omitted,
+  it's byte-identical to the pre-existing behavior. All 3 hook points were verified end-to-end against
+  the live dev DB (dummy company/lead, confirmed notification creation, `updateLeadWithNotification`'s
+  patch still applies correctly, `markNotificationRead` persists) before shipping.
 - **`users`**: `listUsers`/`listUsersRaw`, `getUserById`, `createUser`, `updateUser`, `deleteUser`, plus finders
   (`findUserByUsername`, `findUserByEmail`) and partial setters (`updateUserLastLogin`, `setUserActive`).
   `role` is a 4-value ENUM: `admin`, `developer` (both "elevated" — see `isElevated()` in
@@ -432,6 +567,21 @@ in place, so clicking a chart bar after any prior filter was active could AND th
 and show zero rows). If you add a new chart click-to-filter interaction, copy the pattern
 from an existing `applyXFilter`, including the reset of unrelated fields — don't just call
 `setFilters`/`setChartFilter` directly from a component.
+`ui.filters` (`DEFAULT_FILTERS`) is shared, global state, not per-page — `/leads`'
+`LeadFilters` (multi-select `coordinator`, via `Dropdown`'s `multiple` mode) and `/agents`'
+`AgentsPanel` chip row (`setCoordinatorFilter`, exposed as `activeCoordinator`/
+`onToggleCoordinator` in `src/app/agents/page.js`) read/write the exact same
+`filters.coordinator` field. The chip row is a **deliberately single-exclusive quick-pick**
+(clicking a chip always narrows to just that one agent, clicking the sole active one clears
+it — same "owns exactly one value" contract as a chart drill-down, not a second multi-select
+UI), while the dropdown is genuinely multi-select — so `AgentsPanel`'s chip *highlight* check
+must be array-safe (`Array.isArray(activeCoordinator) ? .includes(n) : === n`, so multiple
+dropdown-selected agents still show `-active`) but the chip *click* handler deliberately stays
+plain `activeCoordinator === n` (not array-aware) so a chip click always collapses to a single
+agent rather than merging into the dropdown's array. Don't "fix" the click handler to be
+array-toggle-aware to match the highlight logic — that was tried and reverted; the two need
+different logic on purpose because they answer different questions ("is this chip part of the
+current selection" vs. "what should clicking it set").
 `calendar` and `fontScale` are localStorage-persisted, following `theme.js`'s SSR-safe
 pattern: `ui` starts at server defaults (`'gregorian'`/`FONT_SCALE_DEFAULT`) and reads
 localStorage only lazily in `subscribe` (`hydrateUi`), and `getServerSnapshot` returns a

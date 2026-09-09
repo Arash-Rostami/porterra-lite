@@ -1,14 +1,16 @@
 'use client';
 import { useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import { getFiltered, coordLabel, coordClass, badgeClass, statusBadgeInfo } from '../../lib/filters.js';
 import Utils from '../../lib/utils.js';
 import { PencilIcon, TrashIcon, DownloadIcon, PlusIcon, FlagIcon, ArrowsUpDownIcon } from '../ui/Icon.jsx';
 import { useUiStore, setFilters as setUiFilters } from '../../lib/uiStore.js';
 import { useLeadPrefs, toggleFlag, setManualOrder, getOrderIndex } from '../../lib/leadPrefs.js';
 import { formatDisplayDate } from '../../lib/calendar.js';
+import { useScopedData, markReminderDone } from '../../lib/store.js';
 import ImportExportBar from './ImportExportBar.jsx';
 import CompanySuggest from '../ui/CompanySuggest.jsx';
+import Modal from '../ui/Modal.jsx';
+import CompanyReport from '../customer/CompanyReport.jsx';
 import Pagination, { paginate } from '../ui/Pagination.jsx';
 
 const SORT_COLUMNS = [
@@ -28,7 +30,8 @@ function StatusBadge({ r }) {
 }
 
 export default function LeadTable({ records, filters, chartFilter, onEdit, onDelete, onImport, onToggleAdd, addOpen, onExport, onSearchChange, title = 'سرنخ‌ها', recordNoun = 'سرنخ', addLabel = 'افزودن سرنخ جدید' }) {
-  const router = useRouter();
+  const { records: allRecords, reminders } = useScopedData();
+  const [reportCompany, setReportCompany] = useState(null);
   const calendar = useUiStore((u) => u.calendar);
   const { order, flags } = useLeadPrefs();
   const [page, setPage] = useState(1);
@@ -180,7 +183,7 @@ export default function LeadTable({ records, filters, chartFilter, onEdit, onDel
                       <span
                         className="crm-company-text crm-company-link"
                         title="مشاهده گزارش این شرکت"
-                        onClick={(e) => { e.stopPropagation(); router.push(`/company-report?company=${encodeURIComponent(r.company)}`); }}
+                        onClick={(e) => { e.stopPropagation(); setReportCompany(r.company); }}
                       >{r.company}</span>
                     ) : (
                       <span className="crm-company-text">-</span>
@@ -206,6 +209,9 @@ export default function LeadTable({ records, filters, chartFilter, onEdit, onDel
         </table>
       </div>
       <Pagination safePage={safePage} totalPages={totalPages} onPage={setPage} perPage={perPage} onPerPage={changePerPage} />
+      <Modal open={!!reportCompany} onClose={() => setReportCompany(null)} title={reportCompany || 'گزارش شرکت'} width="4xl">
+        <CompanyReport records={allRecords} reminders={reminders} onMarkReminderDone={markReminderDone} onOpenRecord={onEdit} initialCompany={reportCompany || ''} />
+      </Modal>
     </div>
   );
 }

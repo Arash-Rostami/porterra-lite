@@ -2,7 +2,7 @@
 import { useState, useMemo } from 'react';
 import { computeAgentStats } from '../../lib/analytics.js';
 import { computeSuggestions } from '../../lib/suggestions.js';
-import { coordLabel, statusBadgeInfo } from '../../lib/filters.js';
+import { coordLabel, statusBadgeInfo, textFilter } from '../../lib/filters.js';
 import Utils from '../../lib/utils.js';
 import RingChart from '../ui/RingChart.jsx';
 import Modal from '../ui/Modal.jsx';
@@ -55,10 +55,7 @@ export default function AgentProfileModal({ agent, records, onClose, onOpenRecor
     const da = Utils.parseDate(a.date), db = Utils.parseDate(b.date);
     return (db || new Date(0)) - (da || new Date(0));
   });
-  const histQ = Utils.normSpace(histQuery).toLowerCase();
-  const filteredHistory = histQ
-    ? sortedHistory.filter((r) => [r.company, r.notes].some((v) => (v || '').toLowerCase().includes(histQ)))
-    : sortedHistory;
+  const filteredHistory = textFilter(sortedHistory, histQuery, (r) => [r.company, r.notes]);
 
   const { pageItems: sugPageItems, totalPages: sugTotalPages, safePage: sugSafePage } = paginate(suggestions, sugPage, sugPerPage);
   const { pageItems: histPageItems, totalPages: histTotalPages, safePage: histSafePage } = paginate(filteredHistory, histPage, histPerPage);

@@ -46,14 +46,17 @@ function scopeBootData(data, scope) {
     const matchAgent = scope.type === 'own'
         ? (code) => code === scope.agentCode
         : (code) => scope.agentCodes.includes(code);
-    const records = data.records.filter((r) => matchAgent(r.coordinator));
-    const reminders = data.reminders.filter((rm) => matchAgent(rm.forAgent));
+    const owned = data.records.filter((r) => matchAgent(r.coordinator));
+    const ownedCompanyKeys = new Set(owned.map((r) => Utils.normSpace(r.company).toLowerCase()).filter(Boolean));
+    const records = data.records.filter((r) => matchAgent(r.coordinator) || ownedCompanyKeys.has(Utils.normSpace(r.company).toLowerCase()));
+    const reminders = data.reminders.filter((rm) => matchAgent(rm.forAgent) || (rm.custKey && ownedCompanyKeys.has(rm.custKey)));
+    const notifications = (data.notifications || []).filter((n) => matchAgent(n.forAgent));
     const companyKeys = new Set(records.map((r) => Utils.normSpace(r.company).toLowerCase()).filter(Boolean));
     const companyMeta = {};
     for (const key of Object.keys(data.companyMeta || {})) {
         if (companyKeys.has(key)) companyMeta[key] = data.companyMeta[key];
     }
-    return { ...data, records, reminders, companyMeta };
+    return { ...data, records, reminders, notifications, companyMeta };
 }
 
 const OFFLINE_DIR = path.join(process.cwd(), '.porterra');
@@ -135,7 +138,7 @@ export async function loadBootData(user) {
     data = await loadAllFromDb();
   } catch {
     const snap = await readSnapshot();
-    const fallback = snap || { records: [], companyMeta: {}, reminders: [], products: [], agents: [], categories: [] };
+    const fallback = snap || { records: [], companyMeta: {}, reminders: [], notifications: [], products: [], agents: [], categories: [] };
     return { data: scopeBootData(fallback, scope), offline: true, queueCount: await getQueueCount() };
   }
   await writeSnapshot(data).catch(() => {});

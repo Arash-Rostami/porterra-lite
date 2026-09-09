@@ -43,6 +43,7 @@ export const addReminder = (r) => req('POST', '/api/reminders', r);
 export const markReminderDone = (id) => req('POST', `/api/reminders/${enc(id)}/done`);
 export const updateReminder = (id, patch) => req('PATCH', `/api/reminders/${enc(id)}`, { patch });
 export const deleteReminder = (id) => req('DELETE', `/api/reminders/${enc(id)}`);
+export const markNotificationRead = (id) => req('POST', `/api/notifications/${enc(id)}/read`);
 
 export const createProduct = (product) => req('POST', '/api/products', { product });
 export const updateProductAction = (id, patch) => req('PATCH', `/api/products/${enc(id)}`, { patch });

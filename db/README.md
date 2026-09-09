@@ -101,6 +101,20 @@ ALTER TABLE contacts DROP COLUMN category_id;
 -- categories table itself: DROP TABLE categories; (optional)
 ```
 
+## Migration history: `notifications`
+
+Added 2026-09-09 for the persistent per-agent notification feature (new comment
+on your company, quote priced/resolved by someone else, lead reassigned to
+you — see `../src/lib/CLAUDE.md`'s `queries.js`/`serverOps.js` sections).
+Purely additive — no FK to any existing table, no column added to `contacts`/
+`reminders`/anything else, so nothing else depends on it.
+
+**Rollback** (lossless — drops only the notifications themselves, nothing else references this table):
+
+```sql
+DROP TABLE notifications;
+```
+
 ## Related docs
 
 - `../SERVER_CONFIG.md` — production DB is a separate Chabokan-hosted MySQL

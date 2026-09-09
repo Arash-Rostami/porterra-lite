@@ -55,3 +55,38 @@ Two invariants that override any "looks about right" instinct:
 If you add a new top-level convention (a new shared pattern, a new table, a
 new route group), update the relevant doc in this map rather than leaving it
 undocumented — that's the whole point of this map staying accurate.
+
+## Agentic pipeline policy
+
+- **Read skills first, always.** On the very first turn of every session, before any
+  reply or tool call, read and internalize
+  `.claude/skills/code-reviewer/SKILL.md` and
+  `.claude/skills/nextjs-performance/SKILL.md`, then summarize their key rules in
+  your own words. Hard prerequisite — only after the summary may you start work.
+- **Subagent review mode (since 2026-08-30).** `FATEH_REVIEW_MODE='subagent'` in
+  `~/.claude/pipelines/models.ps1` is the pipeline default:
+  `.claude/hooks/post_tool_review.php` is INERT in every session — it only tracks
+  edit state for the Stop hook. After a coherent unit of work, spawn a FRESH
+  `claude-reviewer` subagent via the `Agent` tool (no model override — inherits
+  the driving model; correctness/security + performance/pattern lenses); safe
+  fixes are applied by the session or a coder subagent, never by the reviewer.
+  Trivial-lane single-file edits are the only exception.
+- **API only for enrichment + end-stage review.** No API call for coding,
+  delivery, unit review, or fixes. API survives in exactly two places: plan
+  enrichment (`FATEH_PLAN_MODEL`, plus the OpenAI refiner `FATEH_MAX_MODEL` on
+  max) and the end-stage dual review (`FATEH_REVIEWER_MODEL_A` +
+  `FATEH_REVIEWER_MODEL_B`, one round per stage, findings fixed by the Lead).
+- **Three delegation lanes** — the session is the Lead; planning,
+  architecture, and review decisions are never delegated. **Trivial** (one file, few
+  lines): do it directly, no delegation or subagent review. **Standard**: optional
+  `claude-planner` enrichment, mechanical slices to `claude-coder` (parallel only
+  across file-disjoint slices), closed by a `claude-reviewer` pass. **Complex**
+  (schema/auth/destructive/multi-module): planner enrichment required, then ask
+  whether to refine via the OpenAI refiner (skip if the user already said "max"),
+  then as standard.
+- **End-stage doc sweep only.** Never update docs/legend/guides/tests after every
+  edit; all documentation work happens once, in a single consolidated sweep right
+  before declaring the work done (a Stop hook enforces it from the session's real
+  edits). Erase temp/probe files the same turn you create them.
+- **Vanilla mode.** Saying `vanilla mode` drops all the policies above for the
+  session; they resume on `resume project mode` or a new session.

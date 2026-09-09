@@ -5,6 +5,21 @@ export default class Utils {
         return (s || '').toString().replace(/\s+/g, ' ').trim();
     }
 
+    // Search-comparison normalizer: unifies Arabic/Persian Yeh & Kaf variants (ي/ى→ی, ك→ک),
+    // Persian/Arabic-Indic digits→Latin, and half-space/direction marks, so a name typed on one
+    // keyboard layout still matches text entered on another even though both look identical.
+    static normText(s) {
+        return (s || '').toString()
+            .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06F0))
+            .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+            .replace(/[يى]/g, 'ی')
+            .replace(/ك/g, 'ک')
+            .replace(/[‌‎‏]/g, ' ')
+            .toLowerCase()
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
     static normalizePhone(s) {
         if (!s) return '';
         let out = String(s)
