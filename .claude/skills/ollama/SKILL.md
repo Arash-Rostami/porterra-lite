@@ -17,7 +17,7 @@ Lead = the model the user chose at launch, exported as `FATEH_LEAD_MODEL`. The L
 
 ## Model-Slot Resolution Rule
 Every model id in this document names a ROLE. Concrete ids come from the environment exported by `~/.claude/pipelines/models.ps1` at launch:
-* `FATEH_LEAD_MODEL` — Lead; ALL subagents (coder + unit reviewer) inherit this model via the session backend. Never hardcoded, never re-verified — the harness guarantees availability.
+* `FATEH_LEAD_MODEL` — Lead; ALL subagents (coder + unit reviewer) inherit this model via the session backend. Never hardcoded, never re-verified — the harness guarantees availability. Gotcha (2026-09-14): the BUILT-IN Explore/Plan agent types pin a Claude model (`claude-opus-5[1m]`) that the Ollama backend cannot serve — dispatching them fails with a model error. Fixed via user-level overrides `~/.claude/agents/Explore.md` + `Plan.md` (no `model` frontmatter → inherit the session backend; applies to every project on the PC; they load at session start, so a file written mid-session needs a restart to take effect). Until the override is loaded, dispatch `general-purpose` for search/architecture subtasks instead. Never re-add a model pin to those two files — it would break Ollama sessions while changing nothing meaningful for plain Claude Code sessions.
 * `FATEH_PLAN_MODEL` — plan enricher (kimi-k3 class: deep, one thick API call)
 * `FATEH_MAX_MODEL` (+ `FATEH_MAX_INPUT_CAP` / `FATEH_MAX_OUTPUT_CAP` token caps) — max-mode plan refiner; the OpenAI-cloud slot, the one API slot exempt from `ollama list` verification
 * `FATEH_REVIEWER_MODEL_A` / `_B` — end-stage heavy review pair (deliberately two DIFFERENT model families, one integrated API call each, fired once per stage)
