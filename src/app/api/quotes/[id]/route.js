@@ -5,6 +5,7 @@ import { tryOp, checkLeadScope } from '@/lib/serverOps.js';
 import { getLeadById } from '@/lib/queries.js';
 import { parseOrThrow, Id, QuoteAnnouncePrice, QuoteResolve } from '@/lib/models.js';
 import Utils from '@/lib/utils.js';
+import { companyKey } from '@/lib/companies.js';
 
 function validationError(message) {
   const err = new Error(message);
@@ -27,7 +28,7 @@ export const PATCH = handle(async (req, ctx) => {
     return {
       id: 'NOTIF-' + Date.now() + '-' + Math.floor(Math.random() * 100000),
       forAgent: lead.coordinator, type,
-      custKey: Utils.normSpace(lead.company).toLowerCase(), company: lead.company,
+      custKey: companyKey(lead.company), company: lead.company,
       text, createdAt: Date.now(), read: false,
     };
   }

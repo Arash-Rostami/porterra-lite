@@ -28,9 +28,8 @@ const REPORT_COLUMNS = [
     {key: 'category', label: 'دسته محصول'},
     {key: 'source', label: 'منبع سرنخ'},
     {key: 'date', label: 'تاریخ تماس'},
-    {key: 'price', label: 'آخرین قیمت اعلامی'},
+    {key: 'quotePrice', label: 'قیمت استعلام'},
     {key: 'result', label: 'نتیجه'},
-    {key: 'priority', label: 'اولویت'},
     {key: 'converted', label: 'سرنخ تبدیل‌شده'},
 ];
 const DEFAULT_COLS = ['coordinator', 'company', 'product', 'date', 'result'];

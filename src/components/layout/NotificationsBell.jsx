@@ -1,6 +1,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
-import { getDueReminders, markReminderDone, markNotificationRead, findLatestComment, custKey, useScopedData } from '../../lib/store.js';
+import { useRouter } from 'next/navigation';
+import { getDueReminders, markReminderDone, refreshNotifications, markNotificationRead, markAllNotificationsRead, findLatestComment, custKey, useScopedData } from '../../lib/store.js';
 import { openProfile } from '../../lib/uiStore.js';
 import { coordLabel } from '../../lib/filters.js';
 import { BellIcon, CheckIcon } from '../ui/Icon.jsx';
@@ -14,6 +15,7 @@ const PER_PAGE = 6;
 
 // surfaces due reminders + latest comment on every tab, not just Suggestions
 export default function NotificationsBell() {
+  const router = useRouter();
   const { records, reminders, notifications, companyMeta } = useScopedData();
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(1);
@@ -35,14 +37,25 @@ export default function NotificationsBell() {
     return () => document.removeEventListener('click', onDocClick);
   }, []);
 
+  useEffect(() => {
+    const tick = () => { if (!document.hidden) refreshNotifications(); };
+    const id = setInterval(tick, 60000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', tick);
+    };
+  }, []);
+
   const due = getDueReminders(reminders);
   const duePaged = paginate(due, page, PER_PAGE);
   const unread = notifications.filter((n) => !n.read).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   const unreadPaged = paginate(unread, notifPage, PER_PAGE);
   const latestComment = findLatestComment(companyMeta, records);
 
-  function goTo(id) {
-    openProfile(id);
+  function goTo(id, tab) {
+    if (id === null) router.push('/messages');
+    else openProfile(id, false, tab);
     setOpen(false);
   }
 
@@ -57,13 +70,13 @@ export default function NotificationsBell() {
         <div className="crm-notif-dropdown">
           {!!unread.length && (
             <>
-              <div className="crm-notif-dropdown-title">اعلان‌ها</div>
+              <div className="crm-notif-dropdown-title">اعلان‌ها <button type="button" className="crm-btn-ghost" onClick={markAllNotificationsRead}><CheckIcon />همه خوانده شد</button></div>
               {unreadPaged.pageItems.map((n) => {
                 const rec = records.find((r) => custKey(r.company) === n.custKey);
                 return (
                   <div className="crm-notif-item" key={n.id}>
-                    <div className="crm-notif-item-main" onClick={() => rec && goTo(rec.id)}>
-                      <div className="crm-notif-item-company">{n.company || '-'}</div>
+                    <div className="crm-notif-item-main" onClick={() => (n.type === 'mention' ? goTo(null) : rec && goTo(rec.id, n.type === 'comment' ? 'correspondence' : 'form'))}>
+                      <div className="crm-notif-item-company">{n.type === 'mention' ? 'پیام‌رسان' : (n.company || '-')}</div>
                       <div className="crm-notif-item-text">{n.text}</div>
                       <div className="crm-notif-item-meta">{Utils.formatTs(n.createdAt, calendar)}</div>
                     </div>
@@ -100,7 +113,7 @@ export default function NotificationsBell() {
             <>
               <div className="crm-notif-dropdown-title">آخرین مکاتبه</div>
               <div className="crm-notif-item">
-                <div className="crm-notif-item-main" onClick={() => latestComment.record && goTo(latestComment.record.id)}>
+                <div className="crm-notif-item-main" onClick={() => latestComment.record && goTo(latestComment.record.id, 'correspondence')}>
                   <div className="crm-notif-item-company">{latestComment.companyLabel}</div>
                   <div className="crm-notif-item-text">{latestComment.comment.author ? `${latestComment.comment.author}: ` : ''}{latestComment.comment.text}</div>
                   <div className="crm-notif-item-meta">{Utils.formatTs(latestComment.comment.ts, calendar)}</div>

@@ -21,6 +21,7 @@ const timeField = z.preprocess(emptyToNull, z.string().regex(/^\d{2}:\d{2}$/, 'd
 const boolField = z.preprocess((v) => v === true || v === 1 || v === '1' || v === 'true', z.boolean());
 
 const quoteResultField = z.preprocess(emptyToNull, z.enum(['موفق', 'ناموفق']).nullable());
+const temperatureField = z.preprocess(emptyToNull, z.enum(['hot', 'warm', 'cold']).nullable());
 
 const requireDeactivateReason = (data, ctx) => {
     if (data.result === 'غیرفعال' && !data.deactivateReason) {
@@ -51,6 +52,7 @@ export const LeadCreate = z.object({
     quoteResult: quoteResultField.optional(),
     quoteResultDate: dateField.optional(),
     quoteFailReason: optStr(500),
+    temperature: temperatureField.optional(),
 }).superRefine(requireDeactivateReason);
 
 // partial UPDATE patch (id passed separately): absent keys stay undefined so SQL skips them; present '' becomes NULL
@@ -76,6 +78,7 @@ export const LeadUpdate = z.object({
     quoteResult: quoteResultField.optional(),
     quoteResultDate: dateField.optional(),
     quoteFailReason: optStr(500).optional(),
+    temperature: temperatureField.optional(),
 }).superRefine((data, ctx) => {
     if (data.result === undefined) return;
     requireDeactivateReason(data, ctx);
@@ -129,6 +132,20 @@ export const Activity = z.object({
     text: reqStr(10000),
 });
 
+export const CompanyRename = z.object({
+    company: reqStr(255),
+    rename: reqStr(255),
+    entry: Activity.optional(),
+});
+
+export const MessageInput = z.object({
+    text: reqStr(5000),
+});
+
+export const CompanyRef = z.object({
+    company: reqStr(255),
+});
+
 export const Reminder = z.object({
     id: reqStr(40),
     custKey: optStr(255),
@@ -142,11 +159,7 @@ export const Reminder = z.object({
 });
 
 export const ActivityUpdate = z.object({
-    companyKey: reqStr(255).optional(),
-    type: z.enum(['comment', 'change']).optional(),
-    ts: z.number().int().nonnegative().optional(),
-    author: optStr(255).optional(),
-    text: reqStr(10000).optional(),
+    text: reqStr(10000),
 });
 
 export const ReminderUpdate = z.object({

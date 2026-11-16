@@ -9,7 +9,7 @@ import { XIcon } from '../ui/Icon.jsx';
 export function ReminderBanner({ byAgent }) {
   const [closed, setClosed] = useState(false);
   if (closed) return null;
-  const { total, noAnswer, highPriority } = summarizeSuggestions(byAgent);
+  const { total, noAnswer, hot } = summarizeSuggestions(byAgent);
 
   if (!total) {
     return (
@@ -26,8 +26,8 @@ export function ReminderBanner({ byAgent }) {
       {noAnswer > 0 && (
         <span className="crm-reminder-stat -noanswer"><b>{noAnswer.toLocaleString('en-US')}</b> تماس مجدد (بی‌پاسخ)</span>
       )}
-      {highPriority > 0 && (
-        <span className="crm-reminder-stat -high"><b>{highPriority.toLocaleString('en-US')}</b> اولویت بالا</span>
+      {hot > 0 && (
+        <span className="crm-reminder-stat -high"><b>{hot.toLocaleString('en-US')}</b> سرنخ داغ</span>
       )}
       <button type="button" className="crm-banner-close" onClick={() => setClosed(true)}><XIcon /></button>
     </div>
@@ -41,7 +41,7 @@ export function CommentBanner({ companyMeta, records, onOpenProfile }) {
   if (closed || !found) return null;
   const { comment, record, companyLabel } = found;
   return (
-    <div className="crm-comment-banner -show" id="crmCommentBanner" onClick={() => record && onOpenProfile(record.id)}>
+    <div className="crm-comment-banner -show" id="crmCommentBanner" onClick={() => record && onOpenProfile(record.id, false, 'correspondence')}>
       <span>🗨️ برای «{companyLabel}» نظر جدیدی از <b>{comment.author || '-'}</b> ثبت شد</span>
       <span className="crm-comment-time">{Utils.formatTs(comment.ts, calendar)}</span>
       <button type="button" className="crm-banner-close" onClick={(e) => { e.stopPropagation(); setClosed(true); }}><XIcon /></button>

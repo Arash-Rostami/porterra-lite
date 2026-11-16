@@ -34,7 +34,7 @@ export default function ImportExportBar({ records, onImport }) {
 
   return (
     <>
-      <button type="button" className="crm-theme-toggle" title="دانلود قالب اکسل" onClick={downloadImportTemplate}><DownloadIcon /></button>
+      <button type="button" className="crm-theme-toggle" title="دانلود قالب اکسل" onClick={() => downloadImportTemplate().catch(() => toast('دانلود قالب ناموفق بود'))}><DownloadIcon /></button>
       <button type="button" className="crm-theme-toggle" title="وارد کردن از اکسل" disabled={busy} onClick={() => fileRef.current?.click()}><UploadIcon /></button>
       <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleFile} />
     </>

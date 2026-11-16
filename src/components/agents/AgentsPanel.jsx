@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import Utils from '../../lib/utils.js';
 import { coordLabel, textFilter } from '../../lib/filters.js';
 import { agentColor } from '../../lib/analytics.js';
+import { isCall } from '../../lib/companies.js';
 import Pagination, { paginate } from '../ui/Pagination.jsx';
 
 const PER_PAGE = 20;
@@ -11,12 +12,15 @@ export default function AgentsPanel({ records, activeCoordinator, onToggleCoordi
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
 
-  const counts = {};
-  for (const r of records) {
-    const a = Utils.normSpace(r.coordinator) || 'نامشخص';
-    counts[a] = (counts[a] || 0) + 1;
-  }
-  const allNames = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+  const { counts, allNames } = useMemo(() => {
+    const byAgent = {};
+    for (const r of records) {
+      if (!isCall(r)) continue;
+      const a = Utils.normSpace(r.coordinator) || 'نامشخص';
+      byAgent[a] = (byAgent[a] || 0) + 1;
+    }
+    return { counts: byAgent, allNames: Object.keys(byAgent).sort((a, b) => byAgent[b] - byAgent[a]) };
+  }, [records]);
   const names = useMemo(() => {
     return textFilter(allNames, q, (n) => [coordLabel(n)]);
   }, [allNames, q]);

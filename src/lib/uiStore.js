@@ -1,5 +1,6 @@
 'use client';
 import { useSyncExternalStore } from 'react';
+import { OTHER_SOURCES_LABEL } from './filters.js';
 
 const CALENDAR_KEY = 'crm_calendar_pref_v1';
 function readCalendarPref() {
@@ -19,11 +20,26 @@ function readFontScalePref() {
   } catch { return FONT_SCALE_DEFAULT; }
 }
 
-export const DEFAULT_FILTERS = { q: '', coordinator: '', category: '', source: '', product: '', status: '', dateFrom: '', dateTo: '' };
+export const DEFAULT_FILTERS = { q: '', coordinator: '', category: '', source: '', product: '', status: '', temp: '', dateFrom: '', dateTo: '' };
+
+const URL_KEYS = { coordinator: 'agent', status: 'status', temp: 'temp', category: 'cat', source: 'source', product: 'product', dateFrom: 'from', dateTo: 'to', q: 'q' };
+const SINGLE_KEYS = new Set(['q', 'dateFrom', 'dateTo']);
+
+function mirrorFiltersToUrl(filters) {
+  if (typeof window === 'undefined' || window.location.pathname !== '/leads') return;
+  const params = new URLSearchParams();
+  for (const [key, name] of Object.entries(URL_KEYS)) {
+    const v = Array.isArray(filters[key]) ? filters[key].join(',') : filters[key];
+    if (v) params.set(name, v);
+  }
+  const qs = params.toString();
+  window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
+}
 
 let ui = {
   profileId: null,
   quickCallOnOpen: false,
+  profileTab: 'form',
   agentProfile: null,
   addFormOpen: false,
   chartFilter: null,
@@ -50,12 +66,24 @@ export function useUiStore(selector) {
   );
 }
 
-export function openProfile(id, quickCall = false) { ui = { ...ui, profileId: id, quickCallOnOpen: quickCall }; emit(); }
-export function closeProfile() { ui = { ...ui, profileId: null, quickCallOnOpen: false }; emit(); }
+export function openProfile(id, quickCall = false, tab = 'form') { ui = { ...ui, profileId: id, quickCallOnOpen: quickCall, profileTab: tab }; emit(); }
+export function closeProfile() { ui = { ...ui, profileId: null, quickCallOnOpen: false, profileTab: 'form' }; emit(); }
 export function openAgentProfile(agent) { ui = { ...ui, agentProfile: agent }; emit(); }
 export function closeAgentProfile() { ui = { ...ui, agentProfile: null }; emit(); }
 export function setAddFormOpen(open) { ui = { ...ui, addFormOpen: open }; emit(); }
-export function setFilters(filters) { ui = { ...ui, filters }; emit(); }
+export function setFilters(filters) { ui = { ...ui, filters }; mirrorFiltersToUrl(filters); emit(); }
+export function applyLeadFilter(partial) { ui = { ...ui, chartFilter: null }; setFilters({ ...DEFAULT_FILTERS, ...partial }); }
+export function hydrateFiltersFromUrl() {
+  if (typeof window === 'undefined' || !window.location.search) return;
+  const params = new URLSearchParams(window.location.search);
+  const next = { ...DEFAULT_FILTERS };
+  for (const [key, name] of Object.entries(URL_KEYS)) {
+    const v = params.get(name);
+    if (v) next[key] = SINGLE_KEYS.has(key) ? v : v.split(',');
+  }
+  ui = { ...ui, chartFilter: null };
+  setFilters(next);
+}
 export function setChartFilter(chartFilter) { ui = { ...ui, chartFilter }; emit(); }
 export function clearChartFilter() { ui = { ...ui, chartFilter: null }; emit(); }
 export function toggleCalendar() {
@@ -80,9 +108,9 @@ export function applyCategoryFilter(category) {
   setFilters({ ...ui.filters, coordinator: '', category, source: '', product: '', dateFrom: '', dateTo: '' });
 }
 export function applySourceFilter(source, top) {
-  if (source === 'سایر') {
-    const topSet = new Set(top.filter((t) => t[0] !== 'سایر').map((t) => t[0]));
-    setChartFilter({ type: 'otherSource', label: `منبع سرنخ: سایر منابع (غیر از ${topSet.size} مورد پرتکرار)`, topSet });
+  if (source === OTHER_SOURCES_LABEL) {
+    const topSet = new Set(top.filter((t) => t[0] !== OTHER_SOURCES_LABEL).map((t) => t[0]));
+    setChartFilter({ type: 'otherSource', label: `منبع سرنخ: ${OTHER_SOURCES_LABEL} (غیر از ${topSet.size} مورد پرتکرار)`, topSet });
     setFilters({ ...ui.filters, coordinator: '', category: '', source: '', product: '', dateFrom: '', dateTo: '' });
   } else {
     setChartFilter(null);
@@ -96,10 +124,6 @@ export function applyMonthFilter(dateFrom, dateTo, label) {
 export function applyDayFilter(date, agent, label) {
   setChartFilter({ type: 'day', date, agent, label });
   setFilters({ ...ui.filters, coordinator: '', category: '', source: '', product: '', dateFrom: '', dateTo: '' });
-}
-export function applyKpiFilter(key, label) {
-  setChartFilter({ type: 'kpi', key, label });
-  setFilters({ ...ui.filters, coordinator: '', category: '', source: '', product: '', status: '', dateFrom: '', dateTo: '' });
 }
 export function setCoordinatorFilter(coordinator) {
   setFilters({ ...ui.filters, coordinator });

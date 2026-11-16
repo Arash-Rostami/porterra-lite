@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS `contacts` (
   `price`              varchar(64)  COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `result`             varchar(64)  COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `priority`           varchar(32)  COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `temperature`        varchar(10)  COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'manual lead-temperature override: hot|warm|cold; NULL = automatic',
   `notes`              text         COLLATE utf8mb4_unicode_ci,
   `deactivate_reason`  varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `quote_price`        varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -79,7 +80,7 @@ CREATE TABLE IF NOT EXISTS `contacts` (
 CREATE TABLE IF NOT EXISTS `customer_activity` (
   `id`          varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL,
   `company_key` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `type`        enum('comment','change') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `type`        enum('comment','change','message') COLLATE utf8mb4_unicode_ci NOT NULL,
   `ts`          bigint(20) NOT NULL,
   `author`      varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `text`        text COLLATE utf8mb4_unicode_ci NOT NULL,

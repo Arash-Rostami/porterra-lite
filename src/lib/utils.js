@@ -14,10 +14,31 @@ export default class Utils {
             .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
             .replace(/[يى]/g, 'ی')
             .replace(/ك/g, 'ک')
+            .replace(/[أإآ]/g, 'ا')
+            .replace(/[ةۀ]/g, 'ه')
+            .replace(/ؤ/g, 'و')
+            .replace(/ئ/g, 'ی')
+            .replace(/[ـً-ٰٟ]/g, '')
             .replace(/[‌‎‏]/g, ' ')
             .toLowerCase()
             .replace(/\s+/g, ' ')
             .trim();
+    }
+
+    static normName(s) {
+        return Utils.normSpace(s).replace(/[يى]/g, 'ی').replace(/ك/g, 'ک');
+    }
+
+    static recipientKey(user) {
+        return (user && (user.agentCode || user.username)) || null;
+    }
+
+    static phoneDigits(s) {
+        return Utils.normalizePhone(s).replace('+', '');
+    }
+
+    static isPhoneOk(s) {
+        return !s || Utils.phoneDigits(s).length >= 10;
     }
 
     static normalizePhone(s) {
@@ -37,7 +58,7 @@ export default class Utils {
         if (!d || !m || !y) return null;
         if (y < 100) y += 2000;
         const dt = new Date(y, m - 1, d);
-        if (isNaN(dt.getTime())) return null;
+        if (isNaN(dt.getTime()) || dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
         return dt;
     }
 

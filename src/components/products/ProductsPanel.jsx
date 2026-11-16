@@ -50,8 +50,8 @@ export default function ProductsPanel({ products, loaded, isElevated, onAdd, onE
     setPage(1);
   }
 
-  function handleExport() {
-    const res = exportProductsToExcel(products);
+  async function handleExport() {
+    const res = await exportProductsToExcel(products);
     toast(res.ok ? `${res.count.toLocaleString('en-US')} محصول در فایل اکسل ذخیره شد` : 'محصولی برای خروجی گرفتن نیست');
   }
 

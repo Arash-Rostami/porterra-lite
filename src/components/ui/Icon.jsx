@@ -9,7 +9,6 @@ export function DownloadIcon(props) { return <svg {...base} {...props}><path d="
 export function PencilIcon(props) { return <svg {...base} {...props}><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>; }
 export function TrashIcon(props) { return <svg {...base} {...props}><path d="M3 6h18" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>; }
 export function XCircleIcon(props) { return <svg {...base} {...props}><circle cx="12" cy="12" r="9" /><path d="m9.5 9.5 5 5m0-5-5 5" /></svg>; }
-export function ArrowPathIcon(props) { return <svg {...base} {...props}><path d="M3 12a9 9 0 1 0 2.6-6.4" /><path d="M3 4v4h4" /></svg>; }
 export function ArrowsRightLeftIcon(props) { return <svg {...base} {...props}><path d="M3 9h13M12 5l4 4-4 4" /><path d="M8 15h13M12 11l-4 4 4 4" /></svg>; }
 export function ArrowsUpDownIcon(props) { return <svg {...base} {...props}><path d="M12 3v18" /><path d="M8 7l4-4 4 4" /><path d="M8 17l4 4 4-4" /></svg>; }
 export function XIcon(props) { return <svg {...base} {...props}><path d="M18 6 6 18" /><path d="M6 6l12 12" /></svg>; }

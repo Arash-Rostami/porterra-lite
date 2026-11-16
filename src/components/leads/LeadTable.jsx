@@ -1,6 +1,7 @@
 'use client';
 import { useState, useMemo } from 'react';
-import { getFiltered, coordLabel, coordClass, badgeClass, statusBadgeInfo } from '../../lib/filters.js';
+import { coordLabel, coordClass, badgeClass, statusBadgeInfo, TEMP_OPTS } from '../../lib/filters.js';
+import { leadList, companyRows } from '../../lib/companies.js';
 import Utils from '../../lib/utils.js';
 import { PencilIcon, TrashIcon, DownloadIcon, PlusIcon, FlagIcon, ArrowsUpDownIcon } from '../ui/Icon.jsx';
 import { useUiStore, setFilters as setUiFilters } from '../../lib/uiStore.js';
@@ -20,16 +21,21 @@ const SORT_COLUMNS = [
   { key: 'category', label: 'دسته' },
   { key: 'source', label: 'منبع' },
   { key: 'date', label: 'تاریخ' },
-  { key: 'result', label: 'وضعیت' },
+  { key: 'status', label: 'وضعیت' },
+  { key: 'temp', label: 'دما' },
+  { key: 'calls', label: 'تماس' },
   { key: 'notes', label: 'یادداشت' },
 ];
+
+const TEMP_CLASS = { hot: '-fail', warm: '-warn', cold: '-progress' };
+const tempLabel = (v) => (TEMP_OPTS.find((t) => t.value === v) || {}).label || '-';
 
 function StatusBadge({ r }) {
   const { text, className } = statusBadgeInfo(r);
   return <span className={`crm-status-badge ${className}`}>{text}</span>;
 }
 
-export default function LeadTable({ records, filters, chartFilter, onEdit, onDelete, onImport, onToggleAdd, addOpen, onExport, onSearchChange, title = 'سرنخ‌ها', recordNoun = 'سرنخ', addLabel = 'افزودن سرنخ جدید' }) {
+export default function LeadTable({ records, segment, filters, chartFilter, onEdit, onDelete, onImport, onToggleAdd, addOpen, onExport, onSearchChange, title = 'سرنخ‌ها', recordNoun = 'سرنخ', addLabel = 'افزودن سرنخ جدید' }) {
   const { records: allRecords, reminders } = useScopedData();
   const [reportCompany, setReportCompany] = useState(null);
   const calendar = useUiStore((u) => u.calendar);
@@ -43,8 +49,10 @@ export default function LeadTable({ records, filters, chartFilter, onEdit, onDel
 
   const flagSet = useMemo(() => new Set(flags), [flags]);
 
+  const total = useMemo(() => companyRows(allRecords, null, segment).length, [allRecords, segment]);
+
   const list = useMemo(() => {
-    const base = getFiltered(records, filters, chartFilter, sortMode === 'manual' ? null : sort);
+    const base = leadList(allRecords, filters, segment, chartFilter, sortMode === 'manual' ? null : sort);
     if (sortMode !== 'manual') return base;
     const idx = getOrderIndex(order);
     const ranked = [];
@@ -52,7 +60,7 @@ export default function LeadTable({ records, filters, chartFilter, onEdit, onDel
     for (const r of base) (idx.has(r.id) ? ranked : unranked).push(r);
     ranked.sort((a, b) => idx.get(a.id) - idx.get(b.id));
     return ranked.concat(unranked);
-  }, [records, filters, chartFilter, sort, sortMode, order]);
+  }, [allRecords, segment, filters, chartFilter, sort, sortMode, order]);
 
   const { pageItems, totalPages, safePage } = paginate(list, page, perPage);
 
@@ -65,7 +73,7 @@ export default function LeadTable({ records, filters, chartFilter, onEdit, onDel
     setPage(1);
   }
   function enterManual() {
-    if (!order.length) setManualOrder(getFiltered(records, filters, chartFilter, null).map((r) => r.id));
+    if (!order.length) setManualOrder(leadList(allRecords, filters, segment, chartFilter, null).map((r) => r.id));
     setSortMode('manual');
   }
   function exitManual() {
@@ -122,9 +130,9 @@ export default function LeadTable({ records, filters, chartFilter, onEdit, onDel
       <div className="crm-section-title-row">
         <div className="crm-section-title">{title}</div>
         <div className="crm-result-count" id="crmResultCount">
-          {list.length === records.length
-            ? `${records.length.toLocaleString('en-US')} ${recordNoun}`
-            : `${list.length.toLocaleString('en-US')} نتیجه از ${records.length.toLocaleString('en-US')}`}
+          {list.length === total
+            ? `${total.toLocaleString('en-US')} ${recordNoun}`
+            : `${list.length.toLocaleString('en-US')} نتیجه از ${total.toLocaleString('en-US')}`}
         </div>
       </div>
       <div className="crm-toolbar">
@@ -194,6 +202,8 @@ export default function LeadTable({ records, filters, chartFilter, onEdit, onDel
                   <td className="crm-source-text">{Utils.normSpace(r.source) || '-'}</td>
                   <td className="crm-mono crm-date-text">{formatDisplayDate(r.date, calendar) || '-'}</td>
                   <td className="crm-status-holder"><StatusBadge r={r} /></td>
+                  <td><span className={`crm-status-badge ${TEMP_CLASS[r.temp] || '-none'}`}>{tempLabel(r.temp)}{r.tempManual ? ' •' : ''}</span></td>
+                  <td className="crm-mono">{(r.calls || 0).toLocaleString('en-US')}</td>
                   <td className="crm-notes-cell">
                     <div className="crm-notes-text" onClick={(e) => e.currentTarget.classList.toggle('-expanded')}>{r.notes || '-'}</div>
                   </td>
@@ -204,7 +214,7 @@ export default function LeadTable({ records, filters, chartFilter, onEdit, onDel
                   </td>
                 </tr>
               ))
-              : <tr><td colSpan={9}><div className="crm-empty">نتیجه‌ای پیدا نشد — عبارت جست‌وجو یا فیلترها را تغییر دهید</div></td></tr>}
+              : <tr><td colSpan={11}><div className="crm-empty">نتیجه‌ای پیدا نشد — عبارت جست‌وجو یا فیلترها را تغییر دهید</div></td></tr>}
           </tbody>
         </table>
       </div>

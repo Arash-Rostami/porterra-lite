@@ -9,6 +9,8 @@ existing feature, put it in that feature's folder — don't create a new
 top-level folder unless it's genuinely a new feature with its own route.
 `ui/` and `layout/` are the two exceptions (see below).
 
+- New feature folders follow the same rule: `calendar/` ↔ `/calendar` (`CalendarPanel.jsx`),
+  `messages/` ↔ `/messages` (`MessengerPanel.jsx`), `inquiries/` ↔ `/inquiries` (`QuotesPanel.jsx`, a table).
 - **`ui/`** — generic, feature-agnostic building blocks used across multiple
   features: `Modal.jsx`, `Dropdown.jsx`, `DateField.jsx`, `Icon.jsx`,
   `Pagination.jsx`, `ConfirmDialog.jsx`, `Toast.jsx`, `PhoneLink.jsx`,
@@ -43,7 +45,7 @@ almost certainly belongs in `src/lib/` instead, likely already exists there.
   1-item array) so a chart drill-down's `applyCategoryFilter`-style single-value set doesn't
   need to know which filter UI is currently rendering it. Use `multiple` only on a *filter*
   dropdown (a list is being narrowed) — never on a dropdown that sets one field of one record
-  being created/edited (coordinator/category/result/priority pickers in `AddLeadForm`/
+  being created/edited (coordinator/category/result/temperature/source pickers in `AddLeadForm`/
   `LeadProfileModal`/`ProductFormModal`/etc. stay single-select on purpose, see
   `../lib/CLAUDE.md`'s `matchesFilter` note for the filter-side half of this).
 - **`ui/Modal.jsx`** — the only way to build a modal (overlay, header,

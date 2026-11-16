@@ -1,6 +1,7 @@
 import Utils from './utils.js';
 import { FA_MONTHS, JALALI_MONTHS, gregorianToJalali, jalaliToGregorian, jalaliMonthLength } from './calendar.js';
-import { effectiveResult, coordLabel } from './filters.js';
+import { isQuoteOpen, coordLabel, OTHER_SOURCES_LABEL } from './filters.js';
+import { companyRows, callMatcher, companyKey } from './companies.js';
 
 const pad2 = (n) => String(n).padStart(2, '0');
 const ddmmyyyy = (y, m, d) => `${pad2(d)}.${pad2(m)}.${y}`;
@@ -14,56 +15,55 @@ export function agentColor(name) {
     return `hsl(${h},45%,42%)`;
 }
 
-function tally(recs) {
-    let noAnswer = 0, deactivated = 0, followUp = 0, quoteOpen = 0, quoteWon = 0, quoteLost = 0, converted = 0;
-    for (const r of recs) {
-        const eff = effectiveResult(r);
-        if (eff === 'بی‌پاسخ') noAnswer++;
-        else if (eff === 'غیرفعال') deactivated++;
-        else if (eff === 'در حال پیگیری') followUp++;
-        else if (eff === 'در حال استعلام') {
-            if (r.quoteResult === 'موفق') quoteWon++;
-            else if (r.quoteResult === 'ناموفق') quoteLost++;
-            else quoteOpen++;
+const STATUS_KEY = {'در حال پیگیری': 'followUp', 'در حال استعلام': 'inInquiry', 'بی‌پاسخ': 'noAnswer', 'غیرفعال': 'deactivated'};
+
+export function summarize(records, callFilters) {
+    const rows = companyRows(records, callFilters);
+    const s = {companies: rows.length, leads: 0, customers: 0, followUp: 0, inInquiry: 0, noAnswer: 0, deactivated: 0, noStatus: 0,
+        hot: 0, warm: 0, cold: 0, calls: 0, inquiryCompanies: 0, quoteOpen: 0, quoteWon: 0, quoteLost: 0};
+    for (const r of rows) {
+        s.calls += r.calls;
+        if (r.isCustomer) {
+            s.customers++;
+            continue;
         }
-        if (r.converted) converted++;
+        s.leads++;
+        s[r.temp]++;
+        s[STATUS_KEY[r.status] || 'noStatus']++;
     }
-    return {noAnswer, deactivated, followUp, quoteOpen, quoteWon, quoteLost, converted};
+    const match = callMatcher(callFilters);
+    const inquiring = new Set();
+    for (const r of records) {
+        if (match && !match(r)) continue;
+        if (r.quoteResult === 'موفق') s.quoteWon++;
+        else if (r.quoteResult === 'ناموفق') s.quoteLost++;
+        else if (isQuoteOpen(r)) s.quoteOpen++;
+        else continue;
+        inquiring.add(companyKey(r.company));
+    }
+    s.inquiryCompanies = inquiring.size;
+    s.quoteTotal = s.quoteOpen + s.quoteWon + s.quoteLost;
+    s.leadConversionRate = s.companies ? Math.round((s.customers / s.companies) * 100) : 0;
+    s.quoteToSaleRate = s.quoteTotal ? Math.round((s.quoteWon / s.quoteTotal) * 100) : 0;
+    return s;
 }
 
-function quoteToSaleRate(t) {
-    const quoted = t.quoteOpen + t.quoteWon + t.quoteLost;
-    return quoted ? Math.round((t.quoteWon / quoted) * 100) : 0;
+function agentRow(records, agent, callFilters) {
+    const s = summarize(records, {...callFilters, coordinator: agent});
+    return {agent, ...s, total: s.calls, converted: s.customers, conversionRate: s.leadConversionRate};
 }
 
 export function computeAgentReport(records) {
     const agents = Array.from(new Set(records.map((r) => Utils.normSpace(r.coordinator)).filter(Boolean))).sort();
-    return agents.map((agent) => {
-        const recs = records.filter((r) => Utils.normSpace(r.coordinator) === agent);
-        const total = recs.length;
-        const t = tally(recs);
-        return {agent, total, ...t, conversionRate: total ? Math.round((t.converted / total) * 100) : 0, quoteToSaleRate: quoteToSaleRate(t)};
-    }).sort((a, b) => b.total - a.total);
+    return agents.map((agent) => agentRow(records, agent)).sort((a, b) => b.total - a.total);
 }
 
+const toIso = (d) => (d ? d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) : '');
+
 export function computeAgentStats(records, agent, fromDt, toDt) {
-    const recs = records.filter((r) => {
-        if (Utils.normSpace(r.coordinator) !== agent) return false;
-        if (fromDt || toDt) {
-            const dt = Utils.parseDate(r.date);
-            if (!dt) return false;
-            if (fromDt && dt < fromDt) return false;
-            if (toDt && dt > toDt) return false;
-        }
-        return true;
-    });
-    const t = tally(recs);
-    return {
-        recs,
-        total: recs.length, ...t,
-        conversionRate: recs.length ? Math.round((t.converted / recs.length) * 100) : 0,
-        quoteToSaleRate: quoteToSaleRate(t),
-    };
+    const callFilters = {dateFrom: toIso(fromDt), dateTo: toIso(toDt)};
+    const match = callMatcher({...callFilters, coordinator: agent});
+    return {recs: records.filter(match), ...agentRow(records, agent, callFilters)};
 }
 
 export async function exportAgentReportToExcel(data) {
@@ -72,7 +72,7 @@ export async function exportAgentReportToExcel(data) {
     const rows = data.map((d) => ({
         'کارشناس': coordLabel(d.agent), 'کل تماس‌ها': d.total, 'در حال پیگیری': d.followUp, 'بی‌پاسخ': d.noAnswer,
         'غیرفعال': d.deactivated, 'استعلام باز': d.quoteOpen, 'استعلام موفق': d.quoteWon, 'استعلام ناموفق': d.quoteLost,
-        'سرنخ تبدیل‌شده': d.converted, 'نرخ تبدیل سرنخ (٪)': d.conversionRate, 'نرخ تبدیل استعلام به فروش (٪)': d.quoteToSaleRate,
+        'سرنخ تبدیل‌شده': d.converted, 'نرخ تبدیل سرنخ (٪)': d.conversionRate, 'نرخ تبدیل استعلام به فروش (٪)': d.quoteTotal ? d.quoteToSaleRate : '—',
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     ws['!cols'] = [{wch: 14}, {wch: 12}, {wch: 12}, {wch: 10}, {wch: 10}, {wch: 12}, {wch: 12}, {wch: 12}, {wch: 12}, {wch: 14}, {wch: 16}];
@@ -83,37 +83,32 @@ export async function exportAgentReportToExcel(data) {
     return true;
 }
 
-export function computeKpis(records) {
-  const t = tally(records);
+export function computeKpis(records, callFilters) {
+  const s = summarize(records, callFilters);
+  const lead = (status) => ({ href: '/leads', filters: { status: [status] } });
   return [
-    { key: 'total', label: 'تعداد کل سرنخ‌ها', value: records.length, cls: '' },
-    { key: 'converted', label: 'سرنخ تبدیل‌شده', value: t.converted, cls: '-teal' },
-    { key: 'quoteOpen', label: 'استعلام‌های در جریان', value: t.quoteOpen, cls: '-amber' },
-    { key: 'deactivated', label: 'غیرفعال شده', value: t.deactivated, cls: '' },
-    { key: 'followUp', label: 'در حال پیگیری', value: t.followUp, cls: '' },
-    { key: 'noAnswer', label: 'بی‌پاسخ', value: t.noAnswer, cls: '' },
+    { key: 'leads', label: 'سرنخ‌ها', value: s.leads, cls: '', target: { href: '/leads', filters: {} } },
+    { key: 'customers', label: 'مشتریان', value: s.customers, cls: '-teal', target: { href: '/customers', filters: {} } },
+    { key: 'quoteOpen', label: 'استعلام‌های در جریان', value: s.quoteOpen, cls: '-amber', target: { href: '/inquiries', filters: {} } },
+    { key: 'deactivated', label: 'غیرفعال شده', value: s.deactivated, cls: '', target: lead('غیرفعال') },
+    { key: 'followUp', label: 'در حال پیگیری', value: s.followUp, cls: '', target: lead('در حال پیگیری') },
+    { key: 'noAnswer', label: 'بی‌پاسخ', value: s.noAnswer, cls: '', target: lead('بی‌پاسخ') },
   ];
 }
 
-export function computeFunnelStages(records) {
-  const total = records.length;
-  const t = tally(records);
-  const quotedCount = t.quoteOpen + t.quoteWon + t.quoteLost;
-  const convertedCount = t.converted;
+export function computeFunnelStages(records, callFilters) {
+  const s = summarize(records, callFilters);
   const raw = [
-    { label: 'کل سرنخ‌ها', value: total, color: '#64748b' },
-    { label: 'در حال استعلام', value: quotedCount, color: '#ff6900' },
-    { label: 'فروش شده', value: convertedCount, color: '#00bc7d' },
+    { label: 'کل شرکت‌ها', value: s.companies, color: '#64748b' },
+    { label: 'در حال پیگیری', value: s.followUp, color: '#2b7fff' },
+    { label: 'استعلام', value: s.inquiryCompanies, color: '#ff6900' },
+    { label: 'فروش (مشتری)', value: s.customers, color: '#00bc7d' },
   ];
-  const stages = raw.map((s) => {
-    const pct = total ? Math.round((s.value / total) * 100) : 0;
-    return { ...s, pct, widthPct: Math.max(pct, s.value > 0 ? 4 : 0) };
+  const stages = raw.map((st) => {
+    const pct = s.companies ? Math.round((st.value / s.companies) * 100) : 0;
+    return { ...st, pct, widthPct: Math.max(pct, st.value > 0 ? 4 : 0) };
   });
-  return {
-    stages,
-    leadConversionRate: total ? Math.round((convertedCount / total) * 100) : 0,
-    quoteToSaleRate: quoteToSaleRate(t),
-  };
+  return { stages, leadConversionRate: s.leadConversionRate, quoteToSaleRate: s.quoteToSaleRate, quoteTotal: s.quoteTotal };
 }
 
 export function computeTrendData(records, calendar) {
@@ -229,6 +224,6 @@ export function computeSourceData(records) {
   const sorted = Object.entries(bySrc).sort((a, b) => b[1] - a[1]);
   const top = sorted.slice(0, 7);
   const restSum = sorted.slice(7).reduce((a, [, v]) => a + v, 0);
-  if (restSum > 0) top.push(['سایر', restSum]);
+  if (restSum > 0) top.push([OTHER_SOURCES_LABEL, restSum]);
   return top;
 }

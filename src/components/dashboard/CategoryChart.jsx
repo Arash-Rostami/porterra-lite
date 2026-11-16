@@ -33,7 +33,7 @@ export default function CategoryChart({ records, dark, onSelectCategory }) {
 
   return (
     <div className="crm-section">
-      <div className="crm-section-title">توزیع دسته محصول</div>
+      <div className="crm-section-title">توزیع دسته محصول (بر اساس تماس‌ها)</div>
       <div className="crm-chart-canvas-wrap"><canvas ref={canvasRef} id="crmCategoryChart"></canvas></div>
       <div className="crm-chart-chips" id="crmCategoryChips">
         {labels.map((l, idx) => (

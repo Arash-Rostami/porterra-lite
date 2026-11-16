@@ -3,10 +3,10 @@ import { useMemo, useState } from 'react';
 import AddLeadForm from '../../components/leads/AddLeadForm.jsx';
 import LeadFilters from '../../components/leads/LeadFilters.jsx';
 import LeadTable from '../../components/leads/LeadTable.jsx';
-import { addRecords, deleteRecordWithLog, updateRecord, addChangeLogEntry, custKey, useScopedData, EMPTY_RECORD_PATCH } from '../../lib/store.js';
+import { addRecord, addRecords, deleteRecordWithLog, deleteCompany, custKey, useScopedData } from '../../lib/store.js';
 import { openProfile, DEFAULT_FILTERS } from '../../lib/uiStore.js';
 import { exportToExcel } from '../../lib/excel.js';
-import { getFiltered } from '../../lib/filters.js';
+import { leadList, isCall } from '../../lib/companies.js';
 import { confirm } from '../../lib/confirm.js';
 import { toast } from '../../components/ui/Toast.jsx';
 
@@ -16,26 +16,27 @@ export default function CustomersPage() {
     const [filters, setFilters] = useState(DEFAULT_FILTERS);
     const [addFormOpen, setAddFormOpen] = useState(false);
 
-    function handleExport() {
-        const res = exportToExcel(getFiltered(records, filters, null));
+    async function handleExport() {
+        const res = await exportToExcel(leadList(allRecords, filters, 'customer', null));
         toast(res.ok ? `${res.count.toLocaleString('en-US')} رکورد در فایل اکسل ذخیره شد` : 'رکوردی برای خروجی گرفتن نیست');
     }
 
-    function handleAddSubmit(rec) {
-        addRecords([rec]);
-        setAddFormOpen(false);
+    async function handleAddSubmit(rec) {
+        const ok = await addRecord(rec);
+        if (ok) setAddFormOpen(false);
+        return ok;
     }
 
     async function handleDelete(id) {
-        const rec = records.find((r) => r.id === id);
+        const rec = allRecords.find((r) => r.id === id);
         if (!rec) return;
         const k = custKey(rec.company);
-        const remaining = allRecords.find((r) => r.id !== id && custKey(r.company) === k);
+        const remaining = allRecords.find((r) => r.id !== id && isCall(r) && custKey(r.company) === k);
         const ok = await confirm({
             title: 'حذف تماس',
             message: remaining
                 ? `این تماس با «${rec.company || '-'}» (تاریخ ${rec.date || '-'}) برای همیشه حذف بشه؟`
-                : `این تنها تماسیه که از «${rec.company || '-'}» تو لیست شما مونده — با تأیید، فقط اطلاعات این تماس پاک میشه؛ خود شرکت تو لیست شما می‌مونه. ادامه بدید؟`,
+                : `این آخرین تماس «${rec.company || '-'}» است — با تأیید، خود شرکت و یادآوری‌ها و اعلان‌هایش هم حذف می‌شود. ادامه بدید؟`,
             confirmText: 'حذف',
             cancelText: 'انصراف',
         });
@@ -44,18 +45,17 @@ export default function CustomersPage() {
             deleteRecordWithLog(rec);
             toast('تماس حذف شد');
         } else {
-            updateRecord(rec.id, EMPTY_RECORD_PATCH);
-            addChangeLogEntry(k, 'آخرین تماس این شرکت پاک شد — شرکت در لیست باقی موند', currentUser?.displayName || currentUser?.username || null);
-            toast(`اطلاعات آخرین تماس پاک شد — «${rec.company || '-'}» همچنان تو لیست شما هست`);
+            if (await deleteCompany(rec.company)) toast(`«${rec.company || '-'}» با آخرین تماسش حذف شد`);
         }
     }
 
     return (
         <div className="crm-tab-panel" id="crmPanelCustomers">
             <AddLeadForm open={addFormOpen} records={allRecords} defaultCoordinator={currentUser?.agentCode || ''} onSubmit={handleAddSubmit} onCancel={() => setAddFormOpen(false)} />
-            <LeadFilters records={records} filters={filters} onChange={setFilters} chartFilter={null} onClearChartFilter={() => {}} />
+            <LeadFilters records={allRecords} filters={filters} onChange={setFilters} chartFilter={null} onClearChartFilter={() => {}} />
             <LeadTable
                 records={records}
+                segment="customer"
                 filters={filters}
                 chartFilter={null}
                 onEdit={(id) => openProfile(id)}

@@ -6,8 +6,9 @@ import DateField from '../ui/DateField.jsx';
 import ProductField from './ProductField.jsx';
 import CompanyActivityTabs, { COMPANY_ACTIVITY_TABS } from '../customer/CompanyActivityTabs.jsx';
 import Utils from '../../lib/utils.js';
-import { coordLabel, coordClass, statusBadgeInfo, scopedCoordOptions, RESULT_OPTS, PRIORITY_OPTS, sourceSuggestions } from '../../lib/filters.js';
-import { useStore, custKey, updateRecord, deleteRecordWithLog, addRecords, addChangeLogEntry, addReminder, getUnifiedFeed, EMPTY_RECORD_PATCH } from '../../lib/store.js';
+import { coordLabel, coordClass, statusBadgeInfo, scopedCoordOptions, RESULT_OPTS, TEMP_OPTS, SOURCE_OPTS, sourceSuggestions } from '../../lib/filters.js';
+import { companies, isCall } from '../../lib/companies.js';
+import { useStore, custKey, updateRecord, setCompanyTemperature, deleteRecordWithLog, addRecords, addChangeLogEntry, addReminder, getUnifiedFeed, deleteCompany, renameCompany, addRecord } from '../../lib/store.js';
 import { confirm } from '../../lib/confirm.js';
 import { toast } from '../ui/Toast.jsx';
 import { CheckIcon, XCircleIcon, PlusIcon, TrashIcon } from '../ui/Icon.jsx';
@@ -15,18 +16,19 @@ import { useUiStore } from '../../lib/uiStore.js';
 import { formatDisplayDate } from '../../lib/calendar.js';
 import Pagination, { paginate } from '../ui/Pagination.jsx';
 
-const FIELD_LABELS = { coordinator: 'کارشناس', company: 'شرکت', name: 'مخاطب', phone: 'تلفن', product: 'محصول', categoryId: 'دسته محصول', source: 'منبع سرنخ', date: 'تاریخ تماس', price: 'قیمت', result: 'نتیجه', priority: 'اولویت', notes: 'یادداشت', converted: 'سرنخ تبدیل‌شده', deactivateReason: 'دلیل غیرفعال شدن' };
+const FIELD_LABELS = { coordinator: 'کارشناس', company: 'شرکت', name: 'مخاطب', phone: 'تلفن', product: 'محصول', categoryId: 'دسته محصول', source: 'منبع سرنخ', date: 'تاریخ تماس', result: 'نتیجه', notes: 'یادداشت', converted: 'سرنخ تبدیل‌شده', deactivateReason: 'دلیل غیرفعال شدن' };
 
 function formFromRecord(rec) {
   return {
     coordinator: rec.coordinator || '', company: rec.company || '', name: rec.name || '', phone: rec.phone || '',
     product: rec.product || '', categoryId: rec.categoryId || '', source: rec.source || '', date: Utils.toISODate(rec.date),
-    price: rec.price || '', result: rec.result || '', priority: rec.priority || '', notes: rec.notes || '', converted: !!rec.converted,
+    result: rec.result || '', notes: rec.notes || '', converted: !!rec.converted,
     deactivateReason: rec.deactivateReason || '',
   };
 }
+const tempText = (v) => (TEMP_OPTS.find((t) => t.value === v) || {}).label || '-';
 const emptyReminder = { date: '', time: '', for: '', text: '' };
-const emptyQuickCall = { coordinator: '', name: '', phone: '', product: '', categoryId: '', source: '', date: '', price: '', result: '', priority: 'پایین', notes: '', deactivateReason: '' };
+const emptyQuickCall = { coordinator: '', name: '', phone: '', product: '', categoryId: '', source: '', date: '', result: '', notes: '', deactivateReason: '' };
 const TAB_PAGE_SIZE = 6;
 const pageOf = (items, page) => paginate(items, page, TAB_PAGE_SIZE);
 
@@ -37,11 +39,13 @@ function StatusBadge({ r }) {
 
 export default function LeadProfileModal({ recordId, records, companyMeta, reminders, onMarkReminderDone, onClose, onOpenRecord }) {
   const calendar = useUiStore((u) => u.calendar);
+  const profileTab = useUiStore((u) => u.profileTab);
   const categories = useStore((s) => s.categories);
   const currentUser = useStore((s) => s.currentUser);
   const currentUserName = currentUser?.displayName || currentUser?.username || null;
   const categoryOptions = useMemo(() => categories.map((c) => ({ value: c.id, label: c.name })), [categories]);
   const sourceOpts = useMemo(() => sourceSuggestions(records), [records]);
+  const isElevatedUser = !!currentUser && (currentUser.role === 'admin' || currentUser.role === 'developer');
   const rec = records.find((r) => r.id === recordId);
   const [form, setForm] = useState(() => (rec ? formFromRecord(rec) : null));
   const [errors, setErrors] = useState({});
@@ -50,14 +54,15 @@ export default function LeadProfileModal({ recordId, records, companyMeta, remin
   const [quick, setQuick] = useState(() => (rec ? {
     ...emptyQuickCall,
     coordinator: rec.coordinator || '', name: rec.name || '', phone: rec.phone || '',
-    product: rec.product || '', categoryId: rec.categoryId || '', source: rec.source || '',
+    product: rec.product || '', categoryId: rec.categoryId || '', source: isElevatedUser || SOURCE_OPTS.includes(Utils.normSpace(rec.source)) ? (rec.source || '') : '',
     date: Utils.toISODate(Utils.todayDdMmYyyy()),
   } : emptyQuickCall));
   const [quickReminder, setQuickReminder] = useState(emptyReminder);
-  const [mainTab, setMainTab] = useState('form');
+  const [mainTab, setMainTab] = useState(profileTab);
   const [historyPage, setHistoryPage] = useState(1);
 
   const key = rec ? custKey(rec.company) : null;
+  const company = useMemo(() => (key ? companies(records).find((c) => c.key === key) : null), [records, key]);
   const history = useMemo(() => {
     if (!key) return [];
     return records.filter((r) => custKey(r.company) === key).sort((a, b) => {
@@ -85,7 +90,7 @@ export default function LeadProfileModal({ recordId, records, companyMeta, remin
     return errs;
   }
 
-  function handleSave() {
+  async function handleSave() {
     try {
       const errs = validateForm(form);
       if (Object.keys(errs).some((k) => errs[k])) {
@@ -99,27 +104,49 @@ export default function LeadProfileModal({ recordId, records, companyMeta, remin
       const next = {
         coordinator: form.coordinator || null, company: form.company.trim() || null, name: form.name.trim() || null,
         phone: form.phone.trim() || null, product: form.product.trim() || null, categoryId: form.categoryId || null,
-        source: form.source.trim() || null, date: Utils.fromISODate(form.date) || null, price: form.price.trim() || null,
-        result: form.result || null, priority: form.priority || null, notes: form.notes.trim() || null, converted: form.converted,
+        source: form.source.trim() || null, date: Utils.fromISODate(form.date) || null,
+        result: form.result || null, notes: form.notes.trim() || null, converted: form.converted,
         deactivateReason: form.result === 'غیرفعال' ? form.deactivateReason.trim() : null,
       };
-      updateRecord(rec.id, next);
+      const newName = Utils.normName(next.company || '');
+      const renamed = !!newName && newName !== Utils.normName(before.company || '');
+      const companyName = renamed ? newName : before.company;
+      if (renamed) {
+        const merging = custKey(newName) !== key && records.some((r) => custKey(r.company) === custKey(newName));
+        if (merging) {
+          if (!(currentUser && (currentUser.role === 'admin' || currentUser.role === 'developer'))) {
+            toast('این نام برای شرکت دیگری ثبت شده؛ ادغام فقط توسط مدیر انجام می‌شود');
+            return;
+          }
+          const ok = await confirm({
+            title: 'ادغام شرکت‌ها',
+            message: `«${newName}» از قبل وجود دارد. با تأیید، همه تماس‌ها، یادداشت‌ها و یادآوری‌های «${before.company}» به آن منتقل می‌شود. این کار قابل بازگشت نیست.`,
+            confirmText: 'ادغام',
+            cancelText: 'انصراف',
+          });
+          if (!ok) return;
+        }
+        if (!(await renameCompany(before.company, newName, currentUserName))) return;
+      }
+      delete next.company;
+      if (!(await updateRecord(rec.id, next))) return;
 
       const changes = [];
       const catName = (id) => (id ? (categories.find((c) => c.id === id)?.name || id) : '');
       for (const f in FIELD_LABELS) {
+        if (f === 'company') continue;
         let oldV = before[f], newV = next[f];
         if (f === 'categoryId') { oldV = catName(before.categoryId); newV = catName(next.categoryId); }
         if (String(oldV || '') !== String(newV || '')) changes.push(`${FIELD_LABELS[f]}: «${oldV || '-'}» → «${newV || '-'}»`);
       }
-      const k = custKey(next.company || before.company);
+      const k = custKey(companyName);
       if (changes.length) addChangeLogEntry(k, changes.join(' | '), currentUserName);
 
       let reminderCreated = false;
       if (next.result === 'در حال پیگیری' && reminder.date) {
         addReminder({
           id: 'REM-' + Date.now() + '-' + Math.floor(Math.random() * 10000),
-          custKey: k, company: next.company, dueDate: reminder.date, dueTime: reminder.time || null,
+          custKey: k, company: companyName, dueDate: reminder.date, dueTime: reminder.time || null,
           forAgent: reminder.for || next.coordinator || null, text: reminder.text.trim() || null, createdAt: Date.now(), done: false,
         });
         addChangeLogEntry(k, `یادآوری برای ${reminder.date}${reminder.time ? ' ساعت ' + reminder.time : ''} ثبت شد`, currentUserName);
@@ -137,12 +164,12 @@ export default function LeadProfileModal({ recordId, records, companyMeta, remin
     const target = records.find((r) => r.id === id);
     if (!target) return;
     const k = custKey(target.company);
-    const remaining = records.find((r) => r.id !== id && custKey(r.company) === k);
+    const remaining = records.find((r) => r.id !== id && isCall(r) && custKey(r.company) === k);
     const ok = await confirm({
       title: 'حذف تماس',
       message: remaining
         ? `این تماس با «${target.company || '-'}» (تاریخ ${target.date || '-'}) برای همیشه حذف بشه؟`
-        : `این تنها تماسیه که از «${target.company || '-'}» تو لیست شما مونده — با تأیید، فقط اطلاعات این تماس پاک میشه؛ خود شرکت تو لیست شما می‌مونه. ادامه بدید؟`,
+        : `این آخرین تماس «${target.company || '-'}» است — با تأیید، خود شرکت و یادآوری‌ها و اعلان‌هایش هم حذف می‌شود. ادامه بدید؟`,
       confirmText: 'حذف',
       cancelText: 'انصراف',
     });
@@ -153,28 +180,30 @@ export default function LeadProfileModal({ recordId, records, companyMeta, remin
       toast('تماس حذف شد');
       if (wasCurrent) onOpenRecord(remaining.id);
     } else {
-      updateRecord(target.id, EMPTY_RECORD_PATCH);
-      addChangeLogEntry(k, 'آخرین تماس این شرکت پاک شد — شرکت در لیست باقی موند', currentUserName);
-      toast(`اطلاعات آخرین تماس پاک شد — «${target.company || '-'}» همچنان تو لیست شما هست`);
-      onClose();
+      if (await deleteCompany(target.company)) {
+        toast(`«${target.company || '-'}» با آخرین تماسش حذف شد`);
+        onClose();
+      }
     }
   }
 
-  function submitQuickCall() {
+  async function submitQuickCall() {
     const coordinatorSel = quick.coordinator || rec.coordinator;
     if (!coordinatorSel) { toast('کارشناس رو انتخاب کن'); return; }
     if (quick.result === 'غیرفعال' && !quick.deactivateReason.trim()) { toast('برای غیرفعال کردن، دلیل الزامی است'); return; }
+    if (!quick.product.trim() || !quick.categoryId) { toast('محصول و دسته محصول الزامی است'); return; }
+    if (!Utils.isPhoneOk(quick.phone)) { toast('شماره تلفن کامل نیست (حداقل ۱۰ رقم)'); return; }
     const newRec = {
       id: 'CALL-' + Date.now() + '-' + Math.floor(Math.random() * 100000),
       converted: rec.converted, coordinator: coordinatorSel, company: rec.company,
       name: quick.name.trim() || null, phone: quick.phone.trim() || null, product: quick.product.trim() || null,
       categoryId: quick.categoryId || null, source: quick.source.trim() || null,
       date: (quick.date ? Utils.fromISODate(quick.date) : '') || Utils.todayDdMmYyyy(),
-      price: quick.price.trim() || null, result: quick.result || null, priority: quick.priority || null, notes: quick.notes.trim() || null,
+      result: quick.result || null, notes: quick.notes.trim() || null,
       deactivateReason: quick.result === 'غیرفعال' ? quick.deactivateReason.trim() : null,
     };
     const k = custKey(rec.company);
-    addRecords([newRec]);
+    if (!(await addRecord(newRec))) return;
     addChangeLogEntry(k, `تماس جدید ثبت شد — تاریخ: ${newRec.date}${newRec.notes ? '، یادداشت: ' + newRec.notes : ''}`, coordLabel(coordinatorSel));
 
     let reminderCreated = false;
@@ -220,11 +249,10 @@ export default function LeadProfileModal({ recordId, records, companyMeta, remin
             <div className="crm-field"><label>تلفن</label><input className="crm-input crm-mono" value={form.phone} onChange={setInput('phone')} maxLength={128} /></div>
             <div className="crm-field"><label>محصول</label><ProductField value={form.product} onChange={set('product')} onCategorySelect={(cid) => setForm((s) => (s.categoryId ? s : { ...s, categoryId: cid }))} /></div>
             <div className="crm-field"><label>دسته محصول</label><Dropdown value={form.categoryId} onChange={set('categoryId')} options={categoryOptions} placeholder="انتخاب کنید" /></div>
-            <div className="crm-field"><label>منبع سرنخ</label><input className="crm-input" list="crm-src-edit" value={form.source} onChange={setInput('source')} maxLength={64} placeholder="منبع سرنخ" /><datalist id="crm-src-edit">{sourceOpts.map((s) => <option key={s} value={s} />)}</datalist></div>
+            <div className="crm-field"><label>منبع سرنخ</label>{isElevatedUser ? <><input className="crm-input" list="crm-src-edit" value={form.source} onChange={setInput('source')} maxLength={64} placeholder="منبع سرنخ" /><datalist id="crm-src-edit">{sourceOpts.map((s) => <option key={s} value={s} />)}</datalist></> : <Dropdown value={form.source} onChange={set('source')} options={SOURCE_OPTS} placeholder="انتخاب کنید" />}</div>
             <div className="crm-field"><label>تاریخ تماس</label><DateField className="crm-input crm-mono" value={form.date} onChange={set('date')} /></div>
-            <div className="crm-field"><label>آخرین قیمت اعلامی</label><input className="crm-input crm-mono" value={form.price} onChange={setInput('price')} maxLength={64} /></div>
             <div className="crm-field"><label>نتیجه</label><Dropdown value={form.result} onChange={set('result')} options={RESULT_OPTS} placeholder="انتخاب کنید" /></div>
-            <div className="crm-field"><label>اولویت</label><Dropdown value={form.priority} onChange={set('priority')} options={PRIORITY_OPTS} placeholder="انتخاب کنید" /></div>
+            <div className="crm-field"><label>دمای سرنخ</label><Dropdown value={company ? company.tempManual || 'auto' : 'auto'} onChange={async (v) => { if (await setCompanyTemperature(rec.company, v === 'auto' ? null : v)) toast('دمای سرنخ ذخیره شد'); }} options={[{ value: 'auto', label: `خودکار (${tempText(company && company.temp)})` }, ...TEMP_OPTS]} placeholder="انتخاب کنید" /></div>
             <div className="crm-field -span3"><label>یادداشت</label><textarea className="crm-textarea" rows={3} value={form.notes} onChange={setInput('notes')} maxLength={10000} /></div>
             {form.result === 'غیرفعال' && (
               <div className="crm-field -span3"><label>دلیل غیرفعال شدن *</label><textarea className="crm-textarea" rows={2} value={form.deactivateReason} onChange={setInput('deactivateReason')} maxLength={500} placeholder="چرا این سرنخ کنار گذاشته شد؟" />{errors.deactivateReason && <span className="crm-field-error">{errors.deactivateReason}</span>}</div>
@@ -262,11 +290,9 @@ export default function LeadProfileModal({ recordId, records, companyMeta, remin
                   <div className="crm-field"><label>تلفن</label><input className="crm-input crm-mono" value={quick.phone} onChange={(e) => setQuick({ ...quick, phone: e.target.value })} /></div>
                   <div className="crm-field"><label>محصول</label><ProductField value={quick.product} onChange={(v) => setQuick({ ...quick, product: v })} onCategorySelect={(cid) => setQuick((s) => (s.categoryId ? s : { ...s, categoryId: cid }))} /></div>
                   <div className="crm-field"><label>دسته محصول</label><Dropdown value={quick.categoryId} onChange={(v) => setQuick({ ...quick, categoryId: v })} options={categoryOptions} placeholder="انتخاب کنید" /></div>
-                  <div className="crm-field"><label>منبع سرنخ</label><input className="crm-input" list="crm-src-quick" value={quick.source} onChange={(e) => setQuick({ ...quick, source: e.target.value })} maxLength={64} placeholder="منبع سرنخ" /><datalist id="crm-src-quick">{sourceOpts.map((s) => <option key={s} value={s} />)}</datalist></div>
+                  <div className="crm-field"><label>منبع سرنخ</label>{isElevatedUser ? <><input className="crm-input" list="crm-src-quick" value={quick.source} onChange={(e) => setQuick({ ...quick, source: e.target.value })} maxLength={64} placeholder="منبع سرنخ" /><datalist id="crm-src-quick">{sourceOpts.map((s) => <option key={s} value={s} />)}</datalist></> : <Dropdown value={quick.source} onChange={(v) => setQuick({ ...quick, source: v })} options={SOURCE_OPTS} placeholder="انتخاب کنید" />}</div>
                   <div className="crm-field"><label>تاریخ تماس</label><DateField className="crm-input crm-mono" value={quick.date} onChange={(v) => setQuick({ ...quick, date: v })} /></div>
-                  <div className="crm-field"><label>آخرین قیمت اعلامی</label><input className="crm-input crm-mono" value={quick.price} onChange={(e) => setQuick({ ...quick, price: e.target.value })} /></div>
                   <div className="crm-field"><label>نتیجه</label><Dropdown value={quick.result} onChange={(v) => setQuick({ ...quick, result: v })} options={RESULT_OPTS} placeholder="انتخاب کنید" /></div>
-                  <div className="crm-field"><label>اولویت</label><Dropdown value={quick.priority} onChange={(v) => setQuick({ ...quick, priority: v })} options={PRIORITY_OPTS} placeholder="انتخاب کنید" /></div>
                   <div className="crm-field -span3"><label>یادداشت</label><textarea className="crm-textarea" rows={2} value={quick.notes} onChange={(e) => setQuick({ ...quick, notes: e.target.value })} /></div>
                   {quick.result === 'غیرفعال' && (
                     <div className="crm-field -span3"><label>دلیل غیرفعال شدن *</label><textarea className="crm-textarea" rows={2} value={quick.deactivateReason} onChange={(e) => setQuick({ ...quick, deactivateReason: e.target.value })} placeholder="چرا این سرنخ کنار گذاشته شد؟" /></div>

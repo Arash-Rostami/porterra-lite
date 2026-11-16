@@ -1,8 +1,8 @@
 # Database setup
 
 `schema.sql` in this folder is the **current-state source of truth** for the
-`porterra-lite` MySQL schema — 6 tables (`categories`, `contacts`,
-`customer_activity`, `products`, `reminders`, `users`), generated from
+`porterra-lite` MySQL schema — 7 tables (`categories`, `contacts`,
+`customer_activity`, `notifications`, `products`, `reminders`, `users`), generated from
 `SHOW CREATE TABLE` against the real running app, not hand-written. Column
 names, business logic per table, and per-file conventions are documented in
 `../src/lib/CLAUDE.md` (the `queries.js`/`mappers.js`/`models.js` section).
@@ -114,6 +114,22 @@ Purely additive — no FK to any existing table, no column added to `contacts`/
 ```sql
 DROP TABLE notifications;
 ```
+
+## Migration history: Nov 2026 data and schema fixes
+
+Applied once to dev and production through phpMyAdmin (the one-off scripts were hex-encoded so
+pasted Persian text could not be corrupted, and were deleted afterwards). **`schema.sql` already
+reflects this state** — existing databases need the
+`ALTER`s below *before* the new code runs, because every lead query selects the new column by name
+(without it the whole boot load fails and the app falls back to the offline snapshot):
+
+- `contacts.temperature VARCHAR(10) NULL` — manual lead-temperature override (`hot|warm|cold`).
+- `customer_activity.type` enum gained `'message'` — the internal messenger's public channel
+  (`company_key='#public'`); `loadAllFromDb`/`listActivity` exclude these rows from the boot payload.
+- Data: legacy `result` values `'موفق'`/`'ناموفق'` moved into the quote model, company names
+  normalized (ي/ك → ی/ک, trimmed) across all four company-keyed tables, old `price` copied into
+  `quote_price`, empty sources set to `'سایر'`, missing `category_id`/`product` filled from the
+  company's other rows.
 
 ## Related docs
 

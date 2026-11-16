@@ -2,10 +2,12 @@ import Utils from './utils.js';
 
 export const COORD_LABELS = { FARNAZ: 'فرناز', PARDIS: 'پردیس', ZOHREH: 'زهره' };
 export const COORD_OPTS = [{ value: 'FARNAZ', label: 'فرناز' }, { value: 'PARDIS', label: 'پردیس' }, { value: 'ZOHREH', label: 'زهره' }];
-export const SOURCE_OPTS = ['ادمونت', 'اینترنت', 'نمایشگاه', 'مدیریت', 'ارتباطات', 'بازاریابی', 'همکاران', 'مشتری ورودی'];
+export const SOURCE_OPTS = ['ادمونت', 'اینترنت', 'نمایشگاه', 'همکاران', 'بازاریابی', 'ارتباطات', 'مدیریت', 'مشتری ورودی', 'سایر'];
+export const OTHER_SOURCES_LABEL = 'سایر منابع';
+export const TEMP_OPTS = [{ value: 'hot', label: 'داغ' }, { value: 'warm', label: 'گرم' }, { value: 'cold', label: 'سرد' }];
+export const TEMP_RANK = { hot: 0, warm: 1, cold: 2 };
 export const RESULT_OPTS = ['در حال پیگیری', 'در حال استعلام', 'بی‌پاسخ', 'غیرفعال'];
 export const STATUS_OPTS = ['در حال پیگیری', 'در حال استعلام', 'بی‌پاسخ', 'غیرفعال', 'بدون وضعیت'];
-export const PRIORITY_OPTS = ['بالا', 'متوسط', 'پایین'];
 export const PRICE_TYPE_OPTS = ['نقدی', 'اعتباری', 'پیش‌پرداخت'];
 const FAIL_NOTE_PATTERNS = ['یادم نمیاد', 'جواب نداد', 'پاسخ نداد', 'جواب نمی', 'پاسخ نمی'];
 
@@ -98,19 +100,30 @@ export function textFilter(items, query, fieldsFn) {
   return items.filter((item) => fieldsFn(item).some((v) => v && Utils.normText(v).indexOf(q) > -1));
 }
 
+const HAY_FIELDS = ['company', 'name', 'phone', 'notes', 'product', 'category', 'source', 'coordinator'];
+const hayCache = new WeakMap();
+
+export function searchHay(r) {
+  let hay = hayCache.get(r);
+  if (hay === undefined) {
+    const parts = HAY_FIELDS.map((f) => (r[f] ? Utils.normText(r[f]) : ''));
+    if (r.phone) parts.push(Utils.phoneDigits(r.phone));
+    if (r.coordinator) parts.push(Utils.normText(coordLabel(r.coordinator)));
+    hay = parts.filter(Boolean).join('\n');
+    hayCache.set(r, hay);
+  }
+  return hay;
+}
+
 export function smartSearch(records, query) {
-  if (!query || !query.trim()) return records.map((r) => ({ r, score: 1 }));
-  const tokens = Utils.normText(query).split(/\s+/).filter(Boolean);
-  const fields = ['company', 'name', 'phone', 'notes', 'product', 'category', 'source', 'coordinator'];
+  const phrase = Utils.normText(query);
+  if (!phrase) return records.map((r) => ({ r, score: 1 }));
+  const tokens = phrase.split(' ');
   const out = [];
   for (const r of records) {
-    const hay = fields.map((f) => r[f] ? Utils.normText(r[f]) : '');
-    if (r.coordinator) hay.push(Utils.normText(coordLabel(r.coordinator)));
-    let score = 0;
-    for (const tok of tokens) {
-      if (hay.some((v) => v && v.indexOf(tok) > -1)) score++;
-    }
-    if (score > 0) out.push({ r, score });
+    const hay = r.hay || searchHay(r);
+    if (!tokens.every((t) => hay.indexOf(t) > -1)) continue;
+    out.push({ r, score: hay.indexOf(phrase) > -1 ? 2 : 1 });
   }
   return out;
 }
@@ -127,15 +140,16 @@ function activeStatuses(status) {
 
 export function getFiltered(records, filters, chartFilter, sort) {
   let base = records;
-  const { coordinator, category, source, product, status, dateFrom, dateTo } = filters;
+  const { coordinator, category, source, product, status, dateFrom, dateTo, temp } = filters;
   base = base.filter((r) => {
     if (!matchesFilter(r.coordinator, coordinator)) return false;
-    if (!matchesFilter(r.category, category)) return false;
-    if (!matchesFilter(Utils.normSpace(r.source), source)) return false;
+    if (!matchesFilter(r.category || 'نامشخص', category)) return false;
+    if (!matchesFilter(Utils.normSpace(r.source) || 'نامشخص', source)) return false;
     if (!matchesFilter(r.product, product)) return false;
+    if (!matchesFilter(r.temp, temp)) return false;
     const statuses = activeStatuses(status);
     if (statuses) {
-      const eff = effectiveResult(r);
+      const eff = r.status !== undefined ? r.status : effectiveResult(r);
       if (!statuses.some((s) => (s === 'بدون وضعیت' ? !eff : eff === s))) return false;
     }
     return true;
@@ -173,15 +187,6 @@ export function getFiltered(records, filters, chartFilter, sort) {
       if (cf.type === 'otherSource') {
         return !cf.topSet.has(Utils.normSpace(r.source) || 'نامشخص');
       }
-      if (cf.type === 'kpi') {
-        if (cf.key === 'total') return true;
-        if (cf.key === 'converted') return !!r.converted;
-        if (cf.key === 'quoteOpen') return isQuoteOpen(r);
-        if (cf.key === 'deactivated') return r.result === 'غیرفعال';
-        if (cf.key === 'followUp') return r.result === 'در حال پیگیری';
-        if (cf.key === 'noAnswer') return effectiveResult(r) === 'بی‌پاسخ';
-        return true;
-      }
       return true;
     });
   }
@@ -190,11 +195,17 @@ export function getFiltered(records, filters, chartFilter, sort) {
   let list = scored.map((s) => s.r);
   if (sort && sort.key) {
     const k = sort.key;
-    list = list.slice().sort((a, b) => {
-      let av = a[k] || '', bv = b[k] || '';
-      if (k === 'date') { av = Utils.parseDate(a.date) || new Date(0); bv = Utils.parseDate(b.date) || new Date(0); return (av - bv) * sort.dir; }
-      return String(av).localeCompare(String(bv)) * sort.dir;
-    });
+    if (k === 'date') {
+      list = list.map((r) => [r, (Utils.parseDate(r.date) || new Date(0)).getTime()])
+        .sort((a, b) => (a[1] - b[1]) * sort.dir)
+        .map((x) => x[0]);
+    } else if (k === 'temp') {
+      list = list.slice().sort((a, b) => (TEMP_RANK[a.temp] - TEMP_RANK[b.temp]) * sort.dir);
+    } else if (k === 'calls') {
+      list = list.slice().sort((a, b) => ((a.calls || 0) - (b.calls || 0)) * sort.dir);
+    } else {
+      list = list.slice().sort((a, b) => String(a[k] || '').localeCompare(String(b[k] || '')) * sort.dir);
+    }
   }
   return list;
 }

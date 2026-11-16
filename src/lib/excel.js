@@ -1,6 +1,6 @@
-import * as XLSX from 'xlsx';
 import Utils from './utils.js';
-import { coordLabel, coordCodeFromLabel, effectiveResult } from './filters.js';
+import { coordLabel, coordCodeFromLabel, effectiveResult, TEMP_OPTS } from './filters.js';
+import { companyKey } from './companies.js';
 
 const IMPORT_ALIASES = {
   coordinator: ['coordinator', 'کارشناس', 'هماهنگ کننده', 'هماهنگ\u200cکننده'],
@@ -11,15 +11,14 @@ const IMPORT_ALIASES = {
   category: ['product category', 'دسته محصول', 'دسته'],
   source: ['lead source', 'منبع سرنخ', 'منبع'],
   date: ['date of contact', 'تاریخ تماس', 'تاریخ'],
-  price: ['last quoted price', 'آخرین قیمت اعلامی', 'قیمت'],
   result: ['result', 'نتیجه', 'وضعیت'],
-  priority: ['priority', 'اولویت'],
   notes: ['notes', 'یادداشت'],
   converted: ['سرنخ تبدیل‌شده', 'converted'],
 };
 
-export function exportToExcel(records) {
+export async function exportToExcel(records) {
   if (!records.length) return { ok: false, reason: 'empty' };
+  const XLSX = await import('xlsx');
   const rows = records.map((r) => ({
     'کارشناس': r.coordinator ? coordLabel(r.coordinator) : '',
     'شرکت': r.company || '',
@@ -29,9 +28,9 @@ export function exportToExcel(records) {
     'دسته محصول': r.category || '',
     'منبع سرنخ': r.source || '',
     'تاریخ تماس': r.date || '',
-    'آخرین قیمت اعلامی': r.price || '',
     'وضعیت': effectiveResult(r) || '',
-    'اولویت': r.priority || '',
+    'دما': (TEMP_OPTS.find((t) => t.value === r.temp) || {}).label || '',
+    'تعداد تماس': r.calls || '',
     'سرنخ تبدیل‌شده': r.converted ? 'بله' : 'خیر',
     'یادداشت': r.notes || '',
   }));
@@ -45,8 +44,9 @@ export function exportToExcel(records) {
   return { ok: true, count: records.length };
 }
 
-export function exportProductsToExcel(products) {
+export async function exportProductsToExcel(products) {
   if (!products.length) return { ok: false, reason: 'empty' };
+  const XLSX = await import('xlsx');
   const rows = products.map((p) => ({
     'نام محصول': p.name || '',
     'دسته‌بندی': p.category || '',
@@ -62,12 +62,13 @@ export function exportProductsToExcel(products) {
   return { ok: true, count: products.length };
 }
 
-export function downloadImportTemplate() {
-  const headers = ['کارشناس', 'شرکت', 'مخاطب', 'تلفن', 'محصول', 'دسته محصول', 'منبع سرنخ', 'تاریخ تماس', 'آخرین قیمت اعلامی', 'نتیجه', 'اولویت', 'سرنخ تبدیل‌شده', 'یادداشت'];
+export async function downloadImportTemplate() {
+  const XLSX = await import('xlsx');
+  const headers = ['کارشناس', 'شرکت', 'مخاطب', 'تلفن', 'محصول', 'دسته محصول', 'منبع سرنخ', 'تاریخ تماس', 'نتیجه', 'سرنخ تبدیل‌شده', 'یادداشت'];
   const sample = [{
     'کارشناس': 'فرناز', 'شرکت': 'شرکت نمونه صنعت', 'مخاطب': 'آقای محمدی', 'تلفن': '09121234567',
     'محصول': 'PVC', 'دسته محصول': 'Polymer', 'منبع سرنخ': 'نمایشگاه', 'تاریخ تماس': '14.07.2026',
-    'آخرین قیمت اعلامی': '', 'نتیجه': 'در حال پیگیری', 'اولویت': 'متوسط', 'سرنخ تبدیل‌شده': 'خیر',
+    'نتیجه': 'در حال پیگیری', 'سرنخ تبدیل‌شده': 'خیر',
     'یادداشت': 'این یک ردیف نمونه‌ست — پاکش کن و ردیف‌های خودت رو جایگزین کن',
   }];
   const ws = XLSX.utils.json_to_sheet(sample, { header: headers });
@@ -133,6 +134,7 @@ export function resolveImportCategoryIds(records, categories) {
 }
 
 export async function parseImportFile(file) {
+  const XLSX = await import('xlsx');
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: 'array', cellDates: true });
   const sheetName = wb.SheetNames[0];
@@ -140,11 +142,12 @@ export async function parseImportFile(file) {
   const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
   let imported = 0, skipped = 0;
   const newRecords = [];
+  const stamp = Date.now();
   for (const row of rows) {
     const company = findImportField(row, IMPORT_ALIASES.company);
     if (!company || !String(company).trim()) { skipped++; continue; }
     newRecords.push({
-      id: 'IMP-' + Date.now() + '-' + Math.floor(Math.random() * 100000),
+      id: 'IMP-' + stamp + '-' + newRecords.length,
       converted: normalizeImportConverted(findImportField(row, IMPORT_ALIASES.converted)),
       coordinator: normalizeImportCoordinator(findImportField(row, IMPORT_ALIASES.coordinator)),
       company: String(company).trim(),
@@ -154,9 +157,7 @@ export async function parseImportFile(file) {
       category: findImportField(row, IMPORT_ALIASES.category),
       source: findImportField(row, IMPORT_ALIASES.source),
       date: normalizeImportDate(findImportField(row, IMPORT_ALIASES.date)),
-      price: findImportField(row, IMPORT_ALIASES.price) != null ? String(findImportField(row, IMPORT_ALIASES.price)).trim() : null,
       result: findImportField(row, IMPORT_ALIASES.result),
-      priority: findImportField(row, IMPORT_ALIASES.priority),
       notes: findImportField(row, IMPORT_ALIASES.notes),
     });
     imported++;
@@ -165,6 +166,6 @@ export async function parseImportFile(file) {
 }
 
 export function countDuplicates(existingRecords, newRecords) {
-  const existingCompanies = new Set(existingRecords.map((r) => Utils.normSpace(r.company).toLowerCase()));
-  return newRecords.filter((r) => existingCompanies.has(Utils.normSpace(r.company).toLowerCase())).length;
+  const existingCompanies = new Set(existingRecords.map((r) => companyKey(r.company)));
+  return newRecords.filter((r) => existingCompanies.has(companyKey(r.company))).length;
 }

@@ -1,10 +1,11 @@
 import Utils from './utils.js';
 import { coordLabel } from './filters.js';
+import { companyKey } from './companies.js';
 
 export function findDuplicateCompany(records, companyInput) {
-  const company = Utils.normSpace(companyInput).toLowerCase();
+  const company = companyKey(companyInput);
   if (company.length < 2) return null;
-  const match = records.find((r) => r.company && Utils.normSpace(r.company).toLowerCase() === company);
+  const match = records.find((r) => r.company && companyKey(r.company) === company);
   if (!match) return null;
   return `⚠️ قبلاً ${coordLabel(match.coordinator)} با «${match.company}» تماس گرفته${match.name ? ' (مخاطب: ' + match.name + ')' : ''} — تاریخ آخرین تماس: ${match.date || '-'}`;
 }

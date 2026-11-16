@@ -1,6 +1,8 @@
 'use client';
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { computeAgentReport, exportAgentReportToExcel, agentColor } from '../../lib/analytics.js';
+import { applyLeadFilter } from '../../lib/uiStore.js';
 import { coordLabel, textFilter } from '../../lib/filters.js';
 import RingChart from '../ui/RingChart.jsx';
 import { toast } from '../ui/Toast.jsx';
@@ -14,7 +16,20 @@ function Bar({ val, total, color }) {
   return <div className="crm-agent-report-bar-wrap"><div className="crm-agent-report-bar" style={{ width: pct + '%', background: color }}></div></div>;
 }
 
+function Row({ label, val, total, color, onOpen }) {
+  return (
+    <div className="crm-agent-report-row -link" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}>
+      <span>{label}</span><Bar val={val} total={total} color={color} /><b>{val.toLocaleString('en-US')}</b>
+    </div>
+  );
+}
+
 function AgentReportCard({ d }) {
+  const router = useRouter();
+  const open = (href, partial) => () => {
+    applyLeadFilter({ coordinator: [d.agent], ...partial });
+    router.push(href);
+  };
   return (
     <div className="crm-agent-report-card">
       <div className="crm-agent-report-head">
@@ -23,13 +38,13 @@ function AgentReportCard({ d }) {
         <span className="crm-agent-report-total">{d.total.toLocaleString('en-US')} تماس</span>
         <RingChart percent={d.conversionRate} size={40} stroke={5} />
       </div>
-      <div className="crm-agent-report-row"><span>در حال پیگیری</span><Bar val={d.followUp} total={d.total} color="#E3A23C" /><b>{d.followUp.toLocaleString('en-US')}</b></div>
-      <div className="crm-agent-report-row"><span>بی‌پاسخ</span><Bar val={d.noAnswer} total={d.total} color="#6B7280" /><b>{d.noAnswer.toLocaleString('en-US')}</b></div>
-      <div className="crm-agent-report-row"><span>غیرفعال</span><Bar val={d.deactivated} total={d.total} color="#7C2D12" /><b>{d.deactivated.toLocaleString('en-US')}</b></div>
-      <div className="crm-agent-report-row"><span>استعلام باز</span><Bar val={d.quoteOpen} total={d.total} color="#1F6F72" /><b>{d.quoteOpen.toLocaleString('en-US')}</b></div>
-      <div className="crm-agent-report-row"><span>استعلام موفق</span><Bar val={d.quoteWon} total={d.total} color="#3E7A4F" /><b>{d.quoteWon.toLocaleString('en-US')}</b></div>
-      <div className="crm-agent-report-row"><span>استعلام ناموفق</span><Bar val={d.quoteLost} total={d.total} color="#B4532A" /><b>{d.quoteLost.toLocaleString('en-US')}</b></div>
-      <div className="crm-agent-report-conversion"><span>نرخ تبدیل سرنخ</span><span>{d.conversionRate}٪ ({d.converted.toLocaleString('en-US')} نفر)</span></div>
+      <Row label="در حال پیگیری" val={d.followUp} total={d.leads} color="#E3A23C" onOpen={open('/leads', { status: ['در حال پیگیری'] })} />
+      <Row label="بی‌پاسخ" val={d.noAnswer} total={d.leads} color="#6B7280" onOpen={open('/leads', { status: ['بی‌پاسخ'] })} />
+      <Row label="غیرفعال" val={d.deactivated} total={d.leads} color="#7C2D12" onOpen={open('/leads', { status: ['غیرفعال'] })} />
+      <Row label="استعلام باز" val={d.quoteOpen} total={d.quoteTotal} color="#1F6F72" onOpen={open('/inquiries')} />
+      <Row label="استعلام موفق" val={d.quoteWon} total={d.quoteTotal} color="#3E7A4F" onOpen={open('/inquiries')} />
+      <Row label="استعلام ناموفق" val={d.quoteLost} total={d.quoteTotal} color="#B4532A" onOpen={open('/inquiries')} />
+      <div className="crm-agent-report-conversion"><span>نرخ تبدیل سرنخ</span><span>{d.conversionRate}٪ ({d.converted.toLocaleString('en-US')} مشتری از {d.companies.toLocaleString('en-US')} شرکت)</span></div>
     </div>
   );
 }
@@ -37,7 +52,7 @@ function AgentReportCard({ d }) {
 export default function AgentReport({ records }) {
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
-  const data = computeAgentReport(records);
+  const data = useMemo(() => computeAgentReport(records), [records]);
   const filtered = useMemo(() => {
     return textFilter(data, q, (d) => [coordLabel(d.agent)]);
   }, [data, q]);

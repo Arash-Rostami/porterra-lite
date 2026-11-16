@@ -49,3 +49,4 @@ next-env.d.ts
 # Claude Code local settings + temp (credentials/data must stay out of git)
 /.claude/settings.local.json
 /.claude/tmp/
+/.claude/hooks/.state/

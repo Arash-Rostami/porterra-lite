@@ -37,7 +37,7 @@ export default function SourceChart({ records, dark, onSelectSource }) {
 
   return (
     <div className="crm-section">
-      <div className="crm-section-title">منابع سرنخ</div>
+      <div className="crm-section-title">منابع سرنخ (بر اساس تماس‌ها)</div>
       <div className="crm-chart-canvas-wrap"><canvas ref={canvasRef} id="crmSourceChart"></canvas></div>
       <div className="crm-chart-chips" id="crmSourceChips">
         {top.map((t, idx) => (

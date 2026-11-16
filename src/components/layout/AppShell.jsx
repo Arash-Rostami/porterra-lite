@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import Sidebar from './Sidebar.jsx';
 import Header from './Header.jsx';
@@ -12,6 +12,7 @@ import ConfirmDialog from '../ui/ConfirmDialog.jsx';
 import { useStore, loadAll, syncNow, markReminderDone } from '../../lib/store.js';
 import { useUiStore, closeProfile, closeAgentProfile, openProfile } from '../../lib/uiStore.js';
 import { useTheme } from '../../lib/theme.js';
+import { summarize } from '../../lib/analytics.js';
 
 export default function AppShell({ children }) {
   const pathname = usePathname();
@@ -23,6 +24,7 @@ export default function AppShell({ children }) {
   const offline = useStore((s) => s.offline);
   const queueCount = useStore((s) => s.queueCount);
   const profileId = useUiStore((u) => u.profileId);
+  const profileTab = useUiStore((u) => u.profileTab);
   const agentProfile = useUiStore((u) => u.agentProfile);
   const fontScale = useUiStore((u) => u.fontScale);
   const { dark, toggleTheme } = useTheme();
@@ -40,6 +42,8 @@ export default function AppShell({ children }) {
     return () => { clearInterval(id); window.removeEventListener('online', onOnline); };
   }, [offline, isAuth]);
 
+  const counts = useMemo(() => (loaded ? summarize(records) : null), [loaded, records]);
+
   if (isAuth) {
     return <div className={`crm-root${dark ? ' -dark' : ''}`}>{children}</div>;
   }
@@ -54,14 +58,20 @@ export default function AppShell({ children }) {
             حالت آفلاین — {queueCount.toLocaleString('en-US')} تغییر در صف محلی — به‌محض برقراری اتصال، خودکار همگام‌سازی می‌شود
           </div>
         )}
-        <Header leadCount={records.filter((r) => !r.converted).length} customerCount={records.filter((r) => r.converted).length} dark={dark} onToggleTheme={toggleTheme} />
-        {loaded && children}
+        <Header counts={counts} dark={dark} onToggleTheme={toggleTheme} />
+        {loaded ? children : (
+          <div className="crm-skeleton-page" aria-busy="true">
+            <div className="crm-skeleton -sm" />
+            <div className="crm-skeleton -lg" />
+            <div className="crm-skeleton -lg" />
+          </div>
+        )}
         {loaded && <Footer />}
       </div>
 
       {profileId && (
         <LeadProfileModal
-          key={profileId}
+          key={profileId + ':' + profileTab}
           recordId={profileId}
           records={records}
           companyMeta={companyMeta}

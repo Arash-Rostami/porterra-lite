@@ -38,12 +38,20 @@ export const findLeadByCompany = (company) => req('GET', `/api/leads/by-company?
 
 export const addChangeLog = (p) => req('POST', '/api/activity', { ...p, type: 'change' });
 export const addComment = (p) => req('POST', '/api/activity', { ...p, type: 'comment' });
+export const getNotifications = () => req('GET', '/api/notifications');
+export const getMessages =(since) => req('GET', `/api/messages?since=${since}`);
+export const sendMessage = (text) => req('POST', '/api/messages', { text });
+export const updateActivity = (id, patch) => req('PATCH', `/api/activity/${enc(id)}`, { patch });
+export const deleteActivity = (id) => req('DELETE', `/api/activity/${enc(id)}`);
 
 export const addReminder = (r) => req('POST', '/api/reminders', r);
 export const markReminderDone = (id) => req('POST', `/api/reminders/${enc(id)}/done`);
 export const updateReminder = (id, patch) => req('PATCH', `/api/reminders/${enc(id)}`, { patch });
 export const deleteReminder = (id) => req('DELETE', `/api/reminders/${enc(id)}`);
+export const renameCompany = (company, rename, entry) => req('PATCH', '/api/companies', { company, rename, entry });
+export const deleteCompany = (company) => req('DELETE', '/api/companies', { company });
 export const markNotificationRead = (id) => req('POST', `/api/notifications/${enc(id)}/read`);
+export const markAllNotificationsRead = () => req('POST', '/api/notifications/all/read');
 
 export const createProduct = (product) => req('POST', '/api/products', { product });
 export const updateProductAction = (id, patch) => req('PATCH', `/api/products/${enc(id)}`, { patch });
@@ -56,7 +64,6 @@ export const resolveQuote = (id, result, failReason) => req('PATCH', `/api/quote
 
 export const importRecords = (records) => req('POST', '/api/leads/import', { records });
 export const syncNow = () => req('POST', '/api/sync');
-export const resetToSeed = () => req('POST', '/api/admin/reset');
 
 export const listDepartmentsAction = () => req('GET', '/api/departments');
 

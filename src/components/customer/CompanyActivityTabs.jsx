@@ -1,12 +1,13 @@
 'use client';
 import { useState } from 'react';
 import Utils from '../../lib/utils.js';
-import { getUnifiedFeed, addComment, addReminder, addChangeLogEntry } from '../../lib/store.js';
+import { getUnifiedFeed, addComment, updateComment, deleteComment, addReminder, addChangeLogEntry } from '../../lib/store.js';
 import { coordLabel, scopedCoordOptions } from '../../lib/filters.js';
 import { useUiStore } from '../../lib/uiStore.js';
 import { formatDisplayDate } from '../../lib/calendar.js';
+import { confirm } from '../../lib/confirm.js';
 import { toast } from '../ui/Toast.jsx';
-import { CheckIcon, PlusIcon, XCircleIcon } from '../ui/Icon.jsx';
+import { CheckIcon, PencilIcon, PlusIcon, TrashIcon, XCircleIcon } from '../ui/Icon.jsx';
 import Dropdown from '../ui/Dropdown.jsx';
 import DateField from '../ui/DateField.jsx';
 import Pagination, { paginate } from '../ui/Pagination.jsx';
@@ -24,6 +25,8 @@ export const COMPANY_ACTIVITY_TABS = [
 export default function CompanyActivityTabs({ custKey, company, tab, reminders, onMarkReminderDone, onOpenRecord, currentUser, currentUserName }) {
   const calendar = useUiStore((u) => u.calendar);
   const [commentText, setCommentText] = useState('');
+  const [editId, setEditId] = useState(null);
+  const [editText, setEditText] = useState('');
   const [changelogPage, setChangelogPage] = useState(1);
   const [correspondencePage, setCorrespondencePage] = useState(1);
   const [reminderPage, setReminderPage] = useState(1);
@@ -46,6 +49,19 @@ export default function CompanyActivityTabs({ custKey, company, tab, reminders, 
     addComment(custKey, commentText.trim(), currentUserName);
     setCommentText('');
     toast('نظر ثبت شد');
+  }
+
+  const canEditComment = (item) => !!currentUser && (currentUser.role === 'admin' || currentUser.role === 'developer' || item.author === currentUserName);
+
+  function saveEdit() {
+    if (!editText.trim()) { toast('متن نظر خالیه'); return; }
+    updateComment(custKey, editId, editText.trim());
+    setEditId(null);
+  }
+
+  async function removeComment(id) {
+    const ok = await confirm({ title: 'حذف نظر', message: 'این نظر برای همیشه حذف شود؟', tone: 'danger', confirmText: 'حذف', cancelText: 'انصراف' });
+    if (ok) deleteComment(custKey, id);
   }
 
   function submitNewReminder() {
@@ -89,7 +105,21 @@ export default function CompanyActivityTabs({ custKey, company, tab, reminders, 
           {!correspondenceItems.length ? <div className="crm-feed-empty">هنوز نظری برای این شرکت ثبت نشده</div> : correspondencePaged.pageItems.map((item) => (
             <div className="crm-feed-item -comment" key={item.id}>
               <div className="crm-feed-item-head"><b>{item.author}</b><span>{Utils.formatTs(item.ts, calendar)}</span></div>
-              <div>{item.text}</div>
+              {editId === item.id ? (
+                <>
+                  <textarea className="crm-textarea" rows={2} value={editText} onChange={(e) => setEditText(e.target.value)} />
+                  <div className="crm-quickcall-actions">
+                    <button type="button" className="crm-btn-primary" onClick={saveEdit}><CheckIcon />ذخیره</button>
+                    <button type="button" className="crm-btn-ghost" onClick={() => setEditId(null)}><XCircleIcon />انصراف</button>
+                  </div>
+                </>
+              ) : <div>{item.text}</div>}
+              {editId !== item.id && canEditComment(item) && (
+                <div className="crm-quickcall-actions">
+                  <button type="button" className="crm-edit-btn" onClick={() => { setEditId(item.id); setEditText(item.text); }}><PencilIcon />ویرایش</button>
+                  <button type="button" className="crm-delete-btn" onClick={() => removeComment(item.id)}><TrashIcon />حذف</button>
+                </div>
+              )}
             </div>
           ))}
         </div>

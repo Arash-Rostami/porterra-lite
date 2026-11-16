@@ -6,12 +6,19 @@ import Utils from '../../lib/utils.js';
 import { coordLabel, coordClass, PRICE_TYPE_OPTS, textFilter } from '../../lib/filters.js';
 import { announceQuotePrice, resolveQuote } from '../../lib/store.js';
 import { formatDisplayDate } from '../../lib/calendar.js';
-import { useUiStore } from '../../lib/uiStore.js';
+import { useUiStore, setFilters, DEFAULT_FILTERS } from '../../lib/uiStore.js';
+import { callMatcher } from '../../lib/companies.js';
 import { toast } from '../ui/Toast.jsx';
-import { CheckIcon, XCircleIcon } from '../ui/Icon.jsx';
+import { CheckIcon, XCircleIcon, TrashIcon } from '../ui/Icon.jsx';
 import Pagination, { paginate } from '../ui/Pagination.jsx';
 
-const PER_PAGE = 6;
+const PER_PAGE = 15;
+
+function quoteStatus(r) {
+  if (r.quoteResult) return { text: r.quoteResult, className: r.quoteResult === 'موفق' ? '-success' : '-fail' };
+  if (r.quotePrice) return { text: 'در انتظار جواب مشتری', className: '-progress' };
+  return { text: 'در انتظار اعلام قیمت', className: '-warn' };
+}
 
 function quoteDuration(rec) {
   const priceDt = Utils.parseDate(rec.quotePriceDate) || Utils.parseDate(rec.date);
@@ -85,7 +92,9 @@ function QuoteDetailModal({ rec, calendar, onClose, onOpenRecord }) {
         <div style={{ fontSize: 12.5, display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div>نتیجه: <b>{rec.quoteResult}</b></div>
           <div>قیمت اعلامی: {rec.quotePrice}{rec.quotePriceType ? ` (${rec.quotePriceType})` : ''}</div>
-          {rec.quoteFailReason && <div>دلیل ناموفقی: {rec.quoteFailReason}</div>}
+          {rec.quotePriceDate && <div>تاریخ اعلام قیمت: {formatDisplayDate(rec.quotePriceDate, calendar)}</div>}
+          {rec.quoteResultDate && <div>تاریخ نتیجه: {formatDisplayDate(rec.quoteResultDate, calendar)}</div>}
+          {rec.quoteResult === 'ناموفق' && rec.quoteFailReason && <div>دلیل ناموفقی: {rec.quoteFailReason}</div>}
           {duration != null && <div>مدت‌زمان استعلام: {duration.toLocaleString('en-US')} روز</div>}
         </div>
       )}
@@ -113,23 +122,15 @@ export default function QuotesPanel({ records, onOpenRecord }) {
     setPage(1);
   }
 
-  const quotes = useMemo(() => records.filter((r) => r.result === 'در حال استعلام'), [records]);
-  const open = useMemo(() => quotes.filter((q) => !q.quoteResult), [quotes]);
-  const won = useMemo(() => quotes.filter((q) => q.quoteResult === 'موفق'), [quotes]);
-  const lost = useMemo(() => quotes.filter((q) => q.quoteResult === 'ناموفق'), [quotes]);
-
-  const companyBadges = useMemo(() => {
-    const seen = new Set();
-    for (const r of quotes) {
-      const name = Utils.normSpace(r.company);
-      if (name) seen.add(name);
-    }
-    return Array.from(seen).sort((a, b) => a.localeCompare(b));
-  }, [quotes]);
-
-  function toggleCompanyBadge(name) {
-    changeQuery(Utils.normSpace(q) === name ? '' : name);
-  }
+  const filters = useUiStore((u) => u.filters);
+  const quotes = useMemo(() => {
+    const match = callMatcher(filters);
+    return records.filter((r) => (r.result === 'در حال استعلام' || r.quoteResult) && (!match || match(r)));
+  }, [records, filters]);
+  const filterActive = !!callMatcher(filters);
+  const open = useMemo(() => quotes.filter((x) => !x.quoteResult), [quotes]);
+  const won = useMemo(() => quotes.filter((x) => x.quoteResult === 'موفق'), [quotes]);
+  const lost = useMemo(() => quotes.filter((x) => x.quoteResult === 'ناموفق'), [quotes]);
 
   const sorted = useMemo(() => {
     const pool = filter === 'open' ? open : filter === 'won' ? won : lost;
@@ -149,19 +150,13 @@ export default function QuotesPanel({ records, onOpenRecord }) {
 
   return (
     <>
-      <div className="crm-kpis" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-        <div className={`crm-kpi${filter === 'open' ? ' -selected' : ''}`} style={{ cursor: 'pointer' }} onClick={() => changeFilter('open')}>
-          <div className="crm-kpi-label">باز</div>
-          <div className="crm-kpi-value">{open.length.toLocaleString('en-US')}</div>
-        </div>
-        <div className={`crm-kpi${filter === 'won' ? ' -selected' : ''}`} style={{ cursor: 'pointer' }} onClick={() => changeFilter('won')}>
-          <div className="crm-kpi-label">موفق</div>
-          <div className="crm-kpi-value">{won.length.toLocaleString('en-US')}</div>
-        </div>
-        <div className={`crm-kpi${filter === 'lost' ? ' -selected' : ''}`} style={{ cursor: 'pointer' }} onClick={() => changeFilter('lost')}>
-          <div className="crm-kpi-label">ناموفق</div>
-          <div className="crm-kpi-value">{lost.length.toLocaleString('en-US')}</div>
-        </div>
+      <div className="crm-kpis crm-kpis-3">
+        {[['open', 'باز', open], ['won', 'موفق', won], ['lost', 'ناموفق', lost]].map(([key, label, pool]) => (
+          <button key={key} type="button" className={`crm-kpi${filter === key ? ' -selected' : ''}`} onClick={() => changeFilter(key)}>
+            <div className="crm-kpi-label">{label}</div>
+            <div className="crm-kpi-value">{pool.length.toLocaleString('en-US')}</div>
+          </button>
+        ))}
       </div>
 
       <div className="crm-section">
@@ -175,34 +170,34 @@ export default function QuotesPanel({ records, onOpenRecord }) {
         <div className="crm-toolbar">
           <input className="crm-input crm-search-input -compact" value={q} onChange={(e) => changeQuery(e.target.value)} placeholder="جست‌وجوی شرکت، محصول یا کارشناس..." />
         </div>
-        {companyBadges.length > 0 && (
-          <div className="crm-badge-row">
-            {companyBadges.map((name) => (
-              <span
-                key={name}
-                className={`crm-badge -clickable${Utils.normSpace(q) === name ? ' -active' : ''}`}
-                onClick={() => toggleCompanyBadge(name)}
-              >{name}</span>
-            ))}
+        {filterActive && (
+          <div className="crm-active-chart-filter -show">
+            <span>فیلتر فعال از صفحه قبل (کارشناس/بازه تاریخ)</span>
+            <button type="button" title="پاک کردن" aria-label="پاک کردن" onClick={() => setFilters(DEFAULT_FILTERS)}><TrashIcon /></button>
           </div>
         )}
-        <div className="crm-history-list" style={{ maxHeight: 'none' }}>
-          {!list.length && <div className="crm-feed-empty">استعلامی در این دسته یافت نشد</div>}
-          {pageItems.map((r) => {
-            const duration = quoteDuration(r);
-            return (
-              <div className="crm-history-item" key={r.id} onClick={() => setActiveId(r.id)}>
-                <div className="crm-history-item-top">
-                  <span><span className={`crm-coord-tag ${coordClass(r.coordinator)}`}>{coordLabel(r.coordinator)}</span> <b>{r.company}</b></span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {r.quoteResult ? <span className={`crm-status-badge ${r.quoteResult === 'موفق' ? '-success' : '-fail'}`}>{r.quoteResult}</span> : <span className="crm-status-badge -progress">باز</span>}
-                    {duration != null && <span style={{ fontSize: 11, color: 'var(--muted)' }}>{duration.toLocaleString('en-US')} روز</span>}
-                  </span>
-                </div>
-                <div className="crm-history-item-notes">{r.product || 'بدون محصول'} — {formatDisplayDate(r.date, calendar)}</div>
-              </div>
-            );
-          })}
+        <div className="crm-table-wrap">
+          <table className="crm-table">
+            <thead>
+              <tr><th>شرکت</th><th>محصول</th><th>وضعیت</th><th>تاریخ</th><th>قیمت</th><th>مدت</th></tr>
+            </thead>
+            <tbody>
+              {pageItems.length ? pageItems.map((r) => {
+                const duration = quoteDuration(r);
+                const st = quoteStatus(r);
+                return (
+                  <tr key={r.id} className="crm-row-link" role="button" tabIndex={0} onClick={() => setActiveId(r.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveId(r.id); } }}>
+                    <td><span className={`crm-coord-tag ${coordClass(r.coordinator)}`}>{coordLabel(r.coordinator)}</span> <b>{r.company}</b></td>
+                    <td className="crm-product-text">{r.product || '-'}</td>
+                    <td><span className={`crm-status-badge ${st.className}`}>{st.text}</span></td>
+                    <td className="crm-mono crm-date-text">{formatDisplayDate(r.date, calendar) || '-'}</td>
+                    <td className="crm-mono">{r.quotePrice || '-'}</td>
+                    <td className="crm-mono">{duration != null ? `${duration.toLocaleString('en-US')} روز` : '-'}</td>
+                  </tr>
+                );
+              }) : <tr><td colSpan={6}><div className="crm-empty">استعلامی در این دسته یافت نشد</div></td></tr>}
+            </tbody>
+          </table>
         </div>
         <Pagination safePage={safePage} totalPages={totalPages} onPage={setPage} />
       </div>

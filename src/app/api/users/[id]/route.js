@@ -11,7 +11,7 @@ export const PATCH = handle(async (req, ctx) => {
   const targetId = parseOrThrow(Id, rawId);
   const elevated = isElevated(actor);
   const isSelf = actor.id === targetId;
-  if (!elevated && !isSelf) throw new Error('FORBIDDEN');
+  if (!elevated && !isSelf) throw Object.assign(new Error('VALIDATION: دسترسی شما برای ویرایش این کاربر کافی نیست'), { code: 'VALIDATION' });
 
   const body = await req.json();
   let u = parseOrThrow(UserUpdate, body.patch);

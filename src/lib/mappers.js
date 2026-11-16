@@ -30,6 +30,7 @@ export function rowToLead(row) {
     quoteResult: row.quote_result,
     quoteResultDate: row.quote_result_date,
     quoteFailReason: row.quote_fail_reason,
+    temperature: row.temperature,
   };
 }
 
@@ -126,6 +127,7 @@ export function leadToRow(c) {
     quote_result: n(c.quoteResult),
     quote_result_date: normDate(n(c.quoteResultDate)),
     quote_fail_reason: n(c.quoteFailReason),
+    temperature: n(c.temperature),
   };
 }
 
@@ -203,7 +205,7 @@ export function rowToUser(row) {
 
 export const LEAD_COLS = [
   'id', 'converted', 'company', 'coordinator', 'name', 'phone', 'product', 'category_id', 'source', 'date', 'price', 'result', 'priority', 'notes',
-  'deactivate_reason', 'quote_price', 'quote_price_type', 'quote_terms', 'quote_price_date', 'quote_result', 'quote_result_date', 'quote_fail_reason',
+  'deactivate_reason', 'quote_price', 'quote_price_type', 'quote_terms', 'quote_price_date', 'quote_result', 'quote_result_date', 'quote_fail_reason', 'temperature',
 ];
 export const REMINDER_COLS = ['id', 'cust_key', 'company', 'due_date', 'due_time', 'for_agent', 'text', 'created_at', 'done'];
 export const NOTIFICATION_COLS = ['id', 'for_agent', 'type', 'cust_key', 'company', 'text', 'created_at', 'is_read'];

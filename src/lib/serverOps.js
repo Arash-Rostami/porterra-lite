@@ -2,7 +2,6 @@ import { withTransaction, isConnError } from './db.js';
 import {
   applyOp,
   loadAllFromDb,
-  reseedLeads,
   findUserByEmail,
   createUser,
   updateUserLastLogin,
@@ -10,10 +9,10 @@ import {
 } from './queries.js';
 import {mkdir, readdir, readFile, rename, unlink, writeFile} from 'fs/promises';
 import path from 'path';
-import { SEED_DATA } from '../data/seed.js';
 import { parseOrThrow, LeadCreate, LoginInput } from './models.js';
 import { encryptString, decryptString } from './crypto.js';
 import { rowToUser } from './mappers.js';
+import { companyKey } from './companies.js';
 import { isElevated } from './auth.js';
 import Utils from './utils.js';
 
@@ -36,22 +35,36 @@ export async function resolveScope(user) {
 export async function checkLeadScope(user, existingLead, nextCoordinator) {
     if (isElevated(user)) return;
     const scope = await resolveScope(user);
-    const covers = (code) => (scope.type === 'own' ? code === scope.agentCode : scope.agentCodes.includes(code));
-    if (existingLead && !covers(existingLead.coordinator)) throw new Error('FORBIDDEN');
-    if (nextCoordinator !== undefined && !covers(nextCoordinator)) throw new Error('FORBIDDEN');
+    const covers = (code) => (scope.type === 'own' ? scope.agentCode != null && code === scope.agentCode : scope.agentCodes.includes(code));
+    if ((existingLead && !covers(existingLead.coordinator)) || (nextCoordinator !== undefined && !covers(nextCoordinator))) {
+      throw Object.assign(new Error('VALIDATION: این سرنخ متعلق به کارشناس دیگری است'), { code: 'VALIDATION' });
+    }
 }
 
-function scopeBootData(data, scope) {
-    if (!scope || scope.type === 'all') return data;
+export async function checkReminderScope(user, reminder, requireOwner = false) {
+    if (!reminder || isElevated(user)) return;
+    if (!reminder.forAgent) {
+      if (requireOwner) throw Object.assign(new Error('VALIDATION: کارشناس مربوط به یادآوری مشخص نیست'), { code: 'VALIDATION' });
+      return;
+    }
+    const scope = await resolveScope(user);
+    const covers = scope.type === 'own' ? scope.agentCode != null && reminder.forAgent === scope.agentCode : scope.agentCodes.includes(reminder.forAgent);
+    if (!covers) throw Object.assign(new Error('VALIDATION: این یادآوری متعلق به کارشناس دیگری است'), { code: 'VALIDATION' });
+}
+
+function scopeBootData(data, scope, user) {
+    const mine = Utils.recipientKey(user);
+    const ownNotifications = (data.notifications || []).filter((n) => n.forAgent === mine);
+    if (!scope || scope.type === 'all') return { ...data, notifications: ownNotifications };
     const matchAgent = scope.type === 'own'
-        ? (code) => code === scope.agentCode
+        ? (code) => scope.agentCode != null && code === scope.agentCode
         : (code) => scope.agentCodes.includes(code);
     const owned = data.records.filter((r) => matchAgent(r.coordinator));
-    const ownedCompanyKeys = new Set(owned.map((r) => Utils.normSpace(r.company).toLowerCase()).filter(Boolean));
-    const records = data.records.filter((r) => matchAgent(r.coordinator) || ownedCompanyKeys.has(Utils.normSpace(r.company).toLowerCase()));
+    const ownedCompanyKeys = new Set(owned.map((r) => companyKey(r.company)).filter(Boolean));
+    const records = data.records.filter((r) => matchAgent(r.coordinator) || ownedCompanyKeys.has(companyKey(r.company)));
     const reminders = data.reminders.filter((rm) => matchAgent(rm.forAgent) || (rm.custKey && ownedCompanyKeys.has(rm.custKey)));
-    const notifications = (data.notifications || []).filter((n) => matchAgent(n.forAgent));
-    const companyKeys = new Set(records.map((r) => Utils.normSpace(r.company).toLowerCase()).filter(Boolean));
+    const notifications = ownNotifications;
+    const companyKeys = new Set(records.map((r) => companyKey(r.company)).filter(Boolean));
     const companyMeta = {};
     for (const key of Object.keys(data.companyMeta || {})) {
         if (companyKeys.has(key)) companyMeta[key] = data.companyMeta[key];
@@ -75,7 +88,7 @@ async function ensureDir() {
 
 async function writeJson(file, data) {
     await ensureDir();
-    const tmp = file + '.tmp';
+    const tmp = `${file}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 6)}.tmp`;
     await writeFile(tmp, JSON.stringify(data));
     await rename(tmp, file);
 }
@@ -93,7 +106,7 @@ function readQueue() {
 }
 
 function appendOp(op, payload) {
-    queueChain = queueChain.then(async () => {
+    queueChain = queueChain.catch(() => {}).then(async () => {
         const q = await readQueue();
         q.push({id: `${op}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, op, payload, ts: Date.now()});
         await writeJson(QUEUE_FILE, q);
@@ -139,25 +152,31 @@ export async function loadBootData(user) {
   } catch {
     const snap = await readSnapshot();
     const fallback = snap || { records: [], companyMeta: {}, reminders: [], notifications: [], products: [], agents: [], categories: [] };
-    return { data: scopeBootData(fallback, scope), offline: true, queueCount: await getQueueCount() };
+    return { data: scopeBootData(fallback, scope, user), offline: true, queueCount: await getQueueCount() };
   }
-  await writeSnapshot(data).catch(() => {});
-  return { data: scopeBootData(data, scope), offline: false, queueCount: await getQueueCount() };
+  writeSnapshot(data).catch(() => {});
+  return { data: scopeBootData(data, scope, user), offline: false, queueCount: await getQueueCount() };
 }
 
 export async function syncData(user) {
   const queue = await readQueue();
   try {
-    if (queue.length > 0) {
-      await withTransaction(async (conn) => {
-        for (const entry of queue) await applyOp(entry.op, entry.payload, conn);
-      });
+    let applied = 0;
+    for (const entry of queue) {
+      if (entry.op === 'markNotificationRead' && entry.payload.forAgent === undefined) continue;
+      try {
+        await withTransaction((conn) => applyOp(entry.op, entry.payload, conn));
+        applied++;
+      } catch (err) {
+        if (isConnError(err)) throw err;
+        console.error('dropping an unreplayable queued op:', entry.op, err && err.message);
+      }
     }
     const data = await loadAllFromDb();
     await writeSnapshot(data);
     if (queue.length > 0) await clearQueue();
     const scope = await resolveScope(user);
-    return { data: scopeBootData(data, scope), synced: queue.length, remaining: 0 };
+    return { data: scopeBootData(data, scope, user), synced: applied, remaining: 0 };
   } catch (err) {
     return { error: 'sync-failed', message: err && err.message ? err.message : 'sync failed', remaining: await getQueueCount() };
   }
@@ -176,11 +195,6 @@ export async function importLeads(records) {
     }
     throw err;
   }
-}
-
-export async function resetData() {
-  await reseedLeads(SEED_DATA);
-  return { ok: true };
 }
 
 export async function authenticateUser(email, password) {

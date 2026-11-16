@@ -2,7 +2,8 @@
 import { useState, useMemo } from 'react';
 import { computeAgentStats } from '../../lib/analytics.js';
 import { computeSuggestions } from '../../lib/suggestions.js';
-import { coordLabel, statusBadgeInfo, textFilter } from '../../lib/filters.js';
+import { coordLabel, statusBadgeInfo, textFilter, TEMP_OPTS } from '../../lib/filters.js';
+import { isCall } from '../../lib/companies.js';
 import Utils from '../../lib/utils.js';
 import RingChart from '../ui/RingChart.jsx';
 import Modal from '../ui/Modal.jsx';
@@ -14,7 +15,8 @@ import { formatDisplayDate } from '../../lib/calendar.js';
 import { FilterIcon, TrashIcon } from '../ui/Icon.jsx';
 import Pagination, { paginate } from '../ui/Pagination.jsx';
 
-const priorityClass = (p) => (p === 'بالا' ? '-high' : p === 'متوسط' ? '-mid' : '-low');
+const TEMP_CLASS = { hot: '-high', warm: '-mid', cold: '-low' };
+const tempLabel = (v) => (TEMP_OPTS.find((t) => t.value === v) || {}).label || '';
 
 function StatValue({ target }) {
   const display = useCountUp(target, 500);
@@ -46,12 +48,12 @@ export default function AgentProfileModal({ agent, records, onClose, onOpenRecor
   const suggestions = useMemo(() => {
     if (!agent) return [];
     const byAgent = computeSuggestions(records);
-    return (byAgent[agent] || []).slice().sort((a, b) => (b.noStatus - a.noStatus) || (b.isNoAnswer - a.isNoAnswer) || (b.pr - a.pr) || (b.days - a.days));
+    return byAgent[agent] || [];
   }, [agent, records]);
 
   if (!agent || !s) return null;
 
-  const sortedHistory = s.recs.slice().sort((a, b) => {
+  const sortedHistory = s.recs.filter(isCall).sort((a, b) => {
     const da = Utils.parseDate(a.date), db = Utils.parseDate(b.date);
     return (db || new Date(0)) - (da || new Date(0));
   });
@@ -102,7 +104,7 @@ export default function AgentProfileModal({ agent, records, onClose, onOpenRecor
           </div>
 
           <div className="crm-agent-profile-stats" id="apStats">
-            {[['کل تماس‌ها', s.total], ['در حال پیگیری', s.followUp], ['بی‌پاسخ', s.noAnswer], ['غیرفعال', s.deactivated], ['استعلام باز', s.quoteOpen], ['استعلام موفق', s.quoteWon], ['استعلام ناموفق', s.quoteLost]].map(([label, val]) => (
+            {[['کل تماس‌ها', s.total], ['شرکت‌ها', s.companies], ['در حال پیگیری', s.followUp], ['بی‌پاسخ', s.noAnswer], ['غیرفعال', s.deactivated], ['استعلام باز', s.quoteOpen], ['استعلام موفق', s.quoteWon], ['استعلام ناموفق', s.quoteLost]].map(([label, val]) => (
               <div className="crm-agent-profile-stat" key={label}>
                 <StatValue target={val} />
                 <div className="crm-agent-profile-stat-label">{label}</div>
@@ -113,7 +115,7 @@ export default function AgentProfileModal({ agent, records, onClose, onOpenRecor
               <div className="crm-agent-profile-stat-label">نرخ تبدیل سرنخ</div>
             </div>
             <div className="crm-agent-profile-stat crm-ring-stat">
-              <RingChart percent={s.quoteToSaleRate} size={60} stroke={7} />
+              {s.quoteTotal ? <RingChart percent={s.quoteToSaleRate} size={60} stroke={7} /> : <div style={{ height: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>—</div>}
               <div className="crm-agent-profile-stat-label">نرخ تبدیل استعلام به فروش</div>
             </div>
           </div>
@@ -141,7 +143,7 @@ export default function AgentProfileModal({ agent, records, onClose, onOpenRecor
                             {item.r.phone && <PhoneLink phone={item.r.phone} />}
                             {item.noStatus && <span className="crm-suggest-priority -high">بدون وضعیت</span>}
                             {item.isNoAnswer && <span className="crm-suggest-priority -high">تماس مجدد</span>}
-                            {item.r.priority && <span className={`crm-suggest-priority ${priorityClass(item.r.priority)}`}>{item.r.priority}</span>}
+                            <span className={`crm-suggest-priority ${TEMP_CLASS[item.temp]}`}>{tempLabel(item.temp)}</span>
                           </div>
                         </div>
                       ))}

@@ -42,13 +42,13 @@ export async function requireUser() {
 
 export async function requireAdmin() {
   const user = await requireUser();
-  if (user.role !== 'admin') throw new Error('FORBIDDEN');
+  if (user.role !== 'admin') throw Object.assign(new Error('VALIDATION: این عملیات فقط برای مدیر مجاز است'), { code: 'VALIDATION' });
   return user;
 }
 
 export async function requireElevated() {
   const user = await requireUser();
-  if (!isElevated(user)) throw new Error('FORBIDDEN');
+  if (!isElevated(user)) throw Object.assign(new Error('VALIDATION: دسترسی شما برای این عملیات کافی نیست'), { code: 'VALIDATION' });
   return user;
 }
 

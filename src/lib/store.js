@@ -1,9 +1,9 @@
 'use client';
 import {useSyncExternalStore, useMemo} from 'react';
 import Utils from './utils.js';
-import {SEED_DATA} from '../data/seed.js';
 import {toast, toastShownRecently} from '../components/ui/Toast.jsx';
 import {setAgentDirectory} from './filters.js';
+import {companyKey} from './companies.js';
 import {initLeadPrefsForUser, resetLeadPrefs} from './leadPrefs.js';
 import {
     addChangeLog as addChangeLogAction,
@@ -20,8 +20,14 @@ import {
     importRecords as importRecordsAction,
     loadAllData as loadAllDataAction,
     markReminderDone as markReminderDoneAction,
+    createLead as createLeadAction,
+    updateActivity as updateActivityAction,
+    deleteActivity as deleteActivityAction,
+    renameCompany as renameCompanyAction,
+    deleteCompany as deleteCompanyAction,
+    getNotifications,
     markNotificationRead as markNotificationReadAction,
-    resetToSeed as resetToSeedAction,
+    markAllNotificationsRead as markAllNotificationsReadAction,
     resolveQuote as resolveQuoteAction,
     syncNow as syncNowAction,
     updateLead as updateLeadAction,
@@ -61,16 +67,7 @@ function isUnauthorized(err) {
     return err && (err.message === 'UNAUTHORIZED' || err.message === 'FORBIDDEN');
 }
 
-export function custKey(company) {
-    return Utils.normSpace(company).toLowerCase();
-}
-
-export const EMPTY_RECORD_PATCH = {
-    name: null, phone: null, product: null, categoryId: null, source: null, date: null,
-    price: null, result: null, priority: null, notes: null, deactivateReason: null,
-    quotePrice: null, quotePriceType: null, quoteTerms: null, quotePriceDate: null,
-    quoteResult: null, quoteResultDate: null, quoteFailReason: null,
-};
+export const custKey = companyKey;
 
 function categoryNameById(id) {
     if (!id) return null;
@@ -84,7 +81,7 @@ function hydrateAllCategoryNames() {
 }
 
 function persist(rollback, actionFn) {
-    Promise.resolve()
+    return Promise.resolve()
         .then(actionFn)
         .then((res) => {
             if (res && res.queued) {
@@ -93,12 +90,14 @@ function persist(rollback, actionFn) {
                 emit();
                 if (!toastShownRecently(600)) toast('ذخیره آفلاین — بعد از اتصال همگام‌سازی می‌شود');
             }
+            return true;
         })
         .catch((err) => {
             rollback();
             emit();
-            if (isUnauthorized(err)) return redirectToLogin();
-            toast('ذخیره ناموفق: ' + (err && err.message ? err.message : 'خطا'));
+            if (isUnauthorized(err)) redirectToLogin();
+            else toast('ذخیره ناموفق: ' + (err && err.message ? err.message.replace(/^VALIDATION:\s*/, '') : 'خطا'));
+            return false;
         });
 }
 
@@ -195,13 +194,13 @@ export async function syncNow() {
     }
 }
 
-export function resetToSeed() {
+export function addRecord(rec) {
     const prev = state.records;
-    state.records = SEED_DATA.slice();
+    state.records = [{...rec, category: categoryNameById(rec.categoryId)}].concat(prev);
     emit();
-    persist(() => {
+    return persist(() => {
         state.records = prev;
-    }, () => resetToSeedAction());
+    }, () => createLeadAction(rec));
 }
 
 export function addRecords(newRecords) {
@@ -222,9 +221,69 @@ export function updateRecord(id, patch) {
         return merged;
     });
     emit();
-    persist(() => {
+    return persist(() => {
         state.records = prev;
     }, () => updateLeadAction(id, patch));
+}
+
+export function renameCompany(oldName, newName, author) {
+    const nm = Utils.normName(newName);
+    const oldKey = custKey(oldName);
+    const newKey = custKey(nm);
+    const prev = {records: state.records, meta: state.companyMeta, reminders: state.reminders, notifications: state.notifications};
+    state.records = prev.records.map((r) => (custKey(r.company) === oldKey ? {...r, company: nm} : r));
+    const ts = Date.now();
+    const entry = {id: 'chg-' + ts + '-' + Math.random().toString(36).slice(2, 6), ts, text: `نام شرکت از «${oldName}» به «${nm}» تغییر کرد`, author: author || null, type: 'change'};
+    const from = prev.meta[oldKey] || {comments: [], changeLog: []};
+    const to = oldKey === newKey ? from : (prev.meta[newKey] || {comments: [], changeLog: []});
+    const meta = {...prev.meta, [newKey]: {comments: oldKey === newKey ? from.comments : to.comments.concat(from.comments), changeLog: oldKey === newKey ? from.changeLog.concat([entry]) : to.changeLog.concat(from.changeLog, [entry])}};
+    if (oldKey !== newKey) delete meta[oldKey];
+    state.reminders = prev.reminders.map((rm) => (rm.custKey === oldKey ? {...rm, custKey: newKey, company: nm} : rm));
+    state.notifications = prev.notifications.map((n) => (n.custKey === oldKey ? {...n, custKey: newKey, company: nm} : n));
+    state.companyMeta = meta;
+    emit();
+    return persist(() => {
+        state.records = prev.records;
+        state.companyMeta = prev.meta;
+        state.reminders = prev.reminders;
+        state.notifications = prev.notifications;
+    }, () => renameCompanyAction(oldName, nm, {id: entry.id, companyKey: newKey, type: 'change', ts, author: entry.author, text: entry.text}));
+}
+
+export function deleteCompany(company) {
+    const key = custKey(company);
+    const prev = {records: state.records, meta: state.companyMeta, reminders: state.reminders, notifications: state.notifications};
+    state.records = prev.records.filter((r) => custKey(r.company) !== key);
+    const meta = {...prev.meta};
+    delete meta[key];
+    state.companyMeta = meta;
+    state.reminders = prev.reminders.filter((rm) => rm.custKey !== key);
+    state.notifications = prev.notifications.filter((n) => n.custKey !== key);
+    emit();
+    return persist(() => {
+        state.records = prev.records;
+        state.companyMeta = prev.meta;
+        state.reminders = prev.reminders;
+        state.notifications = prev.notifications;
+    }, () => deleteCompanyAction(company));
+}
+
+export function setCompanyTemperature(company, temp) {
+    const key = custKey(company);
+    const rows = state.records.filter((r) => custKey(r.company) === key);
+    if (!rows.length) return Promise.resolve(false);
+    const latest = rows.reduce((a, b) => ((Utils.parseDate(b.date) || 0) > (Utils.parseDate(a.date) || 0) ? b : a));
+    const targets = temp ? [latest] : rows.filter((r) => r.temperature);
+    if (!targets.length) return Promise.resolve(true);
+    const ids = new Set(targets.map((r) => r.id));
+    const prev = state.records;
+    state.records = prev.map((r) => (ids.has(r.id) ? {...r, temperature: temp || null} : r));
+    emit();
+    return persist(() => {
+        state.records = prev;
+    }, async () => {
+        for (const r of targets) await updateLeadAction(r.id, {temperature: temp || null});
+    });
 }
 
 export function deleteRecordWithLog(record) {
@@ -377,6 +436,28 @@ export function addComment(key, text, author) {
     );
 }
 
+export function updateComment(key, id, text) {
+    const prevMeta = state.companyMeta;
+    const meta = prevMeta[key];
+    if (!meta) return;
+    state.companyMeta = {...prevMeta, [key]: {comments: meta.comments.map((c) => (c.id === id ? {...c, text} : c)), changeLog: meta.changeLog}};
+    emit();
+    return persist(() => {
+        state.companyMeta = prevMeta;
+    }, () => updateActivityAction(id, {text}));
+}
+
+export function deleteComment(key, id) {
+    const prevMeta = state.companyMeta;
+    const meta = prevMeta[key];
+    if (!meta) return;
+    state.companyMeta = {...prevMeta, [key]: {comments: meta.comments.filter((c) => c.id !== id), changeLog: meta.changeLog}};
+    emit();
+    return persist(() => {
+        state.companyMeta = prevMeta;
+    }, () => deleteActivityAction(id));
+}
+
 export function getUnifiedFeed(key) {
     const meta = getCompanyMeta(key);
     return meta.comments.concat(meta.changeLog).sort((a, b) => b.ts - a.ts);
@@ -413,6 +494,24 @@ export function markReminderDone(id) {
     }, () => markReminderDoneAction(id));
 }
 
+export async function refreshNotifications() {
+    if (!state.currentUser) return;
+    let res;
+    try {
+        res = await getNotifications();
+    } catch {
+        return;
+    }
+    const fresh = res && res.notifications;
+    if (!Array.isArray(fresh)) return;
+    const readLocally = new Set(state.notifications.filter((n) => n.read).map((n) => n.id));
+    const next = fresh.map((n) => (readLocally.has(n.id) ? {...n, read: true} : n));
+    const same = next.length === state.notifications.length && next.every((n, i) => n.id === state.notifications[i].id && n.read === state.notifications[i].read);
+    if (same) return;
+    state.notifications = next;
+    emit();
+}
+
 export function markNotificationRead(id) {
     const prev = state.notifications;
     state.notifications = prev.map((n) => (n.id === id ? {...n, read: true} : n));
@@ -420,6 +519,15 @@ export function markNotificationRead(id) {
     persist(() => {
         state.notifications = prev;
     }, () => markNotificationReadAction(id));
+}
+
+export function markAllNotificationsRead() {
+    const prev = state.notifications;
+    state.notifications = prev.map((n) => ({...n, read: true}));
+    emit();
+    persist(() => {
+        state.notifications = prev;
+    }, () => markAllNotificationsReadAction());
 }
 
 export function addReminder(reminder) {
@@ -464,6 +572,21 @@ export function findLatestComment(companyMeta, records) {
     return {comment: latest, record: rec || null, companyLabel: rec ? rec.company : latestKey};
 }
 
+const scopedRecordsCache = new WeakMap();
+
+function scopeRecordsFor(records, agentCode) {
+    let byAgent = scopedRecordsCache.get(records);
+    if (!byAgent) scopedRecordsCache.set(records, (byAgent = new Map()));
+    let hit = byAgent.get(agentCode);
+    if (!hit) {
+        const ownedKeys = new Set();
+        for (const r of records) if (r.coordinator === agentCode) ownedKeys.add(custKey(r.company));
+        hit = {ownedKeys, records: records.filter((r) => r.coordinator === agentCode || ownedKeys.has(custKey(r.company)))};
+        byAgent.set(agentCode, hit);
+    }
+    return hit;
+}
+
 export function useScopedData() {
     const records = useStore((s) => s.records);
     const reminders = useStore((s) => s.reminders);
@@ -476,9 +599,7 @@ export function useScopedData() {
         if (!agentCode) {
             return {records, reminders, notifications, companyMeta, currentUser};
         }
-        const owned = records.filter((r) => r.coordinator === agentCode);
-        const ownedCompanyKeys = new Set(owned.map((r) => custKey(r.company)));
-        const scopedRecords = records.filter((r) => r.coordinator === agentCode || ownedCompanyKeys.has(custKey(r.company)));
+        const {ownedKeys: ownedCompanyKeys, records: scopedRecords} = scopeRecordsFor(records, agentCode);
         const scopedReminders = reminders.filter((rm) => rm.forAgent === agentCode || (rm.custKey && ownedCompanyKeys.has(rm.custKey)));
         const scopedMeta = {};
         for (const r of scopedRecords) {

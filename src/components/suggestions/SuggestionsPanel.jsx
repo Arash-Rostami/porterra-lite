@@ -1,25 +1,28 @@
 'use client';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Dropdown from '../ui/Dropdown.jsx';
 import { paginate } from '../ui/Pagination.jsx';
-import { filterAgentSuggestions, sortSuggestions, exportSuggestionsToExcel, SUGGESTION_SORT_MODES } from '../../lib/suggestions.js';
+import { filterAgentSuggestions, sortSuggestions, exportSuggestionsToExcel, SUGGESTION_SORT_MODES, SUGGESTION_DAILY_CAP } from '../../lib/suggestions.js';
 import { agentColor } from '../../lib/analytics.js';
-import { coordLabel } from '../../lib/filters.js';
+import { coordLabel, TEMP_OPTS } from '../../lib/filters.js';
 import { useStore } from '../../lib/store.js';
 import { toast } from '../ui/Toast.jsx';
 import PhoneLink from '../ui/PhoneLink.jsx';
 import { DownloadIcon, TrashIcon, InfoIcon } from '../ui/Icon.jsx';
 
-const priorityClass = (p) => (p === 'بالا' ? '-high' : p === 'متوسط' ? '-mid' : '-low');
+const TEMP_CLASS = { hot: '-high', warm: '-mid', cold: '-low' };
+const tempLabel = (v) => (TEMP_OPTS.find((t) => t.value === v) || {}).label || '';
 const emptyAgentFilter = { category: '', product: '', search: '' };
 const PAGE_SIZE_OPTS = ['6', '10', '20', '50'];
 
-function AgentCard({ agent, pool, sortMode, categoryOpts, productOpts, onOpenProfile }) {
+function AgentCard({ agent, pool, cap, sortMode, categoryOpts, productOpts, onOpenProfile }) {
   const [f, setF] = useState(emptyAgentFilter);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(6);
-  const { filtered } = filterAgentSuggestions(pool, f);
-  const sorted = sortSuggestions(filtered, sortMode);
+  const { filtered, sorted } = useMemo(() => {
+    const { filtered: matching } = filterAgentSuggestions(pool, f);
+    return { filtered: matching, sorted: sortSuggestions(matching, sortMode).slice(0, cap) };
+  }, [pool, f, sortMode, cap]);
 
   const { pageItems, totalPages, safePage } = paginate(sorted, page, perPage);
 
@@ -38,7 +41,7 @@ function AgentCard({ agent, pool, sortMode, categoryOpts, productOpts, onOpenPro
         <span className="crm-suggest-agent-dot" style={{ background: agentColor(agent) }}></span>
         <span className="crm-suggest-agent-name">{coordLabel(agent)}</span>
         <span className="crm-suggest-count">
-          {sorted.length.toLocaleString('en-US')} مورد{sorted.length !== pool.length ? ` (از ${pool.length.toLocaleString('en-US')})` : ''}
+          {sorted.length.toLocaleString('en-US')} مورد{filtered.length > sorted.length ? ` — ${filtered.length.toLocaleString('en-US')} در کل` : ''}{filtered.length !== pool.length ? ` (فیلتر از ${pool.length.toLocaleString('en-US')})` : ''}
         </span>
       </div>
       <div className="crm-suggest-card-search">
@@ -55,7 +58,7 @@ function AgentCard({ agent, pool, sortMode, categoryOpts, productOpts, onOpenPro
         ) : pageItems.map((item) => (
           <div className="crm-suggest-item" key={item.r.id}>
             <div className="crm-suggest-item-top">
-              <span className="crm-suggest-company" title="ثبت تماس با این سرنخ" onClick={() => onOpenProfile(item.r.id, true)}>{item.r.company || '-'}</span>
+              <span className="crm-suggest-company" role="button" tabIndex={0} title="ثبت تماس با این سرنخ" onClick={() => onOpenProfile(item.r.id, true)} onKeyDown={(e) => { if (e.key === 'Enter') onOpenProfile(item.r.id, true); }}>{item.r.company || '-'}</span>
               <span className="crm-suggest-days">{item.days.toLocaleString('en-US')} روز پیش</span>
             </div>
             <div className="crm-suggest-meta">
@@ -63,7 +66,8 @@ function AgentCard({ agent, pool, sortMode, categoryOpts, productOpts, onOpenPro
               {item.r.phone && <PhoneLink phone={item.r.phone} />}
               {item.noStatus && <span className="crm-suggest-priority -high">بدون وضعیت</span>}
               {item.isNoAnswer && <span className="crm-suggest-priority -high">تماس مجدد</span>}
-              {item.r.priority && <span className={`crm-suggest-priority ${priorityClass(item.r.priority)}`}>{item.r.priority}</span>}
+              {item.phoneBad && <span className="crm-suggest-priority -mid">شماره ناقص</span>}
+              <span className={`crm-suggest-priority ${TEMP_CLASS[item.temp]}`}>{tempLabel(item.temp)}</span>
             </div>
           </div>
         ))}
@@ -85,12 +89,14 @@ function AgentCard({ agent, pool, sortMode, categoryOpts, productOpts, onOpenPro
   );
 }
 
-export default function SuggestionsPanel({ byAgent, onOpenProfile }) {
-  const agents = Object.keys(byAgent).sort((a, b) => byAgent[b].length - byAgent[a].length);
+export default function SuggestionsPanel({ byAgent, showAll, onToggleAll, onOpenProfile }) {
+  const agents = useMemo(() => Object.keys(byAgent).sort((a, b) => byAgent[b].length - byAgent[a].length), [byAgent]);
+  const fullTotal = agents.reduce((sum, a) => sum + byAgent[a].length, 0);
+  const hasMore = agents.some((a) => byAgent[a].length > SUGGESTION_DAILY_CAP);
   const categories = useStore((s) => s.categories);
   const products = useStore((s) => s.products);
-  const categoryOpts = categories.map((c) => c.name).sort((a, b) => a.localeCompare(b));
-  const productOpts = products.map((p) => p.name).sort((a, b) => a.localeCompare(b));
+  const categoryOpts = useMemo(() => categories.map((c) => c.name).sort((a, b) => a.localeCompare(b)), [categories]);
+  const productOpts = useMemo(() => products.map((p) => p.name).sort((a, b) => a.localeCompare(b)), [products]);
   const [sortMode, setSortMode] = useState('smart');
   const [legendOpen, setLegendOpen] = useState(false);
 
@@ -112,21 +118,27 @@ export default function SuggestionsPanel({ byAgent, onOpenProfile }) {
               <button key={m.key} type="button" className={`crm-sort-toggle${sortMode === m.key ? ' -active' : ''}`} onClick={() => setSortMode(m.key)}>{m.label}</button>
             ))}
           </div>
+          {hasMore && (
+            <div className="crm-sort-toggle-group">
+              <button type="button" className={`crm-sort-toggle${showAll ? ' -active' : ''}`} onClick={onToggleAll}>
+                {showAll ? `فقط ${SUGGESTION_DAILY_CAP} مورد اول هر کارشناس` : `نمایش همه (${fullTotal.toLocaleString('en-US')})`}
+              </button>
+            </div>
+          )}
           <button type="button" className="crm-suggest-legend-btn" onClick={() => setLegendOpen((o) => !o)}><InfoIcon />توضیح ترتیب</button>
         </div>
       )}
       {legendOpen && (
         <div className="crm-suggest-legend">
-          {sortMode === 'smart' && 'هوشمند: بر اساس مجموع امتیاز وضعیت (بدون پاسخ/بدون وضعیت) + اولویت + مدت زمان از آخرین تماس + ارزش معامله + نرخ تبدیل تاریخی منبع سرنخ — بالاترین امتیاز اول نمایش داده می‌شود.'}
+          {sortMode === 'smart' && `هوشمند: اول سرنخ‌های داغ، بعد گرم و سرد؛ در هر گروه ابتدا بی‌پاسخ‌ها و بعد قدیمی‌ترین تماس. هر کارشناس در هر روز ${SUGGESTION_DAILY_CAP} مورد اول را می‌بیند و با «نمایش همه» بقیه هم نمایش داده می‌شود.`}
           {sortMode === 'days' && 'قدیمی‌ترین تماس: سرنخ‌هایی که بیشترین زمان از آخرین تماس با آن‌ها گذشته، اول نمایش داده می‌شوند.'}
-          {sortMode === 'value' && 'بیشترین ارزش معامله: سرنخ‌هایی که بالاترین آخرین قیمت اعلامی را دارند، اول نمایش داده می‌شوند.'}
         </div>
       )}
       {!agents.length ? (
         <div className="crm-suggest-empty">فعلاً پیشنهاد تماسی نیست — همه پیگیری‌ها به‌روزن 🎉</div>
       ) : (
         <div className="crm-suggest-grid">
-          {agents.map((agent) => <AgentCard key={agent} agent={agent} pool={byAgent[agent]} sortMode={sortMode} categoryOpts={categoryOpts} productOpts={productOpts} onOpenProfile={onOpenProfile} />)}
+          {agents.map((agent) => <AgentCard key={agent} agent={agent} pool={byAgent[agent]} cap={showAll ? Infinity : SUGGESTION_DAILY_CAP} sortMode={sortMode} categoryOpts={categoryOpts} productOpts={productOpts} onOpenProfile={onOpenProfile} />)}
         </div>
       )}
     </div>

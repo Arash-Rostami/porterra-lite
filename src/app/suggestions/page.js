@@ -1,4 +1,5 @@
 'use client';
+import { useState, useMemo } from 'react';
 import { ReminderBanner, CommentBanner } from '../../components/suggestions/ReminderBanner.jsx';
 import RemindersList from '../../components/suggestions/RemindersList.jsx';
 import SuggestionsPanel from '../../components/suggestions/SuggestionsPanel.jsx';
@@ -9,7 +10,8 @@ import { toast } from '../../components/ui/Toast.jsx';
 
 export default function SuggestionsPage() {
     const { records, reminders, companyMeta } = useScopedData();
-    const byAgent = computeSuggestions(records);
+    const [showAll, setShowAll] = useState(false);
+    const byAgent = useMemo(() => computeSuggestions(records), [records]);
 
     function handleMarkDone(id) {
         markReminderDone(id);
@@ -21,7 +23,7 @@ export default function SuggestionsPage() {
             <ReminderBanner byAgent={byAgent} />
             <CommentBanner companyMeta={companyMeta} records={records} onOpenProfile={openProfile} />
             <RemindersList reminders={reminders} records={records} onMarkDone={handleMarkDone} onOpenProfile={openProfile} />
-            <SuggestionsPanel byAgent={byAgent} onOpenProfile={openProfile} />
+            <SuggestionsPanel byAgent={byAgent} showAll={showAll} onToggleAll={() => setShowAll((v) => !v)} onOpenProfile={openProfile} />
         </div>
     );
 }

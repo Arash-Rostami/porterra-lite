@@ -28,8 +28,13 @@ Persian (`۰-۹`) and Arabic-Indic (`٠-٩`) digits to Latin, preserves a leadin
 non-dial chars; `PhoneLink` (`src/components/ui/PhoneLink.jsx`) uses it to build `tel:`
 URIs for read-only phone displays (agent suggestions, suggestions panel, report preview
 phone column) — phone edit inputs stay plain `<input>`.
+`normName(s)` is the **identity normalizer**: `normSpace` plus only ي/ى→ی and ك→ک — exactly the
+fold the production data migration applied to company names, so a typed name matches stored keys.
+`recipientKey(user)` (`agentCode`, else `username`) is the one rule for whom a notification
+belongs to. `phoneDigits(s)` / `isPhoneOk(s)` (empty is OK; otherwise ≥10 digits) back phone validation.
 `normText(s)` is the **search-comparison normalizer**: lowercases, maps Arabic Yeh/Alef-Maksura
-(`ي`/`ى`) and Arabic Kaf (`ك`) to their Persian forms (`ی`/`ک`), converts Persian/Arabic-Indic
+(`ي`/`ى`) and Arabic Kaf (`ك`) to their Persian forms (`ی`/`ک`), folds `أإآ`→`ا`, `ةۀ`→`ه`, `ؤ`→`و`,
+`ئ`→`ی`, drops tatweel and Arabic diacritics, converts Persian/Arabic-Indic
 digits to Latin, strips ZWNJ/LRM/RLM to a space, then collapses whitespace — so text typed on one
 keyboard layout still substring-matches data entered on another even though both render
 identically. Every free-text search comparison in the app routes both the query and the compared
@@ -39,13 +44,13 @@ plus the search boxes in `AgentProfileModal`, `AgentReport`, `AgentsPanel`, `Cat
 identity/grouping, not search, and stays on `normSpace`), `QuotesPanel`, `ProductsPanel`,
 `UsersPanel`, and `CompanySuggest` (`ui/`). If you add a new search input, normalize through this,
 not a local `.toLowerCase()`. Deliberately **not** applied to identity/dedup keys (`custKey` in
-`store.js`, `duplicates.js`, `excel.js`'s import matching, `queries.js`'s department dedup) — those
+`store.js` — an alias of `companyKey` (normName + lower), as are `duplicates.js`, `excel.js`'s import matching and `CompanyReport`'s grouping — plus `queries.js`'s department dedup) — those
 compare for exact record/company identity, a different concern from fuzzy search, and stay on
 `normSpace` only.
 
 ### `filters.js`
 - Also holds the app's shared enum constants (`COORD_OPTS`, `RESULT_OPTS`, `STATUS_OPTS`,
-  `PRIORITY_OPTS`, `PRICE_TYPE_OPTS`) — these used to be duplicated per-component; this file
+  `PRICE_TYPE_OPTS`) — these used to be duplicated per-component; this file
   already owned `COORD_LABELS` so the rest of the label/option vocabulary lives beside it instead
   of a separate constants module. `COMMENT_AUTHORS` was removed; its replacement `commentAuthors()`
   was later removed too once `LeadProfileModal` stopped using an author dropdown (the comment/
@@ -82,10 +87,11 @@ compare for exact record/company identity, a different concern from fuzzy search
   derive from `r.coordinator`), and analytics (auto HSL color via `agentColor()`). `COORD_OPTS`/
   `COORD_LABELS`/`coordClass`/`AGENT_COLORS` remain as intentional legacy fallback/color logic —
   same precedent as `badgeClass`/`catColors` below — not dead code.
-- `SOURCE_OPTS` is now a **seed/fallback only** — lead source forms (`AddLeadForm`,
-  `LeadProfileModal` edit + quick-call) use a free-text `<input className="crm-input"
-  list="...">` + a native `<datalist>` of suggestions from `sourceSuggestions(records)`
-  (the 8 `SOURCE_OPTS` defaults ∪ distinct `Utils.normSpace(r.source)` from records,
+- `SOURCE_OPTS` is the **fixed list for non-elevated roles**: for agents/managers the lead source
+  forms (`AddLeadForm`, `LeadProfileModal` edit + quick-call) show a `Dropdown` over `SOURCE_OPTS`, and
+  `POST /api/leads` rejects anything else; for admin/developer they use a free-text `<input
+  className="crm-input" list="...">` + a native `<datalist>` of suggestions from `sourceSuggestions(records)`
+  (the 9 `SOURCE_OPTS` defaults ∪ distinct `Utils.normSpace(r.source)` from records,
   memoized per form); the source filter dropdowns (`LeadFilters`, `ReportBuilder`) use the
   data-driven `opts.sources` from `filterOptionsFrom(records)` instead of `SOURCE_OPTS`.
   Adding a source = type it on a lead once and save; it then appears in every form's
@@ -119,10 +125,17 @@ compare for exact record/company identity, a different concern from fuzzy search
   "همه وضعیت‌ها" (no status filter) exactly like any other status; the old always-hide-unless-
   checkbox behavior (`filters.showDeactivated`) was removed, and the "نمایش غیرفعال‌ها" checkbox
   in `LeadFilters` is gone. Filter to only deactivated leads via `filters.status === 'غیرفعال'`.
-- `smartSearch(records, query)` — multi-token, scored, OR-across-fields search (company,
-  name, phone, notes, product, category, source, coordinator-label). Not a filter — returns
-  every record with `score >= 1` sorted by score. This is intentionally permissive (feels
-  like "fuzzy" search) rather than an AND-all-tokens filter.
+- `smartSearch(records, query)` — multi-token search over `searchHay(r)` (company, name, phone
+  + phone digits, notes, product, category, source, coordinator code + label, all through
+  `Utils.normText`, cached per record in a `WeakMap`; rows from `companyRows` carry a ready
+  `hay`). **Every token must match** (AND, tokens may sit in different fields); `score` is 2 when
+  the whole phrase appears contiguously, else 1, and results sort by score. The old
+  any-token (OR) behavior returned 83 unrelated hits for a 3-word query — don't restore it.
+  `getFiltered` also honors `filters.temp` (matches `r.temp`) and uses `r.status` when a row
+  carries one (company rows), else `effectiveResult(r)`; date sorts decorate once instead of
+  re-parsing per comparison. Also exports `SOURCE_OPTS` (9 production values, `'سایر'` last),
+  `OTHER_SOURCES_LABEL` (`'سایر منابع'`, the chart "rest" bucket — distinct from the real
+  source `'سایر'`) and `TEMP_OPTS`.
 - `textFilter(items, query, fieldsFn)` — the shared single-substring search filter every
   simple panel/report search box uses instead of hand-rolling `.toLowerCase().includes()`:
   normalizes `query` via `Utils.normText` once, keeps items where `fieldsFn(item)` yields at
@@ -164,25 +177,60 @@ compare for exact record/company identity, a different concern from fuzzy search
   topSet}`. This is a *separate* filter dimension from `filters.category`/`filters.source` — see
   the `uiStore.js` note below for the rule about keeping them mutually exclusive.
 
+### `companies.js`
+The one shared source for "lead", "customer" and "call" — new, not a prototype port. A company is
+the group of rows sharing `companyKey(name)` (`Utils.normName` + lowercase). `companies(records)`
+builds `{key,name,records(newest first),last,calls,answered,isCustomer,won,lost,openQuotes,priced,
+tempManual,lastTs,days,temp}` (plus a **lazy** `hay` — the search text of all the company's calls —
+built on first use by `companyHay(c)`; `companyRows(records, callFilters, segment, withHay = false)` and
+`leadList` ask for it, `summarize` and the header chip do not, so the first paint stays cheap;
+`TEMP_RULES` is internal) once per records-array identity (`WeakMap`; the store always
+replaces the array, never mutates it). **Customer** = any row with `converted` or
+`quoteResult === 'موفق'`; **lead** = any other company; **call** = a row with a date, result or
+notes (`isCall`). `temp` follows `TEMP_RULES` in this order: manual `temperature` override →
+open inquiry = hot → `days >= coldDays` = cold → priced non-lost quote or `answered >= hotAnswered`
+= hot → `answered >= warmAnswered` = warm → cold (`answered` = calls whose effective result is not
+`'بی‌پاسخ'`). `companyRows(records, callFilters, segment)` returns one **representative row**
+per company (spread of its latest matching call plus `key,calls,won,inquiries,isCustomer,temp,
+tempManual,status,hay`; built once per company and reused when unfiltered; `hay` is the search
+text of **all** the company's matching calls, so a phone/product/note that sits only in an older
+call is still found; dropdown filters see only the representative row) so `getFiltered`, sort,
+export and `openProfile(row.id)` work unchanged. `callFilters = {coordinator,dateFrom,dateTo}` are
+applied per call through `callMatcher` (a company appears if it has a matching call; `segment` is
+`'lead'|'customer'|undefined`). `leadList(records, filters, segment, chartFilter, sort)` is the
+single query behind lists and counts; a chart `month`/`day` drill-down is folded into the **call filters**
+(not applied to the representative row), so a bar's number equals the list it opens (verified: busiest
+month 323 = 323, busiest day 111 = 111, day+agent 106 = 106) — only `otherSource` stays a row filter. Must stay free of `'use client'` and must not import
+`store.js`/`uiStore.js`.
+
+**Caches that must keep sharing identity** (all `WeakMap`s keyed by the store's records array, which is
+replaced on every mutation so they die with it): `companies()`, `computeSuggestions()`, and
+`store.js`'s `scopeRecordsFor(records, agentCode)` (so every `useScopedData()` caller of an agent gets the
+SAME scoped array and therefore the same company cache). `companyKey` itself memoizes by input string
+(a bounded `Map`, cleared at 20k entries) — about 15× faster for the per-row key calls scattered through
+the app. Never pass a freshly filtered copy of records into these functions.
+
 ### `suggestions.js`
-`computeSuggestions(records)` — the "who to call today" engine, grouped by agent. Algorithm
-(exact order, don't reorder):
-1. Reduce to **one record per customer** — the most recent by date. Older records for the
-   same company are ignored entirely, even if they were never actioned.
-2. Skip if `converted`, `result === 'غیرفعال'`, or `result === 'در حال استعلام'` (deactivated leads
-   and open quotes are handled by their own surfaces — the deactivated list and the Inquiry Panel —
-   not by call suggestions).
-3. Skip if the latest contact date is today or in the future (`days <= 0`).
-4. `noStatus = !effectiveResult` → priority rank 3 (highest), overriding `record.priority`.
-5. `isNoAnswer = effectiveResult === 'بی‌پاسخ'` → always surfaced regardless of days elapsed.
-6. Everything else (e.g. "در حال پیگیری") only surfaces once `days >= 3` OR priority rank 3.
-`filterAgentSuggestions` applies the optional per-agent category/product/search UI filters
-on top of the computed pool and returns the sorted `filtered` list; `SuggestionsPanel.jsx`
-paginates it client-side (same pagination pattern as `LeadTable.jsx`/`AgentProfileModal.jsx`)
-rather than the function itself capping the visible count.
+`computeSuggestions(records)` — the "who to call today" engine, grouped by agent. Deliberately
+**no longer** the prototype's scoring algorithm (priority/price/recency score removed — spec U8);
+now: one item per company (`companies()`'s `last` call); skip customers, `'غیرفعال'` and
+`'در حال استعلام'` effective results, and `days <= 0`; order by temperature (hot→warm→cold), then
+no-answer first, then oldest contact, then missing/short phones last. It returns the **full**
+ordered lists, each item `{r,days,temp,isNoAnswer,noStatus,phoneBad,hay}`. The daily cap
+(`SUGGESTION_DAILY_CAP`, 30 per agent) is a pure display limit applied **after** the panel's
+filters: `SuggestionsPanel` receives the full lists and slices each card to the cap unless the
+«نمایش همه» toggle is on, so search/category/product filters always run over the whole pool and
+`ReminderBanner`, the agent profile and the Excel export see the real workload.
+`summarizeSuggestions` returns `{total,noAnswer,hot}`;
+`SUGGESTION_SORT_MODES` is just `smart` (as computed) and `days`.
+`filterAgentSuggestions` applies the optional per-agent category/product filters plus an
+AND-of-tokens search over the item's `hay` (company-wide search text) and returns the
+`filtered` list; `SuggestionsPanel.jsx` caps then paginates it client-side (same pagination
+pattern as `LeadTable.jsx`/`AgentProfileModal.jsx`).
 
 ### `duplicates.js`
-`findDuplicateCompany` — exact match after `normSpace().toLowerCase()`. `findDuplicatePhone`
+`findDuplicateCompany` — exact match on `companyKey` (`normName` + lowercase, the same key the whole
+app uses). `findDuplicatePhone`
 — compares the **last 8 digits** after stripping non-digits, to tolerate `0912…` vs
 `+98912…` formats. Both sides now route through `Utils.normalizePhone` so Persian/Arabic-digit
 phones are detected (the old `.replace(/\D/g,'')` silently dropped them). Both are
@@ -192,19 +240,23 @@ behavior change, not a bug fix.
 
 ### `analytics.js`
 Pure "compute metrics from records" — folded `kpis.js` + `chartData.js` + `agentStats.js`
-into one file. `computeKpis` — 6 fixed cards matching the quote-model status set: total
-records, `converted` count, open-quote count (`isQuoteOpen`), `'غیرفعال'` count, `'در حال
-پیگیری'` count, `effectiveResult === 'بی‌پاسخ'` count. `tally()` (private) buckets every
-record into exactly one of `noAnswer`/`deactivated`/`followUp`/`quoteOpen`/`quoteWon`/
-`quoteLost` via `effectiveResult`, then branches into the quote sub-states by `r.quoteResult`
-when `effectiveResult === 'در حال استعلام'` — **never** compares `effectiveResult` against
-`'موفق'`/`'ناموفق'` directly, since `result` can't hold those values (see `filters.js`).
-`computeAgentReport` — per-agent totals across all records; `computeAgentStats` — same tally
-for one agent with an optional date range (agent profile modal). `agentColor` — 3 hardcoded
+into one file. Every count is **company-level** and comes from `summarize(records, callFilters?)`
+(built on `companyRows`, see `companies.js`): `{companies,leads,customers,followUp,inInquiry,
+noAnswer,deactivated,noStatus,hot,warm,cold,calls,inquiryCompanies (companies with a quote row among the
+**filtered** calls),quoteOpen,quoteWon,quoteLost,
+quoteTotal,leadConversionRate,quoteToSaleRate}`. Lead statuses use each company's latest call's
+`effectiveResult`, so status counts sum to `leads` and `leads + customers = companies`. Quote
+tallies are call-level and key on `r.quoteResult` first (`'موفق'`/`'ناموفق'`), open = `isQuoteOpen`
+— **never** compares `effectiveResult` against `'موفق'`/`'ناموفق'`, since `result` can't hold
+them (see `filters.js`). `quoteToSaleRate` = won/(won+lost+open), `0` when `quoteTotal` is 0 (UI
+shows "—" from `quoteTotal`). `computeKpis(records, callFilters?)` — 6 cards (leads, customers,
+open inquiries, deactivated, in follow-up, no answer), each with `target:{href,filters}` so the
+click opens a list whose count equals the card. `computeAgentReport` / `computeAgentStats` (adds
+`recs`, the agent's matching calls, for the profile modal) wrap `summarize` per agent: `total` is
+the call count, `converted` = customers. `agentColor` — 3 hardcoded
 brand colors for FARNAZ/PARDIS/ZOHREH, falls back to a deterministic HSL hash for any other
-coordinator. `computeFunnelStages` returns `{stages, leadConversionRate, quoteToSaleRate}` —
-3 stages (total leads → open+resolved quotes → `converted` count) plus the two conversion
-rates the quote-model spec calls for, replacing the old 4-stage "price-field-truthy" funnel.
+coordinator. `computeFunnelStages` returns `{stages, leadConversionRate, quoteToSaleRate,
+quoteTotal}` — 4 stages (companies → in follow-up → companies with an inquiry → customers).
 `computeTrendData`/`computeDailyAgentData`/`computeCategoryData`/`computeSourceData` — pure
 data-prep for the dashboard charts (no Chart.js objects here — components own the `Chart`
 instance). `computeDailyAgentData`'s outlier cap (`cap = max(15, min(40, p75*3))`) exists so
@@ -220,10 +272,27 @@ the original's separation of "read the file" from "what happens on import." `par
 deliberately doesn't resolve the raw `category` text to a `categoryId` itself (it has no
 access to the live `categories` list) — `resolveImportCategoryIds(records, categories)` does
 that afterward, applying the same chemical/polymer alias mapping as the categories migration
-(`Polymer`/`Petrochemical`/`Chemical` → the `Chemical/Polymer` category). The leads
-export (`src/app/leads/page.js` `handleExport`) passes
-`getFiltered(records, filters, chartFilter)` into `exportToExcel`, so export respects the
-active filter + chart drill-down, not the raw scoped set.
+(`Polymer`/`Petrochemical`/`Chemical` → the `Chemical/Polymer` category). The leads and customers
+exports pass `leadList(allRecords, filters, segment, chartFilter)` into `exportToExcel`, so an
+export is one row per **company** and respects the active filter + chart drill-down (columns
+include «دما» and «تعداد تماس»; price/priority are gone). **`xlsx` is loaded with a dynamic
+`import('xlsx')` inside every export/import function** (`exportToExcel`, `exportProductsToExcel`,
+`downloadImportTemplate`, `parseImportFile` are all `async` now) so the library no longer ships in
+the `/leads`/`/customers` bundles — callers must `await` them. Excel **import stays lenient**
+(`addRecords` → `/api/leads/import`); the add form and quick call use the strict `addRecord` →
+`POST /api/leads` instead.
+
+### `calendarEvents.js`, `productStats.js` — pure data-prep for `/calendar` and the company report
+`calendarEvents.js`: `buildDayIndex(records, reminders, agent)` → `Map<'yyyy-mm-dd', {reminders, calls}>`
+(undone reminders by `dueDate`; calls = `isCall` rows by their `dd.mm.yyyy` date, both filtered through
+`matchesFilter` on the agent), `periodOf(cursor, view, jalali)` (month = whole weeks starting Saturday;
+week; day), `stepCursor`, `cellLabel`, `monthKeyOf`, `isoOf` (local-time ISO — never `toISOString`, which
+shifts the day); call dates with a 2-digit year or no zero padding are normalized to the same key. Verified: 1 Aban 1405 = 23 Oct 2026, Esfand→Farvardin rolls the year.
+`productStats.js`: `contacts.product` is free text (often a list), so `makeProductMatcher(names)` finds the
+known product names inside it (token-boundary match on `normText`, longest name first and removed once
+matched, so «TEXTILE PET» is not also counted as «PET»); no match → `UNKNOWN_PRODUCT` («نامشخص», ~17% of
+production calls). `productStats(records, names)` → `{byCompany: Map<companyKey, {product: calls}>,
+total}` over `isCall` rows; `productColor(name)` is the same deterministic HSL hash as `agentColor`.
 
 ### `calendar.js`
 Jalali/Persian date conversion. Exports `JALALI_MONTHS`, `FA_MONTHS` (Persian month names for
@@ -293,24 +362,21 @@ reminder-creation paths — a reminder created from this tab now leaves the same
 surface already does. If you add a fourth reminder-creation surface anywhere, pair
 `addReminder` with both of these — never one alone.
 
-`EMPTY_RECORD_PATCH` (beside `custKey`) — a `patch` object nulling every lead field except
-`id`/`company`/`coordinator`/`converted`. Used instead of `deleteRecordWithLog` when a
-delete would remove a company's LAST remaining `contacts` row: since a company only exists
-in this app because it has ≥1 row there, deleting the last one made the company vanish from
-every list. `updateRecord(id, EMPTY_RECORD_PATCH)` blanks the row's call-specific fields
-in place instead — the row (and thus the company) survives, `contact_date` (the STORED
-GENERATED column) auto-recomputes to `NULL` with no special handling needed. Verified
-against the live dev DB and the real `LeadUpdate` Zod schema before shipping (both nullable
-except the 4 excluded fields, `LeadUpdate`'s `requireDeactivateReason` refine only fires
-when `result === 'غیرفعال'`, so `result: null` never trips it). Consumers: `LeadProfileModal.jsx`'s
-`handleDelete` (its `records` prop is already the full unscoped set from `AppShell.jsx`, so
-no extra fix needed there), `src/app/leads/page.js` and `src/app/customers/page.js`'s own
-independent `handleDelete` (each page's `records` IS pre-narrowed by `converted` before
-reaching the handler, so both compute the "is this the last record" check against the
-FULL `useScopedData().records` — call it `allRecords` — not the page's narrowed `records`,
-to avoid a false "last record" positive when the same company has a record on the other
-page). If you add a fourth delete entry point, follow the same `allRecords`-not-`records`
-rule.
+**Deleting a company's last call deletes the company.** The old `EMPTY_RECORD_PATCH` blanking
+(which left ghost companies in every list) is gone. `deleteCompany(company)` removes the company's
+rows, activity (comments/changelog), reminders and notifications locally and on the server
+(`DELETE /api/companies`, op `deleteCompany`); the three delete entry points (`LeadProfileModal.jsx`'s
+`handleDelete`, `src/app/leads/page.js`, `src/app/customers/page.js`) confirm first and use it when no
+other row of the company remains. Each page's `records` IS pre-narrowed by `converted`, so the "is this
+the last record" check and the `find` of the clicked row use the FULL `useScopedData().records` —
+call it `allRecords` — never the page's narrowed `records`. A fourth delete entry point must follow
+the same `allRecords`-not-`records` rule.
+**Renaming a company** is `renameCompany(oldName, newName, author)` (`PATCH /api/companies`, op
+`renameCompany`): one transaction updates `contacts.company`, `customer_activity.company_key`, and
+`reminders`/`notifications` `cust_key`+`company`, and writes a changelog entry on the new key, so a
+rename can no longer split a company's history. Renaming onto an existing company **merges** them
+(elevated roles only; `LeadProfileModal` asks for confirmation, an agent gets a toast). The modal's
+save calls `renameCompany` and omits `company` from the row patch.
 Client singleton holding `records`/`companyMeta`/`reminders`/`currentUser`, backed by
 **MySQL via the REST API in `src/app/api/*` (client `apiClient.js` → server `serverOps.js`)** —
 the prototype's `window.storage` is gone, and the former `src/app/actions.js` Server Actions
@@ -318,7 +384,8 @@ layer is gone too (replaced wholesale by the API). `loadAll()` calls `loadAllDat
 (guarded against re-entry) and stashes
 `currentUser`; mutations go through `persist(rollback, actionFn)`, which applies the change
 optimistically and rolls back on failure, redirecting to `/login` on `UNAUTHORIZED`/`FORBIDDEN`.
-`logout()` clears state and redirects. `custKey` (company normalization) lives here rather than
+`logout()` clears state and redirects. `custKey` is `companyKey` re-exported from `companies.js`
+(`normName` + lowercase, so Arabic/Persian letter variants are one key); it lives here rather than
 `filters.js` only because it's needed to key `companyMeta`/reminders — anything else needing a
 company key should import it from here. **The real access-control boundary is server-side now**
 (see `auth.js`/`serverOps.js`/`queries.js` below: `resolveScope(user)` + `scopeBootData()`, plus
@@ -335,10 +402,11 @@ only change what an agent sees by default, not what they're allowed to fetch. Th
 user-facing toggle to opt out of it; the removed "همه" (all) option in `UserMenu.jsx` predates
 real server-side scoping and was dropped as a false sense of control back when it was the only
 scoping that existed.
-`resetToSeed()` mirrors the prototype's "بازگشت به داده
-اولیه" footer button (admin-only server-side now). `src/data/seed.js` is legacy — seed data
-still uses the old `category` name shape, so a reset yields leads with `NULL` `category_id`.
-Acceptable because it's an admin-only "wipe to initial data" path, unused on the production DB.
+The prototype's "بازگشت به داده اولیه" reset (`resetToSeed`, `/api/admin/reset`, `resetData`,
+`reseedLeads`, `src/data/seed.js`) was **removed entirely** — on the shared production DB it could
+wipe everyone's data, and it also dragged the whole seed file into every page's client bundle.
+`markAllNotificationsRead()` marks all of the caller's own notifications read (per-recipient).
+`refreshNotifications()` (polled every 60 s by `NotificationsBell`, skipped when the tab is hidden) swaps in the server's list without a re-render when nothing changed, and keeps anything already marked read locally.
 `syncNow()` replays the offline queue and
 swaps in the fresh server data.
 
@@ -347,8 +415,10 @@ primary** and only falls back to the disk `snapshot.json` when the DB is unreach
 (`isConnError`) — disk is the emergency path, not the default. It runs **once per app open**
 (guarded by `state.loaded`/`state.loading`); there is **no full reload per edit** — mutations
 are optimistic and the in-memory store is the UI's source of truth, so a normal edit is ~2 DB
-round-trips (the `getUserById` auth re-validation + the one write). No polling/interval runs
-while online (the 20s `syncNow` timer in `AppShell` fires only while `offline === true`).
+round-trips (the `getUserById` auth re-validation + the one write). No sync polling runs
+while online (the 20s `syncNow` timer in `AppShell` fires only while `offline === true`); the only
+online interval is the `/messages` visible-tab message poll (`MessengerPanel`, 20 s), which never
+touches the store or the boot payload.
 `snapshot.json` is rewritten after every successful load/sync, so a slightly-stale full copy of
 `records`/`companyMeta`/`reminders` always sits on disk in plaintext JSON — that's the offline
 fallback and the reason `.porterra/` must stay gitignored and local.
@@ -403,8 +473,10 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
   `Error('UNAUTHORIZED')` on 401 and `Error('FORBIDDEN')` on 403 — the exact strings
   `store.isUnauthorized` / `users.isUnauthorized` branch on. `serverOps.js` is the **server**
   orchestration moved verbatim out of `actions.js`: `tryOp`, `loadBootData` (MySQL→snapshot
-  fallback + writeSnapshot), `syncData` (replay queue in one transaction → `loadAllFromDb` →
-  snapshot), `importLeads` (per-record queue on DB-down), `resetData`, `authenticateUser`.
+  fallback + a fire-and-forget `writeSnapshot` — not awaited, with a per-call unique tmp file so
+  concurrent boots can't interleave), `syncData` (replay queue in one transaction → `loadAllFromDb` →
+  snapshot), `importLeads` (per-record queue on DB-down), `authenticateUser`. `checkLeadScope` / `checkReminderScope`
+refuse with a **`400 VALIDATION` message, never 403** (the client treats 403 as "logged out").
   `loadBootData(user)`/`syncData(user)` additionally resolve `resolveScope(user)` (`{type:'all'}`
   for elevated, `{type:'department', agentCodes}` for a manager via `listAgentCodesByDepartment`,
   `{type:'own', agentCode}` for an agent — fails closed to an empty set on a lookup error) and run
@@ -449,7 +521,14 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
 `applyOp`'s transaction; otherwise runs on the pool). Coverage:
 - **`contacts`** (table name kept as-is — "leads" in the app layer, `contacts` is the physical
   MySQL table, deliberately not renamed to avoid a DB migration): `listLeads`, `getLeadById`,
-  `createLead` (upsert), `updateLead`, `deleteLead`. Holds the 8 quote/deactivation columns
+  `createLead` / the bulk `upsertLeads` (**insert-only**: `ON DUPLICATE KEY UPDATE id=id`, so an offline-queue
+  replay or a crafted id can never overwrite an existing lead; `createProduct`/`createCategory` swallow only a
+  duplicate of their OWN id on replay, a genuine duplicate name still errors), `updateLead`, `deleteLead`. Also holds `temperature` (`'hot'|'warm'|'cold'|NULL`,
+  the manual lead-temperature override; every query selects it explicitly, so the column must exist —
+  `db/schema.sql`/the production fix scripts add it). The override is **company-level but stored on rows**:
+  `store.js`'s `setCompanyTemperature(company, temp)` writes it to the company's latest row (or clears
+  it on every row), and `companies()` reads the first non-null newest-first, so a newer call never loses
+  an older override (deleting the one row that carries it does drop it — set it again). Holds the 8 quote/deactivation columns
   (`deactivate_reason`, `quote_price`, `quote_price_type`, `quote_terms`, `quote_price_date`,
   `quote_result`, `quote_result_date`, `quote_fail_reason`) added for the inquiry workflow —
   `quote_price_date`/`quote_result_date` are `dd.mm.yyyy` VARCHAR like `date`, not SQL `DATE`, to
@@ -457,7 +536,7 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
   `updateLead` maps camelCase patch keys to snake_case columns via the `LEAD_UPDATE` `{k, col}`
   array (the multi-word quote fields don't collapse to their column name the way the single-word
   legacy fields did).
-- **`customer_activity`**: `listActivity`, `getActivityById`, `createActivity` (upsert), `updateActivity`, `deleteActivity`.
+- **`customer_activity`**: `listActivity`, `getActivityById`, `createActivity` (upsert — so routes must refuse an existing id before calling it), `updateActivity` (text only), `deleteActivity`. It also holds the messenger channel: rows with `type='message'`, `company_key='#public'`, read only through `listMessages(since)` (latest 200, ascending) and written by the `addMessage` op (message + mention notifications in one transaction). **Every general read excludes them** (`listActivity` and `loadAllFromDb` filter `type<>'message'`; `renameCompany`/`deleteCompany` skip them) so chat never reaches `companyMeta`, the boot payload or `snapshot.json`.
 - **`reminders`**: `listReminders`, `getReminderById`, `createReminder` (upsert), `updateReminder`, `deleteReminder`.
 - **`notifications`** (added 2026-09-09, new table — see `db/README.md`'s Migration history):
   persistent per-agent notifications, distinct from `reminders` (due-date follow-ups). `listNotifications`,
@@ -485,7 +564,7 @@ used to live in `offline.js` are now inlined into `serverOps.js` — see below.)
   route through the new `applyOp` case `updateLeadWithNotification` (wraps the existing `updateLead`
   + a `createNotification`, transaction-wrapped like `deleteLead`) instead of touching the plain
   `updateLead` case — **`updateLead` itself was deliberately left untouched**, so every other caller
-  (quick-calls, the edit form, `EMPTY_RECORD_PATCH` blanking, bulk import) is unaffected; a
+  (quick-calls, the edit form, bulk import) is unaffected; a
   regression test confirmed a plain `updateLead` call creates zero notifications. `POST /api/activity`
   similarly extends the existing `addComment` case with an optional `payload.notification` — omitted,
   it's byte-identical to the pre-existing behavior. All 3 hook points were verified end-to-end against
@@ -551,7 +630,7 @@ only present keys (absent = unchanged). **`applyOp` is the offline-queueable mut
 and calls these same functions** — client-driven writes go through it (via `tryOp` in
 `serverOps.js`) so a DB-down mutation lands in the `/.porterra/queue.json` queue; do not call the
 `create/update/delete*` functions directly from an API route for client mutations unless you
-also wire the offline path. `loadAllFromDb` + `reseedLeads` are bulk read/reset, not CRUD.
+also wire the offline path. `loadAllFromDb` is the bulk read, not CRUD.
 Row⇄object mapping lives in `mappers.js` (`rowToLead`/`rowToActivity`/`rowToReminder`/`rowToUser`
 + `*ToRow`); the `*_COLS` arrays there are the single source of truth for column order.
 `models.js` holds the Zod schemas (`*Create`/`*Update`, `Id`, `LoginInput`) every API route
@@ -567,7 +646,18 @@ in place, so clicking a chart bar after any prior filter was active could AND th
 and show zero rows). If you add a new chart click-to-filter interaction, copy the pattern
 from an existing `applyXFilter`, including the reset of unrelated fields — don't just call
 `setFilters`/`setChartFilter` directly from a component.
-`ui.filters` (`DEFAULT_FILTERS`) is shared, global state, not per-page — `/leads`'
+`openProfile(id, quickCall = false, tab = 'form')` also takes the profile modal's starting tab
+(`ui.profileTab`, reset on close) — a comment notification/banner opens `'correspondence'`, so the
+comment is on screen instead of hidden behind the form tab. Comment edit/delete is
+`store.updateComment/deleteComment(key, id, …)` (author or elevated, enforced server-side).
+`applyLeadFilter(partial)` is the one way a card/KPI/agent-row click opens a list: it resets
+`chartFilter` and sets `{...DEFAULT_FILTERS, ...partial}`, so the list count equals the card
+(the old `applyKpiFilter` and `getFiltered`'s `type:'kpi'` branch are gone). While on `/leads`,
+`setFilters` mirrors the filters to the URL with `history.replaceState`
+(`?agent=&status=&temp=&cat=&source=&product=&from=&to=&q=`, list values comma-joined) and
+`/leads` calls `hydrateFiltersFromUrl()` on mount (only when the URL has a query), so a refreshed or
+shared link keeps its filter; a chart `chartFilter` is not mirrored and does not survive a shared link.
+`ui.filters` (`DEFAULT_FILTERS`, now including `temp`) is shared, global state, not per-page — `/leads`'
 `LeadFilters` (multi-select `coordinator`, via `Dropdown`'s `multiple` mode) and `/agents`'
 `AgentsPanel` chip row (`setCoordinatorFilter`, exposed as `activeCoordinator`/
 `onToggleCoordinator` in `src/app/agents/page.js`) read/write the exact same

@@ -1,8 +1,9 @@
 'use client';
+import { useMemo } from 'react';
 import { computeFunnelStages } from '../../lib/analytics.js';
 
-export default function FunnelChart({ records }) {
-  const { stages, leadConversionRate, quoteToSaleRate } = computeFunnelStages(records);
+export default function FunnelChart({ records, callFilters }) {
+  const { stages, leadConversionRate, quoteToSaleRate, quoteTotal } = useMemo(() => computeFunnelStages(records, callFilters), [records, callFilters]);
   return (
     <div className="crm-section" id="crmFunnel">
       <div className="crm-section-title">قیف فروش</div>
@@ -18,8 +19,8 @@ export default function FunnelChart({ records }) {
         </div>
       ))}
       <div className="crm-funnel-rates">
-        <span>نرخ تبدیل سرنخ: {leadConversionRate}٪</span>
-        <span>نرخ تبدیل استعلام به فروش: {quoteToSaleRate}٪</span>
+        <span title="مشتریان ÷ کل شرکت‌ها">نرخ تبدیل سرنخ: {leadConversionRate}٪</span>
+        <span title="استعلام موفق ÷ (موفق + ناموفق + در جریان)">نرخ تبدیل استعلام به فروش: {quoteTotal ? quoteToSaleRate + '٪' : '—'}</span>
       </div>
     </div>
   );

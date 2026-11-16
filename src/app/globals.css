@@ -585,6 +585,37 @@ table.crm-table { width: 100%; border-collapse: collapse; font-size: 12.5px; min
 .crm-status-badge.-success { background: var(--good-bg); color: var(--good); border-color: var(--good-line); }
 .crm-status-badge.-fail { background: var(--rust-bg); color: var(--rust); border-color: var(--rust-line); }
 .crm-status-badge.-progress { background: var(--info-bg); color: var(--info); border-color: var(--info-line); }
+.crm-stack-bar { display: flex; height: 8px; border-radius: 8px; overflow: hidden; margin-top: 6px; background: var(--line); }
+.crm-stack-bar span { min-width: 3px; }
+.crm-product-chart { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 14px; }
+.crm-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin: 12px 0; }
+.crm-cal-dow { text-align: center; font-size: 11px; color: var(--muted); padding: 4px 0; }
+.crm-cal-cell { background: var(--custom-neutral-light); border: 1px solid var(--custom-third-light); border-radius: 8px; min-height: 92px; padding: 6px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+.crm-root.-dark .crm-cal-cell { background: var(--google-first-dark); }
+.crm-cal-cell.-out { opacity: 0.45; }
+.crm-cal-cell.-today { border-color: var(--accent); }
+.crm-cal-cell.-selected, .crm-root.-dark .crm-cal-cell.-selected { background: var(--accent-soft); }
+.crm-cal-event { cursor: pointer; }
+.crm-kpis.crm-kpis-3 { grid-template-columns: repeat(3, 1fr); }
+.crm-row-link { cursor: pointer; }
+.crm-row-link:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.crm-cal-grid.-day { grid-template-columns: 1fr; }
+.crm-feed-list.-scroll { max-height: 420px; overflow-y: auto; }
+.crm-feed-text { white-space: pre-wrap; }
+.crm-skeleton.-sm { height: 96px; }
+.crm-skeleton.-lg { height: 280px; }
+.crm-cal-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.crm-cal-day { font-size: 12px; font-weight: 600; color: var(--ink-soft); font-family: var(--font-mono); }
+.crm-cal-chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; display: block; font-size: 10.5px; padding: 1px 6px; }
+.crm-cal-more { font-size: 10.5px; color: var(--muted); }
+.crm-cal-legend { margin-inline-start: auto; display: flex; gap: 6px; }
+@media (max-width: 640px) { .crm-cal-cell { min-height: 64px; padding: 4px; } .crm-cal-chip { font-size: 9.5px; padding: 0 4px; } }
+.crm-skeleton-page { display: flex; flex-direction: column; gap: 16px; padding: 16px 24px; }
+.crm-skeleton { background: var(--custom-third-mid); border-radius: 8px; animation: crm-skeleton-pulse 1.4s ease-in-out infinite; }
+.crm-root.-dark .crm-skeleton { background: var(--google-second-dark); }
+@keyframes crm-skeleton-pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .crm-skeleton { animation: none; } }
+.crm-status-badge.-warn { background: var(--warn-bg); color: var(--warn); border-color: var(--warn-line); }
 .crm-status-badge.-none { background: transparent; color: var(--muted); border-color: var(--line); }
 
 .crm-user-role { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 100px; font-size: 11px; font-weight: 600; letter-spacing: 0.025em; white-space: nowrap; border: 1px solid transparent; }
@@ -861,6 +892,9 @@ html.crm-modal-open .crm-main { overflow: hidden; }
 .crm-agent-report-name { font-weight: 600; font-size: 14px; }
 .crm-agent-report-total { margin-inline-start: auto; font-size: 11px; color: var(--muted); font-family: var(--font-mono); }
 .crm-agent-report-row { display: flex; align-items: center; gap: 8px; font-size: 11.5px; margin-bottom: 7px; }
+.crm-agent-report-row.-link { cursor: pointer; }
+.crm-agent-report-row.-link:hover b { color: var(--accent); }
+.crm-agent-report-row.-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
 .crm-agent-report-row span:first-child { width: 64px; flex: none; color: var(--ink-soft); }
 .crm-agent-report-bar-wrap { flex: 1; background: var(--paper); border-radius: 8px; overflow: hidden; height: 12px; border: 1px solid var(--line); }
 .crm-agent-report-bar { height: 100%; background: var(--ink-soft); border-radius: 8px; transition: width 400ms var(--md-motion); }
@@ -938,30 +972,6 @@ html.crm-modal-open .crm-main { overflow: hidden; }
 
 .crm-footer { padding: 16px 24px 22px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
 .crm-footer-note { font-size: 11px; color: var(--muted); }
-.crm-reset-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: var(--surface);
-  color: var(--label-rust);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 10px 20px;
-  font-family: var(--font-fa);
-  font-weight: 500;
-  font-size: 13px;
-  cursor: pointer;
-  white-space: nowrap;
-  box-shadow: var(--md-elevation-1);
-  transition: transform 250ms var(--md-motion), box-shadow 250ms var(--md-motion), background-color 250ms var(--md-motion), border-color 250ms var(--md-motion);
-}
-.crm-reset-btn:hover {
-  background: var(--rust-bg);
-  border-color: var(--rust-line);
-  box-shadow: var(--md-elevation-2);
-  transform: translateY(-1px);
-}
 
 .crm-toast {
   position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px);
@@ -1046,7 +1056,8 @@ html.crm-modal-open .crm-main { overflow: hidden; }
   table.crm-table { min-width: 0; font-size: 11.5px; }
   table.crm-table th:nth-child(4), table.crm-table td:nth-child(4),
   table.crm-table th:nth-child(5), table.crm-table td:nth-child(5),
-  table.crm-table th:nth-child(8), table.crm-table td:nth-child(8) { display: none; }
+  table.crm-table th:nth-child(9), table.crm-table td:nth-child(9),
+  table.crm-table th:nth-child(10), table.crm-table td:nth-child(10) { display: none; }
   table.crm-table th, table.crm-table td { padding: 8px 6px; }
   .crm-edit-btn, .crm-delete-btn { padding: 5px 8px; font-size: 10.5px; margin-inline-start: 4px; }
   .crm-modal { max-width: 100% !important; max-height: 94vh; border-radius: 8px 8px 0 0; }

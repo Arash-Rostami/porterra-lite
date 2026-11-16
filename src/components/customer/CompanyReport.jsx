@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import Utils from '../../lib/utils.js';
 import CompanySuggest from '../ui/CompanySuggest.jsx';
+import Dropdown from '../ui/Dropdown.jsx';
+import { productStats, productColor, UNKNOWN_PRODUCT } from '../../lib/productStats.js';
 import CompanyActivityTabs, { COMPANY_ACTIVITY_TABS } from './CompanyActivityTabs.jsx';
 import { coordLabel, coordClass, statusBadgeInfo } from '../../lib/filters.js';
 import { custKey, useStore, getUnifiedFeed } from '../../lib/store.js';
@@ -63,6 +65,11 @@ export default function CompanyReport({ records, reminders, onMarkReminderDone, 
   const [page, setPage] = useState(1);
   const [companyListPage, setCompanyListPage] = useState(1);
   const [activityTab, setActivityTab] = useState('history');
+  const [productFilter, setProductFilter] = useState([]);
+  const products = useStore((s) => s.products);
+  const productNames = useMemo(() => products.map((p) => p.name), [products]);
+  const stats = useMemo(() => productStats(records, productNames), [records, productNames]);
+  const topProducts = useMemo(() => Array.from(stats.total.entries()).filter(([name]) => name !== UNKNOWN_PRODUCT).sort((a, b) => b[1] - a[1]).slice(0, 10), [stats]);
   const report = query ? buildReport(records, query, calendar) : null;
   const historyPage = report && !report.empty ? paginate(report.sorted, page, PER_PAGE) : null;
   const reportKey = report && !report.empty ? custKey(report.displayName) : null;
@@ -90,12 +97,24 @@ export default function CompanyReport({ records, reminders, onMarkReminderDone, 
       const name = Utils.normSpace(r.company);
       if (!name) continue;
       const key = custKey(r.company);
-      if (!seen.has(key)) seen.set(key, { name, count: 0 });
+      if (!seen.has(key)) seen.set(key, { name, count: 0, products: stats.byCompany.get(key) || {} });
       seen.get(key).count++;
     }
     return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [records]);
-  const companyListPaged = paginate(companies, companyListPage, COMPANY_LIST_PAGE_SIZE);
+  }, [records, stats]);
+  const shownCompanies = useMemo(
+    () => (productFilter.length ? companies.filter((c) => productFilter.some((p) => c.products[p])) : companies),
+    [companies, productFilter],
+  );
+  const companyListPaged = paginate(shownCompanies, companyListPage, COMPANY_LIST_PAGE_SIZE);
+
+  function changeProductFilter(v) {
+    setProductFilter(v);
+    setCompanyListPage(1);
+  }
+  function toggleProduct(name) {
+    changeProductFilter(productFilter.includes(name) ? productFilter.filter((p) => p !== name) : [...productFilter, name]);
+  }
 
   function runQuery(v) {
     setQuery(v);
@@ -123,17 +142,41 @@ export default function CompanyReport({ records, reminders, onMarkReminderDone, 
           <div className="crm-section" style={{ marginTop: 8 }}>
             <div className="crm-section-title-row">
               <div className="crm-section-title">فهرست شرکت‌ها</div>
-              <span className="crm-result-count">{companies.length.toLocaleString('en-US')} شرکت</span>
+              <span className="crm-result-count">
+                {shownCompanies.length === companies.length
+                  ? `${companies.length.toLocaleString('en-US')} شرکت`
+                  : `${shownCompanies.length.toLocaleString('en-US')} نتیجه از ${companies.length.toLocaleString('en-US')}`}
+              </span>
             </div>
+            <div className="crm-toolbar">
+              <Dropdown multiple value={productFilter} onChange={changeProductFilter} options={[...productNames, UNKNOWN_PRODUCT]} placeholder="همه محصولات" />
+            </div>
+            {topProducts.length > 0 && (
+              <div className="crm-product-chart">
+                {topProducts.map(([name, n]) => (
+                  <div className="crm-funnel-row" key={name} role="button" tabIndex={0} style={{ cursor: 'pointer', opacity: productFilter.length && !productFilter.includes(name) ? 0.45 : 1 }}
+                    onClick={() => toggleProduct(name)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleProduct(name); } }}>
+                    <div className="crm-funnel-label">{name}</div>
+                    <div className="crm-funnel-bar-wrap">
+                      <div className="crm-funnel-bar" style={{ width: Math.max(Math.round((n / topProducts[0][1]) * 100), 4) + '%', background: productColor(name) }}>{n.toLocaleString('en-US')}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="crm-history-list" style={{ maxHeight: 'none' }}>
-              {!companies.length ? (
-                <div className="crm-feed-empty">شرکتی ثبت نشده است</div>
+              {!shownCompanies.length ? (
+                <div className="crm-feed-empty">شرکتی برای این محصول پیدا نشد</div>
               ) : companyListPaged.pageItems.map((c) => (
                 <div className="crm-history-item" key={c.name} onClick={() => { setInput(c.name); runQuery(c.name); }}>
                   <div className="crm-history-item-top">
                     <span><b>{c.name}</b></span>
                     <span style={{ fontSize: 11, color: 'var(--muted)' }}>{c.count.toLocaleString('en-US')} تماس</span>
                   </div>
+                  <div className="crm-stack-bar">
+                    {Object.entries(c.products).map(([p, n]) => <span key={p} title={`${p}: ${n}`} style={{ flex: n, background: productColor(p) }} />)}
+                  </div>
+                  <div className="crm-history-item-notes">{Object.entries(c.products).sort((a, b) => b[1] - a[1]).map(([p, n]) => `${p} (${n})`).join('، ')}</div>
                 </div>
               ))}
             </div>

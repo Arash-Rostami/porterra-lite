@@ -7,18 +7,19 @@ import DateField from '../ui/DateField.jsx';
 import ProductField from './ProductField.jsx';
 import Utils from '../../lib/utils.js';
 import { findDuplicateCompany, findDuplicatePhone } from '../../lib/duplicates.js';
-import { scopedCoordOptions, coordLabel, RESULT_OPTS, PRIORITY_OPTS, sourceSuggestions } from '../../lib/filters.js';
+import { scopedCoordOptions, coordLabel, RESULT_OPTS, SOURCE_OPTS, sourceSuggestions } from '../../lib/filters.js';
 import { findLeadByCompany } from '../../lib/apiClient.js';
 import { useStore } from '../../lib/store.js';
 import { toast } from '../ui/Toast.jsx';
 import { CheckIcon, XCircleIcon } from '../ui/Icon.jsx';
 
-const empty = { coordinator: '', company: '', name: '', phone: '', product: '', categoryId: '', source: '', date: '', price: '', result: '', priority: 'پایین', notes: '', deactivateReason: '' };
+const empty = { coordinator: '', company: '', name: '', phone: '', product: '', categoryId: '', source: '', date: '', result: '', notes: '', deactivateReason: '' };
 
 // create and edit share the same <Modal> chrome for UI consistency
 export default function AddLeadForm({ open, records, defaultCoordinator, onSubmit, onCancel }) {
   const [f, setF] = useState(empty);
   const currentUser = useStore((s) => s.currentUser);
+  const canTypeSource = !!currentUser && (currentUser.role === 'admin' || currentUser.role === 'developer');
   const categories = useStore((s) => s.categories);
   const categoryOptions = useMemo(() => categories.map((c) => ({ value: c.id, label: c.name })), [categories]);
   const sourceOpts = useMemo(() => sourceSuggestions(records), [records]);
@@ -50,7 +51,7 @@ export default function AddLeadForm({ open, records, defaultCoordinator, onSubmi
         phone: s.phone || lead.phone || '',
         product: s.product || lead.product || '',
         categoryId: s.categoryId || lead.categoryId || '',
-        source: s.source || lead.source || '',
+        source: s.source || (canTypeSource || SOURCE_OPTS.includes(Utils.normSpace(lead.source)) ? lead.source || '' : ''),
       }));
       toast('اطلاعات این شرکت از سابقه قبلی پر شد — قابل ویرایش است');
     } catch {
@@ -64,8 +65,10 @@ export default function AddLeadForm({ open, records, defaultCoordinator, onSubmi
 
   function reset() { setF(empty); }
 
-  function submit() {
+  async function submit() {
     if (!f.coordinator || !f.company.trim()) { toast('کارشناس و نام شرکت الزامی است'); return; }
+    if (!f.product.trim() || !f.categoryId) { toast('محصول و دسته محصول الزامی است'); return; }
+    if (!Utils.isPhoneOk(f.phone)) { toast('شماره تلفن کامل نیست (حداقل ۱۰ رقم)'); return; }
     if (f.result === 'غیرفعال' && !f.deactivateReason.trim()) { toast('برای غیرفعال کردن، دلیل الزامی است'); return; }
     const rec = {
       id: 'NEW-' + Date.now() + '-' + Math.floor(Math.random() * 10000),
@@ -78,13 +81,11 @@ export default function AddLeadForm({ open, records, defaultCoordinator, onSubmi
       categoryId: f.categoryId || null,
       source: f.source.trim() || null,
       date: (f.date ? Utils.fromISODate(f.date) : '') || Utils.todayDdMmYyyy(),
-      price: f.price.trim() || null,
       result: f.result || null,
-      priority: f.priority || null,
       notes: f.notes.trim() || null,
       deactivateReason: f.result === 'غیرفعال' ? f.deactivateReason.trim() : null,
     };
-    onSubmit(rec);
+    if (!(await onSubmit(rec))) return;
     reset();
     toast('سرنخ جدید ثبت شد');
   }
@@ -131,33 +132,31 @@ export default function AddLeadForm({ open, records, defaultCoordinator, onSubmi
           {phoneDup && <div className="crm-dup-warning -show">{phoneDup}</div>}
         </div>
         <div className="crm-field">
-          <label>محصول</label>
+          <label>محصول *</label>
           <ProductField value={f.product} onChange={set('product')} onCategorySelect={(cid) => setF((s) => (s.categoryId ? s : { ...s, categoryId: cid }))} />
         </div>
         <div className="crm-field">
-          <label>دسته محصول</label>
+          <label>دسته محصول *</label>
           <Dropdown value={f.categoryId} onChange={set('categoryId')} options={categoryOptions} placeholder="انتخاب کنید" />
         </div>
         <div className="crm-field">
           <label>منبع سرنخ</label>
-          <input className="crm-input" list="crm-src-add" value={f.source} onChange={setInput('source')} maxLength={64} placeholder="منبع سرنخ" />
-          <datalist id="crm-src-add">{sourceOpts.map((s) => <option key={s} value={s} />)}</datalist>
+          {canTypeSource ? (
+            <>
+              <input className="crm-input" list="crm-src-add" value={f.source} onChange={setInput('source')} maxLength={64} placeholder="منبع سرنخ" />
+              <datalist id="crm-src-add">{sourceOpts.map((s) => <option key={s} value={s} />)}</datalist>
+            </>
+          ) : (
+            <Dropdown value={f.source} onChange={set('source')} options={SOURCE_OPTS} placeholder="انتخاب کنید" />
+          )}
         </div>
         <div className="crm-field">
           <label>تاریخ تماس</label>
           <DateField className="crm-input crm-mono" value={f.date} onChange={set('date')} />
         </div>
         <div className="crm-field">
-          <label>آخرین قیمت اعلامی</label>
-          <input className="crm-input crm-mono" value={f.price} onChange={setInput('price')} placeholder="اختیاری" />
-        </div>
-        <div className="crm-field">
           <label>نتیجه</label>
           <Dropdown value={f.result} onChange={set('result')} options={RESULT_OPTS} placeholder="انتخاب کنید" />
-        </div>
-        <div className="crm-field">
-          <label>اولویت</label>
-          <Dropdown value={f.priority} onChange={set('priority')} options={PRIORITY_OPTS} placeholder="انتخاب کنید" />
         </div>
         <div className="crm-field -span3">
           <label>یادداشت</label>
