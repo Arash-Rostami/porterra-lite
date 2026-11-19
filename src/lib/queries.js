@@ -416,6 +416,10 @@ export async function findUserByEmail(email, conn) {
     const rows = await exec(conn, `SELECT ${USER_SELECT} FROM \`users\` WHERE \`email\`=? LIMIT 1`, [email]);
     return rows && rows[0] ? rows[0] : null;
 }
+export async function findUsersByNormalizedEmail(email, conn) {
+    if (!email) return [];
+    return (await exec(conn, `SELECT ${USER_SAFE_SELECT} FROM \`users\` WHERE LOWER(TRIM(\`email\`))=? LIMIT 2`, [email])) || [];
+}
 export async function createUser(row, conn) {
     const sql = `INSERT INTO \`users\` (\`${USER_COLS.join('`,`')}\`) VALUES (${ph(USER_COLS.length)})`;
     await exec(conn, sql, USER_COLS.map((c) => row[c]));

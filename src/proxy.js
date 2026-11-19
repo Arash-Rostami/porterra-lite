@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import { SESSION_COOKIE_NAME, readSessionToken } from './lib/crypto.js';
+import { SESSION_COOKIE_NAME, readSessionToken, ssoOrigins } from './lib/crypto.js';
+
+const framed = (res) => {
+  res.headers.set('Content-Security-Policy', `frame-ancestors 'self' ${ssoOrigins().join(' ')}`.trim());
+  return res;
+};
 
 export async function proxy(req) {
   const { pathname } = req.nextUrl;
@@ -7,17 +12,17 @@ export async function proxy(req) {
   const session = readSessionToken(token);
   const isLogin = pathname === '/login';
 
-  if (!session && !isLogin) {
+  if (!session && !isLogin && pathname !== '/sso/receive') {
     const url = req.nextUrl.clone();
     url.pathname = '/login';
-    return NextResponse.redirect(url);
+    return framed(NextResponse.redirect(url));
   }
   if (session && isLogin) {
     const url = req.nextUrl.clone();
     url.pathname = '/dashboard';
-    return NextResponse.redirect(url);
+    return framed(NextResponse.redirect(url));
   }
-  return NextResponse.next();
+  return framed(NextResponse.next());
 }
 
 export const config = {

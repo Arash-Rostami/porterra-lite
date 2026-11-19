@@ -56,6 +56,32 @@ If you add a new top-level convention (a new shared pattern, a new table, a
 new route group), update the relevant doc in this map rather than leaving it
 undocumented — that's the whole point of this map staying accurate.
 
+## SSO receiver
+
+`POST /sso/receive` (`src/app/sso/receive/route.js`) logs a Fateh user in from a
+signed assertion; token logic lives in `src/lib/ssoToken.js` (byte-identical copy
+of the AI project's `utils/ssoToken.js` — change both or neither).
+
+- **Env:** `SSO_TENANT` (Fateh tenant name), `SSO_AUDIENCE`, `SSO_PUBLIC_KEYS` (comma-separated),
+  `SSO_ORIGIN` (comma-separated origins, each trimmed and trailing-slash stripped; parsed by `ssoOrigins()` in `src/lib/crypto.js`).
+  Any missing/empty = receiver disabled (generic 403, reason `config`).
+  Production dashboard example: `SSO_ORIGIN=https://team.bmsflow.org`.
+- **Testing from a local Fateh:** add its public key to `SSO_PUBLIC_KEYS` (comma list) and its origin to `SSO_ORIGIN`
+  (e.g. `https://team.bmsflow.org,http://127.0.0.1:8000`), then remove both afterwards.
+- **Framing in Fateh's pinned pane:** the host adds `X-Frame-Options: SAMEORIGIN`, which makes the browser say «refused to connect» inside the pane. `src/proxy.js` therefore sets `Content-Security-Policy: frame-ancestors 'self' <origins>` on every response, with the origins read at runtime from `SSO_ORIGIN` (comma-separated, e.g. `https://team.bmsflow.org,http://127.0.0.1:8000`; only `'self'` when empty); browsers ignore `X-Frame-Options` when `frame-ancestors` is present. The `Origin` check below accepts the same list.
+- **Order:** rate limit (20/min per last `x-forwarded-for` hop, in-memory Map,
+  429 page) → config → exact `Origin` header match against `SSO_ORIGIN` (login-CSRF
+  defence, reason `origin`) → form parse → token verify → replay check (`jti`
+  Map, single instance only) → user lookup.
+- **Match:** by normalized email only; inactive or ambiguous = denied.
+- **Success is two steps:** the POST verifies everything, stores a one-time
+  random code (in-memory Map, 30 s, single instance) and answers 303 to
+  `GET /sso/receive?c=<code>` WITHOUT any cookie; the GET consumes the code,
+  loads the user, calls `createSession` and answers 303 to `safeNext(next)`.
+  Reason: Chrome drops a `SameSite=Lax` cookie set by the response to a
+  cross-site form POST (unsafe method), so the user landed on `/login`; a GET
+  navigation may set it. Do not move `createSession` back into the POST.
+
 ## Agentic pipeline policy
 
 - **Read skills first, always.** On the very first turn of every session, before any

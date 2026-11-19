@@ -38,6 +38,10 @@ export function decryptString(payload) {
   }
 }
 
+export function ssoOrigins() {
+  return (process.env.SSO_ORIGIN || '').split(',').map((o) => o.trim().replace(/\/+$/, '')).filter(Boolean);
+}
+
 const SESSION_COOKIE = 'crm_session';
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
